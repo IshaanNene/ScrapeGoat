@@ -100,12 +100,12 @@ func runAICrawl(cmd *cobra.Command, args []string) error {
 
 	llmAvailable := err == nil && strings.TrimSpace(resp) != ""
 	if llmAvailable {
-		fmt.Printf("   ✅ LLM connected: %q\n", strings.TrimSpace(resp))
+		fmt.Printf("     LLM connected: %q\n", strings.TrimSpace(resp))
 	} else {
 		if err != nil {
-			fmt.Printf("   ⚠️  LLM not reachable: %v\n", err)
+			fmt.Printf("     LLM not reachable: %v\n", err)
 		} else {
-			fmt.Printf("   ⚠️  LLM returned empty response — model '%s' may not be installed.\n", llmModel)
+			fmt.Printf("     LLM returned empty response — model '%s' may not be installed.\n", llmModel)
 			fmt.Printf("   Run: ollama list   to see installed models\n")
 		}
 		fmt.Println("   Running without AI processing (extraction only)")

@@ -199,14 +199,14 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		"bytes", stats["bytes_downloaded"],
 	)
 
-	fmt.Printf("\n✅ Crawl complete in %s\n", elapsed.Round(time.Millisecond))
+	fmt.Printf("\n  Crawl complete in %s\n", elapsed.Round(time.Millisecond))
 	fmt.Printf("   Requests:  %v sent, %v failed\n", stats["requests_sent"], stats["requests_failed"])
 	fmt.Printf("   Items:     %v scraped, %v dropped\n", stats["items_scraped"], stats["items_dropped"])
 	fmt.Printf("   Data:      %v bytes downloaded\n", stats["bytes_downloaded"])
 	fmt.Printf("   Output:    %s\n", cfg.Storage.OutputPath)
 
 	if stats["items_scraped"] == int64(0) {
-		fmt.Println("\n💡 No items were scraped. The crawl command discovers and follows links by default.")
+		fmt.Println("\n  No items were scraped. The crawl command discovers and follows links by default.")
 		fmt.Println("   For automatic content extraction, try:")
 		fmt.Println("     scrapegoat search <url>      — extract title, headings, body text, meta")
 		fmt.Println("     scrapegoat ai-crawl <url>    — AI-powered summarize, NER, sentiment")

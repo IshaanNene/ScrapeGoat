@@ -176,7 +176,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("all seeds were filtered or blocked — check URLs and robots.txt")
 	}
 
-	fmt.Printf("🔍 Search Engine Crawler\n")
+	fmt.Printf("  Search Engine Crawler\n")
 	fmt.Printf("   Seeds: %v\n", args)
 	fmt.Printf("   Config: %d workers, depth %d, max %d pages\n\n", searchConcurrent, searchDepth, searchMaxPages)
 
@@ -195,7 +195,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	eng.Wait()
 
 	stats := eng.Stats().Snapshot()
-	fmt.Printf("\n✅ Search index built in %s\n", time.Since(start).Round(time.Millisecond))
+	fmt.Printf("\n  Search index built in %s\n", time.Since(start).Round(time.Millisecond))
 	fmt.Printf("   Pages indexed: %v\n", stats["items_scraped"])
 	fmt.Printf("   Pages crawled: %v\n", stats["requests_sent"])
 	fmt.Printf("   Data: %v bytes\n", stats["bytes_downloaded"])
