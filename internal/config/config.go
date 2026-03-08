@@ -9,15 +9,19 @@ var Version = "dev"
 
 // Config is the root configuration for ScrapeGoat.
 type Config struct {
-	Engine   EngineConfig   `mapstructure:"engine"   yaml:"engine"`
-	Fetcher  FetcherConfig  `mapstructure:"fetcher"  yaml:"fetcher"`
-	Proxy    ProxyConfig    `mapstructure:"proxy"    yaml:"proxy"`
-	Parser   ParserConfig   `mapstructure:"parser"   yaml:"parser"`
-	Pipeline PipelineConfig `mapstructure:"pipeline" yaml:"pipeline"`
-	Storage  StorageConfig  `mapstructure:"storage"  yaml:"storage"`
-	AI       AIConfig       `mapstructure:"ai"       yaml:"ai"`
-	Logging  LoggingConfig  `mapstructure:"logging"  yaml:"logging"`
-	Metrics  MetricsConfig  `mapstructure:"metrics"  yaml:"metrics"`
+	Engine      EngineConfig          `mapstructure:"engine"      yaml:"engine"`
+	Fetcher     FetcherConfig         `mapstructure:"fetcher"     yaml:"fetcher"`
+	Proxy       ProxyConfig           `mapstructure:"proxy"       yaml:"proxy"`
+	Parser      ParserConfig          `mapstructure:"parser"      yaml:"parser"`
+	Pipeline    PipelineConfig        `mapstructure:"pipeline"    yaml:"pipeline"`
+	Storage     StorageConfig         `mapstructure:"storage"     yaml:"storage"`
+	AI          AIConfig              `mapstructure:"ai"          yaml:"ai"`
+	Logging     LoggingConfig         `mapstructure:"logging"     yaml:"logging"`
+	Metrics     MetricsConfig         `mapstructure:"metrics"     yaml:"metrics"`
+	Browser     BrowserConfig         `mapstructure:"browser"     yaml:"browser"`
+	Distributed DistributedConfig     `mapstructure:"distributed" yaml:"distributed"`
+	Middleware  MiddlewareGroupConfig `mapstructure:"middleware" yaml:"middleware"`
+	Project     ProjectConfig         `mapstructure:"project"     yaml:"project"`
 }
 
 // EngineConfig controls the core crawler engine.
@@ -163,5 +167,52 @@ func DefaultConfig() *Config {
 			Port:    9090,
 			Path:    "/metrics",
 		},
+		Browser: BrowserConfig{
+			Render:      false,
+			BrowserType: "chromium",
+			Headless:    true,
+			WaitTime:    3 * time.Second,
+		},
+		Distributed: DistributedConfig{
+			Enabled:    false,
+			MasterAddr: ":8081",
+			RedisAddr:  "localhost:6379",
+		},
 	}
+}
+
+// BrowserConfig controls headless browser rendering.
+type BrowserConfig struct {
+	Render      bool          `mapstructure:"render"       yaml:"render"`
+	BrowserType string        `mapstructure:"browser_type" yaml:"browser_type"`
+	Headless    bool          `mapstructure:"headless"     yaml:"headless"`
+	WaitTime    time.Duration `mapstructure:"wait_time"    yaml:"wait_time"`
+}
+
+// DistributedConfig controls distributed crawling.
+type DistributedConfig struct {
+	Enabled    bool   `mapstructure:"enabled"     yaml:"enabled"`
+	MasterAddr string `mapstructure:"master_addr" yaml:"master_addr"`
+	RedisAddr  string `mapstructure:"redis_addr"  yaml:"redis_addr"`
+	RedisDB    int    `mapstructure:"redis_db"    yaml:"redis_db"`
+	RedisKey   string `mapstructure:"redis_key"   yaml:"redis_key"`
+}
+
+// MiddlewareGroupConfig groups request and pipeline middleware configs.
+type MiddlewareGroupConfig struct {
+	Request []RequestMiddlewareConfig `mapstructure:"request" yaml:"request"`
+}
+
+// RequestMiddlewareConfig configures a single request middleware.
+type RequestMiddlewareConfig struct {
+	Name    string         `mapstructure:"name"    yaml:"name"`
+	Enabled bool           `mapstructure:"enabled" yaml:"enabled"`
+	Options map[string]any `mapstructure:"options" yaml:"options"`
+}
+
+// ProjectConfig holds project-level configuration.
+type ProjectConfig struct {
+	Name      string   `mapstructure:"name"       yaml:"name"`
+	Version   string   `mapstructure:"version"    yaml:"version"`
+	StartURLs []string `mapstructure:"start_urls" yaml:"start_urls"`
 }

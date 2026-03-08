@@ -1,26 +1,64 @@
-version: "3.9"
+version: "3.8"
 
 services:
-  # Redis: caching layer, distributed queue, pub/sub for worker coordination
+  master:
+    build: .
+    container_name: scrapegoat-master
+    command: ["master", "--addr", ":8081"]
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - scrapegoat
+
+  worker:
+    build: .
+    command: ["worker", "--master", "http://master:8081", "--capacity", "10"]
+    deploy:
+      replicas: 3
+    depends_on:
+      - master
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - scrapegoat
+
+  dashboard:
+    build: .
+    container_name: scrapegoat-dashboard
+    command: ["dashboard", "--addr", ":8080"]
+    ports:
+      - "8080:8080"
+    networks:
+      - scrapegoat
+
   redis:
     image: redis:7-alpine
+    container_name: scrapegoat-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - scrapegoat
 
-  # Postgres: structured storage for crawl results, job metadata, URL history
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: scrapegoat
-      POSTGRES_PASSWORD: scrapegoat
-      POSTGRES_DB: scrapegoat
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: scrapegoat-prometheus
     ports:
-      - "5432:5432"
+      - "9090:9090"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - scrapegoat
+
+networks:
+  scrapegoat:
+    driver: bridge
 
 volumes:
   redis_data:
-  postgres_data:
