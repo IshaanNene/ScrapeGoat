@@ -1,6 +1,7 @@
 version: "3.9"
 
 services:
+  # Redis: caching layer, distributed queue, pub/sub for worker coordination
   redis:
     image: redis:7-alpine
     ports:
@@ -8,6 +9,7 @@ services:
     volumes:
       - redis_data:/data
 
+  # Postgres: structured storage for crawl results, job metadata, URL history
   postgres:
     image: postgres:16-alpine
     environment:
@@ -19,14 +21,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  mongo:
-    image: mongo:7
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-
 volumes:
   redis_data:
   postgres_data:
-  mongo_data:

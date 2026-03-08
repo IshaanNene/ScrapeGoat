@@ -18,7 +18,7 @@ func main() {
 		scrapegoat.WithConcurrency(3),
 		scrapegoat.WithMaxDepth(0), // Single page
 		scrapegoat.WithDelay(1*time.Second),
-		scrapegoat.WithOutput("json", "./output/github"),
+		scrapegoat.WithOutput("json", "./output/github"),   
 		scrapegoat.WithAllowedDomains("github.com"),
 		scrapegoat.WithMaxRequests(5),
 	)

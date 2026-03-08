@@ -1,8 +1,8 @@
 # ScrapeGoat 🕷️
 
-**Next-generation, enterprise-grade web scraping and crawling toolkit written in Go.**
+**Production-ready web scraping and crawling toolkit written in Go.**
 
-ScrapeGoat combines the best of Scrapy, Colly, and modern crawler services into a single, high-performance platform.
+ScrapeGoat combines ideas from Scrapy, Colly, and modern crawler services into a single, high-performance platform with clean interfaces, concurrent workers, and a pluggable middleware pipeline.
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -25,6 +25,34 @@ ScrapeGoat combines the best of Scrapy, Colly, and modern crawler services into 
 |  **Proxy Rotation** | Round-robin / random with health checking |
 |  **Checkpoint Persistence** | Pause/resume crawls with atomic state |
 |  **Graceful Shutdown** | SIGINT/SIGTERM handling with state preservation |
+
+---
+
+## Architecture
+
+```mermaid
+graph LR
+    CLI-->Engine
+    Engine-->Scheduler
+    Scheduler-->Workers
+    Workers-->Fetcher
+    Fetcher-->Parser
+    Parser-->Pipeline
+    Pipeline-->Storage
+    Parser-.->|"new URLs"|Frontier
+    Frontier-.->Workers
+
+    style Engine fill:#E67E22,color:#fff
+    style Workers fill:#E67E22,color:#fff
+    style Fetcher fill:#9B59B6,color:#fff
+    style Parser fill:#1ABC9C,color:#fff
+    style Pipeline fill:#E74C3C,color:#fff
+    style Storage fill:#3498DB,color:#fff
+```
+
+Every major component is behind a Go interface — swap in custom fetchers, parsers, storage backends, or pipeline middleware.
+
+→ **[Full architecture documentation](docs/architecture.md)**
 
 ---
 
@@ -401,6 +429,12 @@ make clean      # Clean build artifacts
 make deps       # Download and tidy modules
 make docker-up  # Start dev services
 ```
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, testing, and PR guidelines.
 
 ---
 
