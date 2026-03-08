@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -58,6 +59,7 @@ Features:
 	rootCmd.AddCommand(crawlCmd())
 	rootCmd.AddCommand(searchCmd())
 	rootCmd.AddCommand(aiCrawlCmd())
+	rootCmd.AddCommand(newCmd())
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(configCmd())
 
@@ -317,4 +319,110 @@ func applyCLIOverrides(cfg *config.Config) {
 		}
 		cfg.Engine.AllowedDomains = domains
 	}
+}
+
+// newCmd creates the "new" subcommand for scaffolding spiders.
+func newCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "new [type] [name]",
+		Short: "Generate a new spider or project scaffold",
+		Long:  "Generate boilerplate code for a new spider using the Spider interface.",
+		Args:  cobra.ExactArgs(2),
+		RunE:  runNew,
+	}
+	return cmd
+}
+
+// runNew generates scaffold files.
+func runNew(cmd *cobra.Command, args []string) error {
+	scaffoldType := args[0]
+	name := args[1]
+
+	switch scaffoldType {
+	case "spider":
+		return generateSpider(name)
+	default:
+		return fmt.Errorf("unknown scaffold type %q (available: spider)", scaffoldType)
+	}
+}
+
+// generateSpider creates a new spider directory with boilerplate main.go.
+func generateSpider(name string) error {
+	dir := name
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create directory: %w", err)
+	}
+
+	mainFile := filepath.Join(dir, "main.go")
+	if _, err := os.Stat(mainFile); err == nil {
+		return fmt.Errorf("%s already exists", mainFile)
+	}
+
+	template := fmt.Sprintf(`package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/PuerkitoBio/goquery"
+	scrapegoat "github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat"
+)
+
+// %sSpider scrapes data from a target website.
+type %sSpider struct{}
+
+func (s *%sSpider) Name() string { return %q }
+
+func (s *%sSpider) StartURLs() []string {
+	return []string{
+		"https://example.com", // 👈 Replace with your target URL
+	}
+}
+
+func (s *%sSpider) Parse(resp *scrapegoat.Response) (*scrapegoat.SpiderResult, error) {
+	result := &scrapegoat.SpiderResult{}
+
+	// Extract data using CSS selectors
+	resp.Doc.Find("h1").Each(func(i int, sel *goquery.Selection) {
+		item := scrapegoat.NewItem(resp.URL)
+		item.Set("title", sel.Text())
+		result.Items = append(result.Items, item)
+	})
+
+	// Follow links (optional)
+	resp.Doc.Find("a[href]").Each(func(i int, sel *goquery.Selection) {
+		if href, ok := sel.Attr("href"); ok {
+			result.Follow = append(result.Follow, href)
+		}
+	})
+
+	return result, nil
+}
+
+func main() {
+	fmt.Println("Starting %s spider...")
+
+	err := scrapegoat.RunSpider(&%sSpider{},
+		scrapegoat.WithConcurrency(5),
+		scrapegoat.WithMaxDepth(2),
+		scrapegoat.WithOutput("json", "./output/%s"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+`, strings.Title(name), strings.Title(name), strings.Title(name), name,
+		strings.Title(name), strings.Title(name), name, strings.Title(name), name)
+
+	if err := os.WriteFile(mainFile, []byte(template), 0o644); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+
+	fmt.Printf("✅ Created spider scaffold:\n")
+	fmt.Printf("   %s/main.go\n\n", dir)
+	fmt.Printf("Next steps:\n")
+	fmt.Printf("  1. Edit %s — update StartURLs() and Parse()\n", mainFile)
+	fmt.Printf("  2. Run:  go run ./%s/\n", dir)
+
+	return nil
 }

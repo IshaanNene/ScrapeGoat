@@ -6,7 +6,7 @@ ScrapeGoat combines ideas from Scrapy, Colly, and modern crawler services into a
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-23%2F23%20pass-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-51%2F51%20pass-brightgreen.svg)](#testing)
 
 ---
 
@@ -14,17 +14,22 @@ ScrapeGoat combines ideas from Scrapy, Colly, and modern crawler services into a
 
 | Feature | Details |
 |---------|---------|
-|  **High-Performance Crawling** | Concurrent workers, per-domain throttling |
-|  **CSS, XPath & Regex Extraction** | goquery CSS selectors, XPath, named regex groups |
-|  **Smart URL Management** | Priority queue, deduplication, domain filters |
-|  **robots.txt Compliance** | Automatic parsing and crawl-delay support |
-|  **Multi-Format Export** | JSON, JSONL, CSV with streaming writes |
-|  **Search Engine Mode** | Full-text index with headings, meta, link graph |
-|  **AI-Powered Crawling** | Summarize, NER, sentiment via Ollama/OpenAI |
-|  **Prometheus Metrics** | Built-in `/metrics` & `/health` endpoints |
-|  **Proxy Rotation** | Round-robin / random with health checking |
-|  **Checkpoint Persistence** | Pause/resume crawls with atomic state |
-|  **Graceful Shutdown** | SIGINT/SIGTERM handling with state preservation |
+| 🚀 **High-Performance Crawling** | Concurrent workers, per-domain throttling, autoscaling pool |
+| 🕷️ **Spider Interface** | Scrapy-style declarative spiders with `StartURLs()` + `Parse()` |
+| 🔍 **CSS, XPath & Regex Extraction** | goquery CSS selectors, XPath, named regex groups |
+| 🧠 **Smart URL Management** | Priority queue frontier, dedup with canonicalization, domain filters |
+| 🤖 **robots.txt Compliance** | Automatic parsing, crawl-delay support, wildcard matching |
+| 📦 **Multi-Format Export** | JSON, JSONL, CSV with streaming writes |
+| 🔎 **Search Engine Mode** | Full-text index with headings, meta, link graph |
+| 🤖 **AI-Powered Crawling** | Summarize, NER, sentiment via Ollama/OpenAI |
+| 📊 **Prometheus Metrics** | Built-in `/metrics` & `/health` endpoints |
+| 🔄 **Proxy Rotation** | Round-robin / random with health checking |
+| 💾 **Checkpoint Persistence** | Pause/resume crawls with atomic state |
+| 🛡️ **Anti-Detection** | TLS fingerprinting, browser stealth JS injection |
+| 🌐 **Distributed Crawling** | Master/worker architecture with task assignment |
+| 🍪 **Session Management** | Per-domain cookie jar with automatic state |
+| 🛑 **Graceful Shutdown** | SIGINT/SIGTERM handling with state preservation |
+| 📝 **CLI Scaffolding** | `scrapegoat new spider <name>` generates boilerplate |
 
 ---
 
