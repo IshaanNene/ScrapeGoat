@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🐐 ScrapeGoat
+# ScrapeGoat
 
 ### The high-performance distributed web scraping framework written in Go.
 
@@ -9,6 +9,11 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/IshaanNene/ScrapeGoat)](https://goreportcard.com/report/github.com/IshaanNene/ScrapeGoat)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Reference](https://pkg.go.dev/badge/github.com/IshaanNene/ScrapeGoat.svg)](https://pkg.go.dev/github.com/IshaanNene/ScrapeGoat)
+[![GitHub stars](https://img.shields.io/github/stars/IshaanNene/ScrapeGoat.svg?style=flat-square)](https://github.com/IshaanNene/ScrapeGoat/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/IshaanNene/ScrapeGoat.svg?style=flat-square)](https://github.com/IshaanNene/ScrapeGoat/network)
+[![GitHub issues](https://img.shields.io/github/issues/IshaanNene/ScrapeGoat.svg?style=flat-square)](https://github.com/IshaanNene/ScrapeGoat/issues)
+[![GitHub clones](https://img.shields.io/badge/dynamic/json?color=success&label=clones&query=count&url=https://gist.githubusercontent.com/IshaanNene/ScrapeGoat/traffic/clones&style=flat-square)](https://github.com/IshaanNene/ScrapeGoat)
+[![GitHub unique cloners](https://img.shields.io/badge/dynamic/json?color=success&label=unique%20cloners&query=uniques&url=https://gist.githubusercontent.com/IshaanNene/ScrapeGoat/traffic/clones&style=flat-square)](https://github.com/IshaanNene/ScrapeGoat)
 
 </div>
 
@@ -27,7 +32,7 @@
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
 ```bash
 # Install
@@ -44,7 +49,7 @@ cd my_scraper
 go run ./spiders/
 ```
 
-## 🔥 One-Liner Auto-Extract
+## One-Liner Auto-Extract
 
 ```bash
 $ scrapegoat extract https://books.toscrape.com
@@ -62,7 +67,7 @@ $ scrapegoat extract https://books.toscrape.com
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 graph TD
@@ -99,7 +104,7 @@ graph TD
 
 ---
 
-## 🕷️ Spider Interface (Scrapy-Style)
+## Spider Interface (Scrapy-Style)
 
 ```go
 type ProductSpider struct{}
@@ -132,7 +137,7 @@ func main() {
 
 ---
 
-## 📊 Features
+## Features
 
 | Category | Features |
 |----------|----------|
@@ -149,7 +154,7 @@ func main() {
 
 ---
 
-## 🖥️ CLI Commands
+## CLI Commands
 
 ```bash
 scrapegoat crawl <url>           # Crawl with link following
@@ -168,7 +173,7 @@ scrapegoat version               # Print version
 
 ---
 
-## 🔌 Plugin Ecosystem
+## Plugin Ecosystem
 
 ```go
 // Register built-in plugins
@@ -189,7 +194,7 @@ func (p *MyPlugin) Store(items []*types.Item) error { /* ... */ }
 
 ---
 
-## 🌐 Distributed Crawling
+## Distributed Crawling
 
 ```bash
 # Terminal 1: Start master
@@ -205,7 +210,7 @@ curl -X POST http://localhost:8081/api/submit \
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 ```yaml
 engine:
@@ -238,7 +243,7 @@ distributed:
 
 ---
 
-## 🐳 Docker
+## Docker
 
 ```bash
 docker-compose up -d
@@ -247,7 +252,7 @@ scrapegoat crawl https://example.com
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ScrapeGoat/
@@ -278,7 +283,7 @@ ScrapeGoat/
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ```bash
 make test           # Unit tests
@@ -290,7 +295,7 @@ make build          # Build binary
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 - **[Quick Start](docs/quickstart.md)** — Get running in 3 minutes
 - **[Architecture](docs/architecture.md)** — How the components fit together
@@ -300,11 +305,11 @@ make build          # Build binary
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## 📄 License
+## License
 
 MIT License — see [LICENSE](LICENSE) for details.
 
@@ -312,8 +317,8 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-**Built with ❤️ in Go**
+**Built with in Go**
 
-[⭐ Star on GitHub](https://github.com/IshaanNene/ScrapeGoat) · [📖 Docs](docs/) · [🐛 Issues](https://github.com/IshaanNene/ScrapeGoat/issues)
+[Star on GitHub](https://github.com/IshaanNene/ScrapeGoat) · [Docs](docs/) · [Issues](https://github.com/IshaanNene/ScrapeGoat/issues)
 
 </div>
