@@ -26,7 +26,7 @@ func testConfig() *config.Config {
 
 func TestNextUserAgent(t *testing.T) {
 	cfg := testConfig()
-	logger := testLogger(t)
+	logger := testLogger()
 	f, err := NewHTTPFetcher(cfg, logger)
 	if err != nil {
 		t.Fatalf("create fetcher: %v", err)
@@ -48,7 +48,7 @@ func TestNextUserAgent(t *testing.T) {
 func TestNextUserAgentEmpty(t *testing.T) {
 	cfg := testConfig()
 	cfg.Engine.UserAgents = nil
-	logger := testLogger(t)
+	logger := testLogger()
 	f, err := NewHTTPFetcher(cfg, logger)
 	if err != nil {
 		t.Fatalf("create fetcher: %v", err)
@@ -139,7 +139,7 @@ func TestFetchSuccess(t *testing.T) {
 	defer server.Close()
 
 	cfg := testConfig()
-	logger := testLogger(t)
+	logger := testLogger()
 	f, err := NewHTTPFetcher(cfg, logger)
 	if err != nil {
 		t.Fatalf("create fetcher: %v", err)
@@ -173,7 +173,7 @@ func TestFetch429(t *testing.T) {
 	defer server.Close()
 
 	cfg := testConfig()
-	logger := testLogger(t)
+	logger := testLogger()
 	f, err := NewHTTPFetcher(cfg, logger)
 	if err != nil {
 		t.Fatalf("create fetcher: %v", err)
@@ -206,7 +206,7 @@ func TestFetch5xx(t *testing.T) {
 	defer server.Close()
 
 	cfg := testConfig()
-	logger := testLogger(t)
+	logger := testLogger()
 	f, err := NewHTTPFetcher(cfg, logger)
 	if err != nil {
 		t.Fatalf("create fetcher: %v", err)
@@ -239,7 +239,7 @@ func TestFetchGzipDecompression(t *testing.T) {
 	defer server.Close()
 
 	cfg := testConfig()
-	logger := testLogger(t)
+	logger := testLogger()
 	f, err := NewHTTPFetcher(cfg, logger)
 	if err != nil {
 		t.Fatalf("create fetcher: %v", err)
@@ -268,7 +268,7 @@ func TestFetchCustomHeaders(t *testing.T) {
 
 	cfg := testConfig()
 	cfg.Engine.UserAgents = []string{"CustomBot/1.0"}
-	logger := testLogger(t)
+	logger := testLogger()
 	f, err := NewHTTPFetcher(cfg, logger)
 	if err != nil {
 		t.Fatalf("create fetcher: %v", err)
@@ -288,6 +288,6 @@ func TestFetchCustomHeaders(t *testing.T) {
 
 // --- Helpers ---
 
-func testLogger(t *testing.T) *slog.Logger {
+func testLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
 }

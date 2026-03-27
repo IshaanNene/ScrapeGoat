@@ -25,8 +25,8 @@ func TestJSONStorage(t *testing.T) {
 	}
 
 	items := []*types.Item{
-		makeItem("https://example.com/1", "title", "Page 1"),
-		makeItem("https://example.com/2", "title", "Page 2"),
+		makeItem("Page 1"),
+		makeItem("Page 2"),
 	}
 
 	if err := store.Store(items); err != nil {
@@ -61,9 +61,9 @@ func TestJSONLStorage(t *testing.T) {
 	}
 
 	items := []*types.Item{
-		makeItem("https://example.com/1", "title", "Page 1"),
-		makeItem("https://example.com/2", "title", "Page 2"),
-		makeItem("https://example.com/3", "title", "Page 3"),
+		makeItem("Page 1"),
+		makeItem("Page 2"),
+		makeItem("Page 3"),
 	}
 
 	if err := store.Store(items); err != nil {
@@ -103,8 +103,8 @@ func TestCSVStorage(t *testing.T) {
 	}
 
 	items := []*types.Item{
-		makeItem("https://example.com/1", "title", "Page 1"),
-		makeItem("https://example.com/2", "title", "Page 2"),
+		makeItem("Page 1"),
+		makeItem("Page 2"),
 	}
 
 	if err := store.Store(items); err != nil {
@@ -152,8 +152,8 @@ func TestStorageName(t *testing.T) {
 
 // --- Helpers ---
 
-func makeItem(url, key, value string) *types.Item {
-	item := types.NewItem(url)
-	item.Set(key, value)
+func makeItem(value string) *types.Item {
+	item := types.NewItem("https://example.com/1")
+	item.Set("title", value)
 	return item
 }

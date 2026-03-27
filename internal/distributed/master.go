@@ -115,7 +115,7 @@ func (m *Master) AssignTasks() []Assignment {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var assignments []Assignment
+	assignments := make([]Assignment, 0, len(m.taskQueue))
 
 	for _, task := range m.taskQueue {
 		if task.Status != "pending" {

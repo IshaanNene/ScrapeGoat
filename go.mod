@@ -12,6 +12,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	go.mongodb.org/mongo-driver v1.17.9
 	golang.org/x/net v0.47.0
+	golang.org/x/text v0.31.0
 )
 
 require (
@@ -44,5 +45,4 @@ require (
 	golang.org/x/crypto v0.44.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
 )

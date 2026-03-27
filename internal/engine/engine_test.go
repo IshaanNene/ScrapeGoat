@@ -77,8 +77,7 @@ func TestFrontierMultipleItems(t *testing.T) {
 			t.Fatalf("unexpected nil at position %d", i)
 		}
 		if prev >= 0 && got.Priority < prev {
-			// Min-heap: each item should have priority >= previous
-			// Actually, with min-heap, priorities come out in ascending order
+			t.Errorf("min-heap violation: got priority %d, previous was %d", got.Priority, prev)
 		}
 		prev = got.Priority
 	}

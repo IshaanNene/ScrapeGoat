@@ -182,9 +182,7 @@ jobs:
       - name: Run OSV-Scanner
         uses: google/osv-scanner-action/osv-scanner-action@v2.3.5
         with:
-          scan-args: |-
-            --lockfile=go.sum
-            --format=table
+          scan-args: "--lockfile=go.sum --format=table"
 
   # ── Tool 8: Dependency Review (Block Vulnerable New Deps) ─────────────
   dependency-review:

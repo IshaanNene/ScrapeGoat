@@ -154,7 +154,7 @@ func (r *Registry) List() []PluginInfo {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var infos []PluginInfo
+	infos := make([]PluginInfo, 0, len(r.plugins))
 	for _, p := range r.plugins {
 		infos = append(infos, PluginInfo{
 			Name:    p.Name(),

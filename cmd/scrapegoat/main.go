@@ -1,6 +1,8 @@
 package main
 
 import (
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -376,6 +378,8 @@ func generateSpider(name string) error {
 	template := fmt.Sprintf(`package main
 
 import (
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"fmt"
 	"log"
 
@@ -426,8 +430,8 @@ func main() {
 		log.Fatal(err)
 	}
 }
-`, strings.Title(name), strings.Title(name), strings.Title(name), name,
-		strings.Title(name), strings.Title(name), name, strings.Title(name), name)
+`, cases.Title(language.Und).String(name), cases.Title(language.Und).String(name), cases.Title(language.Und).String(name), name,
+		cases.Title(language.Und).String(name), cases.Title(language.Und).String(name), name, cases.Title(language.Und).String(name), name)
 
 	if err := os.WriteFile(mainFile, []byte(template), 0o644); err != nil {
 		return fmt.Errorf("write file: %w", err)
@@ -879,6 +883,8 @@ func generateSpiderInDir(dir, name string) error {
 	template := fmt.Sprintf(`package main
 
 import (
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"fmt"
 	"log"
 
@@ -919,7 +925,7 @@ func main() {
 		log.Fatal(err)
 	}
 }
-`, strings.Title(name), strings.Title(name), name, strings.Title(name), strings.Title(name), name, strings.Title(name))
+`, cases.Title(language.Und).String(name), cases.Title(language.Und).String(name), name, cases.Title(language.Und).String(name), cases.Title(language.Und).String(name), name, cases.Title(language.Und).String(name))
 
 	return os.WriteFile(filepath.Join(dir, "main.go"), []byte(template), 0o644)
 }

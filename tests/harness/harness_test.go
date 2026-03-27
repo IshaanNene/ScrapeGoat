@@ -21,7 +21,7 @@ import (
 
 var testLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
-func newTestEngine(ts string, concurrency, maxDepth, maxRequests int) (*engine.Engine, error) {
+func newTestEngine(concurrency, maxDepth, maxRequests int) (*engine.Engine, error) {
 	cfg := config.DefaultConfig()
 	cfg.Engine.Concurrency = concurrency
 	cfg.Engine.MaxDepth = maxDepth
@@ -51,7 +51,7 @@ func TestMode1_InfinitePagination(t *testing.T) {
 	const maxDepth = 3
 	const maxRequests = 50
 
-	eng, err := newTestEngine(ts.URL, 5, maxDepth, maxRequests)
+	eng, err := newTestEngine(5, maxDepth, maxRequests)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +399,7 @@ func TestMode9_JSHeavyHTML(t *testing.T) {
 	ts, _ := NewServer(ServerConfig{Mode: ModeJSHeavy})
 	defer ts.Close()
 
-	eng, err := newTestEngine(ts.URL, 2, 0, 1)
+	eng, err := newTestEngine(2, 0, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
