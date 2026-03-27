@@ -1,5 +1,6 @@
 FROM golang:1.22-alpine AS builder
 
+# hadolint ignore=DL3018
 RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /app
@@ -11,6 +12,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /scrapegoat ./cmd/scra
 
 FROM alpine:3.19
 
+# hadolint ignore=DL3018
 RUN apk add --no-cache ca-certificates tzdata chromium
 
 COPY --from=builder /scrapegoat /usr/local/bin/scrapegoat

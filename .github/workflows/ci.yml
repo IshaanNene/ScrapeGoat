@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   lint:
@@ -24,9 +25,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          args: >-
-            --enable=bodyclose,errcheck,gocritic,gocyclo,gofmt,
-            gosec,misspell,unconvert,unparam,prealloc
+          args: "--enable=bodyclose,errcheck,gocritic,gocyclo,gofmt,gosec,misspell,unconvert,unparam,prealloc"
 
   test:
     name: Test
@@ -64,13 +63,15 @@ jobs:
       - name: Check Coverage Threshold
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Total Coverage: ${COVERAGE}%**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          go tool cover -func=coverage.out | tail -20 >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           THRESHOLD=50
+          {
+            echo "## 📊 Coverage Report"
+            echo ""
+            echo "**Total Coverage: ${COVERAGE}%**"
+            echo ""
+            go tool cover -func=coverage.out | tail -20
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
             echo "::error::Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
             exit 1
@@ -81,13 +82,16 @@ jobs:
   gosec:
     name: "gosec Security Scan"
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: securego/gosec@master
         with:
           args: "-no-fail -fmt sarif -out gosec-results.sarif ./..."
       - name: Upload gosec SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: gosec-results.sarif
@@ -105,12 +109,16 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - name: Run govulncheck
         run: |
-          echo "## 🛡️ Go Vulnerability Check" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🛡️ Go Vulnerability Check"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
           govulncheck ./... 2>&1 | tee vuln-report.txt
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat vuln-report.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          {
+            echo '```'
+            cat vuln-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Tool 4: gitleaks (Secret Detection) ────────────────────────────────
   gitleaks:
@@ -172,7 +180,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run OSV-Scanner
-        uses: google/osv-scanner-action/osv-scanner-action@v2
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.5
         with:
           scan-args: |-
             --lockfile=go.sum
@@ -211,12 +219,16 @@ jobs:
         run: go install github.com/google/go-licenses@latest
       - name: Check Licenses
         run: |
-          echo "## 📜 License Compliance Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 📜 License Compliance Report"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
           go-licenses report ./... 2>&1 | tee license-report.txt || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          head -50 license-report.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          {
+            echo '```'
+            head -50 license-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           # Fail on forbidden licenses (GPL, AGPL in non-GPL projects)
           go-licenses check ./... --disallowed_types=forbidden 2>&1 || true
 
