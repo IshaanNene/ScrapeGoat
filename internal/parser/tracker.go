@@ -173,7 +173,7 @@ func (st *SmartTracker) FindSimilar(resp *types.Response, selector string, maxRe
 	}
 
 	refTag := goquery.NodeName(reference)
-	refClasses := strings.Fields(attrOr(reference, "class", ""))
+	refClasses := strings.Fields(attrOr(reference, "class"))
 	refText := strings.TrimSpace(reference.Text())
 	refAttrs := extractAttributes(reference)
 
@@ -373,7 +373,7 @@ func extractAttributes(sel *goquery.Selection) map[string]string {
 }
 
 // attrOr returns an attribute value or a default.
-func attrOr(sel *goquery.Selection, attr) string {
+func attrOr(sel *goquery.Selection, attr string) string {
 	val, exists := sel.Attr(attr)
 	if !exists {
 		return ""

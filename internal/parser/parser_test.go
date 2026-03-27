@@ -51,7 +51,7 @@ func makeResp() *types.Response {
 	return &types.Response{
 		Request:     req,
 		StatusCode:  200,
-		Body:        []byte(body),
+		Body:        []byte(testHTML),
 		ContentType: "text/html",
 	}
 }

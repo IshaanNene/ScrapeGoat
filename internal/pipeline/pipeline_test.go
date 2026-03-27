@@ -19,7 +19,7 @@ func TestPipelineBasic(t *testing.T) {
 	item.Set("title", "  Hello World  ")
 	item.Set("extra", " spaces ")
 
-	result, err := _, _ = p.Process(item)
+	result, err := p.Process(item)
 	if err != nil {
 		t.Fatalf("pipeline error: %v", err)
 	}
