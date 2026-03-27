@@ -9,11 +9,6 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/IshaanNene/ScrapeGoat)](https://goreportcard.com/report/github.com/IshaanNene/ScrapeGoat)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Reference](https://pkg.go.dev/badge/github.com/IshaanNene/ScrapeGoat.svg)](https://pkg.go.dev/github.com/IshaanNene/ScrapeGoat)
-[![GitHub stars](https://img.shields.io/github/stars/IshaanNene/ScrapeGoat.svg?style=flat-square)](https://github.com/IshaanNene/ScrapeGoat/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/IshaanNene/ScrapeGoat.svg?style=flat-square)](https://github.com/IshaanNene/ScrapeGoat/network)
-[![GitHub issues](https://img.shields.io/github/issues/IshaanNene/ScrapeGoat.svg?style=flat-square)](https://github.com/IshaanNene/ScrapeGoat/issues)
-[![GitHub clones](https://img.shields.io/badge/dynamic/json?color=success&label=clones&query=count&url=https://gist.githubusercontent.com/IshaanNene/ScrapeGoat/traffic/clones&style=flat-square)](https://github.com/IshaanNene/ScrapeGoat)
-[![GitHub unique cloners](https://img.shields.io/badge/dynamic/json?color=success&label=unique%20cloners&query=uniques&url=https://gist.githubusercontent.com/IshaanNene/ScrapeGoat/traffic/clones&style=flat-square)](https://github.com/IshaanNene/ScrapeGoat)
 
 </div>
 

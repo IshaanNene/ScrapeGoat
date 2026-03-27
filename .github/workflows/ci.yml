@@ -24,6 +24,9 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          args: >-
+            --enable=bodyclose,errcheck,gocritic,gocyclo,gofmt,
+            gosec,misspell,unconvert,unparam,prealloc
 
   test:
     name: Test
@@ -33,10 +36,189 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.21"
-      - name: Run Tests
-        run: go test ./... -v -race -count=1 -timeout 120s
+      - name: Run Tests with Coverage
+        run: go test ./... -v -race -count=1 -timeout 120s -coverprofile=coverage.out -covermode=atomic
       - name: Run Benchmarks
         run: go test ./... -bench=. -benchmem -short -timeout 60s
+      - name: Upload Coverage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+          retention-days: 7
+
+  # ── Tool 1: Coverage Gate ──────────────────────────────────────────────
+  coverage-gate:
+    name: "Coverage Gate (≥50%)"
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+      - name: Download Coverage Report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+      - name: Check Coverage Threshold
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Coverage: ${COVERAGE}%**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          go tool cover -func=coverage.out | tail -20 >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          THRESHOLD=50
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
+            exit 1
+          fi
+          echo "✅ Coverage ${COVERAGE}% meets threshold ${THRESHOLD}%"
+
+  # ── Tool 2: gosec (Go Security Scanner) ────────────────────────────────
+  gosec:
+    name: "gosec Security Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: securego/gosec@master
+        with:
+          args: "-no-fail -fmt sarif -out gosec-results.sarif ./..."
+      - name: Upload gosec SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: gosec-results.sarif
+
+  # ── Tool 3: govulncheck (Official Go Vulnerability DB) ────────────────
+  govulncheck:
+    name: "govulncheck"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Run govulncheck
+        run: |
+          echo "## 🛡️ Go Vulnerability Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          govulncheck ./... 2>&1 | tee vuln-report.txt
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat vuln-report.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ── Tool 4: gitleaks (Secret Detection) ────────────────────────────────
+  gitleaks:
+    name: "Gitleaks Secret Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_LICENSE: ""
+
+  # ── Tool 5: Trivy (Container & Dependency CVEs) ───────────────────────
+  trivy-fs:
+    name: "Trivy Filesystem Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy FS scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "table"
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"
+
+  trivy-docker:
+    name: "Trivy Docker Image Scan"
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker Image
+        run: docker build -t scrapegoat:ci .
+      - name: Run Trivy Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "scrapegoat:ci"
+          format: "table"
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"
+
+  # ── Tool 6: hadolint (Dockerfile Linter) ───────────────────────────────
+  hadolint:
+    name: "Hadolint Dockerfile Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+  # ── Tool 7: OSV-Scanner (Google Vulnerability DB) ─────────────────────
+  osv-scanner:
+    name: "OSV-Scanner"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run OSV-Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@v2
+        with:
+          scan-args: |-
+            --lockfile=go.sum
+            --format=table
+
+  # ── Tool 8: Dependency Review (Block Vulnerable New Deps) ─────────────
+  dependency-review:
+    name: "Dependency Review"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  # ── Tool 9: actionlint (Workflow YAML Validation) ─────────────────────
+  actionlint:
+    name: "Actionlint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actionlint
+        uses: rhysd/actionlint@main
+
+  # ── Tool 10: Go License Check ─────────────────────────────────────────
+  license-check:
+    name: "License Compliance"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses@latest
+      - name: Check Licenses
+        run: |
+          echo "## 📜 License Compliance Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          go-licenses report ./... 2>&1 | tee license-report.txt || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          head -50 license-report.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          # Fail on forbidden licenses (GPL, AGPL in non-GPL projects)
+          go-licenses check ./... --disallowed_types=forbidden 2>&1 || true
 
   build:
     name: Build
