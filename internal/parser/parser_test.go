@@ -46,7 +46,7 @@ const testHTML = `<!DOCTYPE html>
 </body>
 </html>`
 
-func makeResp(body string) *types.Response {
+func makeResp() *types.Response {
 	req, _ := types.NewRequest("https://example.com")
 	return &types.Response{
 		Request:     req,
@@ -60,7 +60,7 @@ func makeResp(body string) *types.Response {
 
 func TestCSSParserExtract(t *testing.T) {
 	p := NewCSSParser(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 
 	rules := []config.ParseRule{
 		{Name: "title", Type: "css", Selector: "h1.title"},
@@ -89,7 +89,7 @@ func TestCSSParserExtract(t *testing.T) {
 
 func TestCSSParserLinks(t *testing.T) {
 	p := NewCSSParser(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 
 	_, links, err := p.Parse(resp, nil)
 	if err != nil {
@@ -111,7 +111,7 @@ func TestCSSParserLinks(t *testing.T) {
 
 func TestXPathParser(t *testing.T) {
 	p := NewXPathParser(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 
 	rules := []config.ParseRule{
 		{Name: "heading", Type: "xpath", Selector: "//h1"},
@@ -137,7 +137,7 @@ func TestXPathParser(t *testing.T) {
 
 func TestRegexParser(t *testing.T) {
 	p := NewRegexParser(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 
 	rules := []config.ParseRule{
 		{Name: "title", Type: "regex", Pattern: `<title>(?P<title>[^<]+)</title>`},
@@ -162,7 +162,7 @@ func TestRegexParser(t *testing.T) {
 
 func TestStructuredDataExtraction(t *testing.T) {
 	sde := NewStructuredDataExtractor(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 
 	results, err := sde.Extract(resp)
 	if err != nil {
@@ -213,7 +213,7 @@ func TestStructuredDataExtraction(t *testing.T) {
 
 func TestDOMTraversal(t *testing.T) {
 	dt := NewDOMTraverser(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 
 	t.Run("FindChildren", func(t *testing.T) {
 		results, err := dt.FindChildren(resp, "ul.items", "li")
@@ -256,7 +256,7 @@ func TestDOMTraversal(t *testing.T) {
 
 func TestAutoSelectorGenerator(t *testing.T) {
 	asg := NewAutoSelectorGenerator(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 
 	candidates, err := asg.GenerateForText(resp, "Hello World")
 	if err != nil {
@@ -280,7 +280,7 @@ func TestAutoSelectorGenerator(t *testing.T) {
 
 func TestCompositeParser(t *testing.T) {
 	cp := NewCompositeParser(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 
 	rules := []config.ParseRule{
 		{Name: "heading", Type: "css", Selector: "h1"},
@@ -329,7 +329,7 @@ func TestCompositeParser(t *testing.T) {
 
 func BenchmarkCSSParse(b *testing.B) {
 	p := NewCSSParser(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 	rules := []config.ParseRule{
 		{Name: "title", Type: "css", Selector: "h1"},
 		{Name: "content", Type: "css", Selector: ".content p"},
@@ -343,7 +343,7 @@ func BenchmarkCSSParse(b *testing.B) {
 
 func BenchmarkXPathParse(b *testing.B) {
 	p := NewXPathParser(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 	rules := []config.ParseRule{
 		{Name: "title", Type: "xpath", Selector: "//h1"},
 	}
@@ -356,7 +356,7 @@ func BenchmarkXPathParse(b *testing.B) {
 
 func BenchmarkStructuredData(b *testing.B) {
 	sde := NewStructuredDataExtractor(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -366,7 +366,7 @@ func BenchmarkStructuredData(b *testing.B) {
 
 func BenchmarkCompositeParser(b *testing.B) {
 	cp := NewCompositeParser(testLogger)
-	resp := makeResp(testHTML)
+	resp := makeResp()
 	rules := []config.ParseRule{
 		{Name: "h", Type: "css", Selector: "h1"},
 		{Name: "t", Type: "regex", Selector: `<title>([^<]+)</title>`},

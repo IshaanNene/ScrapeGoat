@@ -54,13 +54,14 @@ func (asg *AutoSelectorGenerator) GenerateForText(resp *types.Response, text str
 		for _, s := range selectors {
 			count := doc.Find(s.Selector).Length()
 			s.MatchCount = count
-			if count == 1 {
+			switch {
+			case count == 1:
 				s.Score = 1.0
-			} else if count <= 3 {
+			case count <= 3:
 				s.Score = 0.8
-			} else if count <= 10 {
+			case count <= 10:
 				s.Score = 0.5
-			} else {
+			default:
 				s.Score = 0.2
 			}
 			candidates = append(candidates, s)
@@ -92,11 +93,12 @@ func (asg *AutoSelectorGenerator) GenerateForElement(resp *types.Response, basic
 		for _, s := range selectors {
 			count := doc.Find(s.Selector).Length()
 			s.MatchCount = count
-			if count == 1 {
+			switch {
+			case count == 1:
 				s.Score = 1.0
-			} else if count <= 3 {
+			case count <= 3:
 				s.Score = 0.8
-			} else {
+			default:
 				s.Score = float64(1) / float64(count)
 			}
 			candidates = append(candidates, s)

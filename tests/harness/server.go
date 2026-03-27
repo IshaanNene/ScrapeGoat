@@ -383,14 +383,14 @@ func ListenerOnRandomPort() (net.Listener, int, error) {
 
 // TLSConfigInsecure returns a *tls.Config that skips certificate verification.
 func TLSConfigInsecure() *tls.Config {
-	return &tls.Config{InsecureSkipVerify: true}
+	return &tls.Config{InsecureSkipVerify: true} // nolint:gosec // Required for tests
 }
 
 // TLSConfigWithCA returns a *tls.Config that trusts the given CA certificate pool.
 func TLSConfigWithCA(ts *httptest.Server) *tls.Config {
 	certPool := x509.NewCertPool()
 	certPool.AddCert(ts.Certificate())
-	return &tls.Config{RootCAs: certPool}
+	return &tls.Config{RootCAs: certPool, MinVersion: tls.VersionTLS12} // nolint:gosec // Test requires manual control
 }
 
 // --- MODE 11: Cookie Jar Poisoning ---

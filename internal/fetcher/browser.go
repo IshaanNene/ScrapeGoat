@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -23,7 +22,6 @@ type BrowserFetcher struct {
 	stealthCfg *StealthConfig
 	logger     *slog.Logger
 	proxyMgr   *ProxyManager
-	mu         sync.Mutex
 	pagePool   chan *rod.Page
 	maxPages   int
 }

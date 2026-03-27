@@ -56,7 +56,7 @@ type Downloader struct {
 
 // NewDownloader creates a new media downloader.
 func NewDownloader(outputDir string, maxSizeMB int64, concurrent int, logger *slog.Logger) *Downloader {
-	os.MkdirAll(outputDir, 0o755)
+	_ = os.MkdirAll(outputDir, 0o755)
 	return &Downloader{
 		outputDir:  outputDir,
 		client:     &http.Client{Timeout: 60 * time.Second},
@@ -106,7 +106,7 @@ func (d *Downloader) Download(ctx context.Context, rawURL string) (*DownloadResu
 
 	// Create subdirectory by type
 	subDir := filepath.Join(d.outputDir, string(mediaType))
-	os.MkdirAll(subDir, 0o755)
+	_ = os.MkdirAll(subDir, 0o755)
 	localPath := filepath.Join(subDir, filename)
 
 	// Write to file with hash computation

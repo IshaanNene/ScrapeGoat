@@ -53,7 +53,7 @@ func NewHTTPFetcher(cfg *config.Config, logger *slog.Logger) (*HTTPFetcher, erro
 		IdleConnTimeout:     cfg.Fetcher.IdleConnTimeout,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: cfg.Fetcher.TLSInsecure,
+			InsecureSkipVerify: cfg.Fetcher.TLSInsecure, // nolint:gosec // Driven by explicit user config
 		},
 		DisableCompression: true, // We handle decompression ourselves (including brotli)
 	}

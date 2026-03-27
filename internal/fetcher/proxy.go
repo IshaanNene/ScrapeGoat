@@ -143,10 +143,11 @@ func (pm *ProxyManager) HealthCheck() {
 		}
 		client.Transport = transport
 
-		_, err := client.Get("https://httpbin.org/ip")
+		resp, err := client.Get("https://httpbin.org/ip")
 		if err != nil {
 			pm.MarkFailed(p.URL, err)
 		} else {
+			resp.Body.Close()
 			pm.MarkHealthy(p.URL)
 		}
 	}

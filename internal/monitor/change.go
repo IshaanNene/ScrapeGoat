@@ -44,7 +44,7 @@ type ChangeDetector struct {
 
 // NewChangeDetector creates a new change detector.
 func NewChangeDetector(snapshotDir string, logger *slog.Logger) *ChangeDetector {
-	os.MkdirAll(snapshotDir, 0o755)
+	_ = os.MkdirAll(snapshotDir, 0o755)
 	return &ChangeDetector{
 		snapshotDir: snapshotDir,
 		logger:      logger.With("component", "change_detector"),
@@ -118,7 +118,7 @@ func (cd *ChangeDetector) loadSnapshot(url string) (map[string]any, error) {
 
 func (cd *ChangeDetector) saveSnapshot(item *types.Item) {
 	data, _ := json.Marshal(item.Fields)
-	os.WriteFile(cd.snapshotPath(item.URL), data, 0o644)
+	_ = os.WriteFile(cd.snapshotPath(item.URL), data, 0o644)
 }
 
 func (cd *ChangeDetector) snapshotPath(url string) string {

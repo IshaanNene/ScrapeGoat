@@ -64,8 +64,8 @@ func (st *SmartTracker) TakeSnapshot(resp *types.Response, selector string, name
 	snap := &elementSnapshot{
 		Tag:        goquery.NodeName(sel),
 		Text:       strings.TrimSpace(sel.Text()),
-		Classes:    strings.Fields(attrOr(sel, "class", "")),
-		ID:         attrOr(sel, "id", ""),
+		Classes:    strings.Fields(attrOr(sel, "class")),
+		ID:         attrOr(sel, "id"),
 		Attributes: extractAttributes(sel),
 		Path:       buildElementPath(sel, 5),
 		Selector:   selector,
@@ -242,7 +242,7 @@ func computeSimilarity(sel *goquery.Selection, refTag string, refClasses []strin
 	}
 
 	// Class overlap
-	classes := strings.Fields(attrOr(sel, "class", ""))
+	classes := strings.Fields(attrOr(sel, "class"))
 	classOverlap := setOverlap(refClasses, classes)
 	scores = append(scores, classOverlap*0.3)
 
@@ -373,10 +373,10 @@ func extractAttributes(sel *goquery.Selection) map[string]string {
 }
 
 // attrOr returns an attribute value or a default.
-func attrOr(sel *goquery.Selection, attr, defaultVal string) string {
+func attrOr(sel *goquery.Selection, attr) string {
 	val, exists := sel.Attr(attr)
 	if !exists {
-		return defaultVal
+		return ""
 	}
 	return val
 }

@@ -106,7 +106,7 @@ storage:
 `
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "test.yaml")
-	if err := os.WriteFile(cfgPath, []byte(yamlContent), 0o644); err != nil {
+	if err := os.WriteFile(cfgPath, []byte(yamlContent), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 

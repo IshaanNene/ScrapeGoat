@@ -95,7 +95,11 @@ func (sc *SitemapCrawler) DiscoverSitemap(domain string) string {
 	for _, u := range candidates {
 		resp, err := sc.client.Head(u)
 		if err == nil && resp.StatusCode == 200 {
+			resp.Body.Close()
 			return u
+		}
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
 		}
 	}
 	return ""
@@ -145,13 +149,14 @@ func (ma *MetaAuditor) Audit(resp *types.Response) (*MetaAuditResult, error) {
 	// Title
 	title := strings.TrimSpace(doc.Find("title").First().Text())
 	result.Tags["title"] = title
-	if title == "" {
+	switch {
+	case title == "":
 		result.Issues = append(result.Issues, AuditIssue{"error", "title", "Missing title tag"})
 		score -= 20
-	} else if len(title) > 60 {
+	case len(title) > 60:
 		result.Issues = append(result.Issues, AuditIssue{"warning", "title", fmt.Sprintf("Title too long (%d chars, max 60)", len(title))})
 		score -= 5
-	} else if len(title) < 10 {
+	case len(title) < 10:
 		result.Issues = append(result.Issues, AuditIssue{"warning", "title", "Title too short"})
 		score -= 5
 	}

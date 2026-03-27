@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
@@ -172,7 +173,7 @@ func (r *REPL) cmdCrawl(args []string) {
 	url := args[0]
 	depth := r.cfg.Engine.MaxDepth
 	if len(args) > 1 {
-		fmt.Sscanf(args[1], "%d", &depth)
+		_, _ = fmt.Sscanf(args[1], "%d", &depth)
 	}
 
 	fmt.Printf("Starting crawl: %s (depth: %d)\n", url, depth)
@@ -189,11 +190,11 @@ func (r *REPL) cmdCrawl(args []string) {
 	store, _ := storage.NewFileStorage(r.cfg.Storage.Type, r.cfg.Storage.OutputPath, r.logger)
 	eng.SetStorage(store)
 
-	eng.AddSeed(url)
+	_ = eng.AddSeed(url)
 	r.engine = eng
 
 	go func() {
-		eng.Start()
+		_ = eng.Start()
 		eng.Wait()
 		fmt.Println("\n✅ Crawl complete!")
 		fmt.Print("scrapegoat> ")
@@ -323,10 +324,10 @@ func (r *REPL) cmdSet(args []string) {
 
 	switch key {
 	case "depth":
-		fmt.Sscanf(val, "%d", &r.cfg.Engine.MaxDepth)
+		_, _ = fmt.Sscanf(val, "%d", &r.cfg.Engine.MaxDepth)
 		fmt.Printf("  Max depth set to %d\n", r.cfg.Engine.MaxDepth)
 	case "concurrency":
-		fmt.Sscanf(val, "%d", &r.cfg.Engine.Concurrency)
+		_, _ = fmt.Sscanf(val, "%d", &r.cfg.Engine.Concurrency)
 		fmt.Printf("  Concurrency set to %d\n", r.cfg.Engine.Concurrency)
 	case "delay":
 		d, err := time.ParseDuration(val)

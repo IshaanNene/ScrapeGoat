@@ -20,7 +20,7 @@ func TestLoadFromFile(t *testing.T) {
   allowed_domains:
     - example.com
 `
-	os.WriteFile(cfgFile, []byte(yaml), 0644)
+	_ = os.WriteFile(cfgFile, []byte(yaml), 0644)
 
 	cfg, err := LoadFromFile(cfgFile)
 	if err != nil {

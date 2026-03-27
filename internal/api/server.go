@@ -68,7 +68,14 @@ func (s *Server) Start() error {
 	s.logger.Info("API server starting", "addr", addr)
 
 	go func() {
-		if err := http.ListenAndServe(addr, s.mux); err != nil {
+		server := &http.Server{
+			Addr:              addr,
+			Handler:           s.mux,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+		}
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			s.logger.Error("API server error", "error", err)
 		}
 	}()
@@ -230,5 +237,5 @@ func (s *Server) jsonResponse(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }

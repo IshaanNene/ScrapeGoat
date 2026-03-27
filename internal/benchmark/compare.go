@@ -221,7 +221,7 @@ func SaveResults(results []*BenchmarkResult, path string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 // formatDuration formats a duration in a human-readable way.

@@ -55,7 +55,7 @@ func (bf *BloomFilter) Add(url string) {
 
 	h1, h2 := bf.hashes(url)
 	for i := 0; i < bf.numHash; i++ {
-		pos := (h1 + uint64(i)*h2) % bf.numBits
+		pos := (h1 + uint64(i)*h2) % bf.numBits // nolint:gosec // Safe integer cast
 		bf.bits[pos/64] |= 1 << (pos % 64)
 	}
 	bf.count++
@@ -70,7 +70,7 @@ func (bf *BloomFilter) Contains(url string) bool {
 
 	h1, h2 := bf.hashes(url)
 	for i := 0; i < bf.numHash; i++ {
-		pos := (h1 + uint64(i)*h2) % bf.numBits
+		pos := (h1 + uint64(i)*h2) % bf.numBits // nolint:gosec // Safe integer cast
 		if bf.bits[pos/64]&(1<<(pos%64)) == 0 {
 			return false
 		}

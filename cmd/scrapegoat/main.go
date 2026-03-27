@@ -433,7 +433,7 @@ func main() {
 `, cases.Title(language.Und).String(name), cases.Title(language.Und).String(name), cases.Title(language.Und).String(name), name,
 		cases.Title(language.Und).String(name), cases.Title(language.Und).String(name), name, cases.Title(language.Und).String(name), name)
 
-	if err := os.WriteFile(mainFile, []byte(template), 0o644); err != nil {
+	if err := os.WriteFile(mainFile, []byte(template), 0o600); err != nil {
 		return fmt.Errorf("write file: %w", err)
 	}
 

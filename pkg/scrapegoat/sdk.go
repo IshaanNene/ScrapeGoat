@@ -43,7 +43,6 @@ type Crawler struct {
 	engine    *engine.Engine
 	logger    *slog.Logger
 	htmlRules map[string]HTMLCallback
-	options   []Option
 }
 
 // HTMLCallback is called for each element matching a CSS selector.

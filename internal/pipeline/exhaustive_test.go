@@ -359,9 +359,6 @@ func TestPipelineOrdering(t *testing.T) {
 
 	var order []string
 
-	type orderMiddleware struct {
-		name string
-	}
 	_ = fmt.Sprint // avoid unused import
 
 	p := New(testLogger)
@@ -374,7 +371,7 @@ func TestPipelineOrdering(t *testing.T) {
 
 	item := types.NewItem("https://example.com")
 	item.Set("title", "test")
-	p.Process(item)
+	_, _ = p.Process(item)
 
 	expected := []string{"first", "second", "third"}
 	if len(order) != len(expected) {
@@ -392,8 +389,8 @@ type trackingMiddleware struct {
 	order *[]string
 }
 
-func (m *trackingMiddleware) Name() string     { return m.name }
-func (m *trackingMiddleware) Priority() int    { return 0 }
+func (m *trackingMiddleware) Name() string  { return m.name }
+func (m *trackingMiddleware) Priority() int { return 0 }
 func (m *trackingMiddleware) Process(item *types.Item) (*types.Item, error) {
 	*m.order = append(*m.order, m.name)
 	return item, nil

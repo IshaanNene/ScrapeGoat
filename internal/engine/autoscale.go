@@ -70,8 +70,8 @@ func NewAutoscaledPool(cfg *AutoscaleConfig, queueSizeFn func() int, logger *slo
 		queueSize: queueSizeFn,
 		logger:    logger.With("component", "autoscale"),
 	}
-	pool.current.Store(int32(cfg.MinConcurrency))
-	pool.desired.Store(int32(cfg.MinConcurrency))
+	pool.current.Store(int32(cfg.MinConcurrency)) // nolint:gosec // Always small positive int
+	pool.desired.Store(int32(cfg.MinConcurrency)) // nolint:gosec // Always small positive int
 
 	return pool
 }
@@ -100,8 +100,8 @@ func (p *AutoscaledPool) RecordWorkerIdle() {
 
 // SetWorkerCounts sets the current worker counts directly.
 func (p *AutoscaledPool) SetWorkerCounts(active, idle int) {
-	p.activeWorkers.Store(int32(active))
-	p.idleWorkers.Store(int32(idle))
+	p.activeWorkers.Store(int32(active)) // nolint:gosec // Always small positive int
+	p.idleWorkers.Store(int32(idle))   // nolint:gosec // Always small positive int
 }
 
 // Evaluate checks current system load and decides whether to scale up or down.
@@ -157,8 +157,8 @@ func (p *AutoscaledPool) Evaluate() ScaleDecision {
 		newCount := min(current+scaleStep(current), p.config.MaxConcurrency)
 		decision.Desired = newCount
 		decision.Action = ScaleUp
-		p.desired.Store(int32(newCount))
-		p.current.Store(int32(newCount))
+		p.desired.Store(int32(newCount)) // nolint:gosec // Always small positive int
+		p.current.Store(int32(newCount)) // nolint:gosec // Always small positive int
 		p.lastAction = time.Now()
 		p.logger.Info("scaling up",
 			"from", current, "to", newCount,

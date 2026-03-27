@@ -316,7 +316,7 @@ func TestMemoryStability(t *testing.T) {
 	var memEnd runtime.MemStats
 	runtime.ReadMemStats(&memEnd)
 
-	heapDeltaMB := float64(int64(memEnd.HeapAlloc)-int64(memStart.HeapAlloc)) / 1024 / 1024
+	heapDeltaMB := float64(int64(memEnd.HeapAlloc)-int64(memStart.HeapAlloc)) / 1024 / 1024 // nolint:gosec // Overflow is fine for tests
 	goroutinesEnd := runtime.NumGoroutine()
 
 	t.Logf("processed: %d pages", processed.Load())

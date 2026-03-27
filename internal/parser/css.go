@@ -34,10 +34,9 @@ func (p *CSSParser) Parse(resp *types.Response, rules []config.ParseRule) ([]*ty
 	}
 
 	var items []*types.Item
-	var links []string
 
 	// Extract links from the page
-	links = p.extractLinks(doc, resp.FinalURL)
+	links := p.extractLinks(doc, resp.FinalURL)
 
 	// If no rules, just return links (discovery mode)
 	if len(rules) == 0 {

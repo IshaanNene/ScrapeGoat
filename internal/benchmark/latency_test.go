@@ -3,7 +3,7 @@ package benchmark
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
@@ -45,8 +46,8 @@ func realisticServer() *httptest.Server {
 			hj, ok := w.(http.Hijacker)
 			if ok {
 				conn, _, _ := hj.Hijack()
-				conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 50000\r\n\r\n"))
-				conn.Write([]byte("<html><body>partial"))
+				_, _ = conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 50000\r\n\r\n"))
+				_, _ = conn.Write([]byte("<html><body>partial"))
 				conn.Close()
 			}
 			return
@@ -64,10 +65,10 @@ func realisticServer() *httptest.Server {
 		}
 
 		// Normal 200 response: 10-50KB realistic HTML
-		sizeKB := rand.Intn(40) + 10
+		sizeKB := rand.IntN(40) + 10
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		w.Write(generateRealisticHTML(sizeKB))
+		_, _ = w.Write(generateRealisticHTML(sizeKB))
 	}))
 }
 
@@ -104,9 +105,9 @@ func generateRealisticHTML(sizeKB int) []byte {
 <main class="container">
 `)
 	for b.Len() < targetBytes {
-		id := rand.Intn(100000)
-		price := float64(rand.Intn(10000)) / 100
-		rating := float64(rand.Intn(50)) / 10
+		id := rand.IntN(100000)
+		price := float64(rand.IntN(10000)) / 100
+		rating := float64(rand.IntN(50)) / 10
 		b.WriteString(fmt.Sprintf(`
 <article class="product-card" data-id="%d">
     <img src="/images/product-%d.jpg" alt="Product %d" loading="lazy">
@@ -130,9 +131,9 @@ func generateRealisticHTML(sizeKB int) []byte {
         <a href="/cart/add/%d" class="btn-secondary">Add to Cart</a>
     </div>
 </article>
-`, id, id, id, id, price, rating, rand.Intn(500)+10,
-			rand.Intn(100)+10, rand.Intn(100)+10, rand.Intn(50)+5,
-			float64(rand.Intn(100))/10, rand.Intn(5)+1, id, id))
+`, id, id, id, id, price, rating, rand.IntN(500)+10,
+			rand.IntN(100)+10, rand.IntN(100)+10, rand.IntN(50)+5,
+			float64(rand.IntN(100))/10, rand.IntN(5)+1, id, id))
 	}
 
 	b.WriteString(`
@@ -446,7 +447,7 @@ func TestMemoryPerRequest(t *testing.T) {
 	var memAfter runtime.MemStats
 	runtime.ReadMemStats(&memAfter)
 
-	heapDelta := int64(memAfter.HeapAlloc) - int64(memBefore.HeapAlloc)
+	heapDelta := int64(memAfter.HeapAlloc) - int64(memBefore.HeapAlloc) // nolint:gosec // Overflow is fine for tests
 	numGC := memAfter.NumGC - memBefore.NumGC
 	pauseTotal := memAfter.PauseTotalNs - memBefore.PauseTotalNs
 	totalMallocs := memAfter.Mallocs - memBefore.Mallocs
@@ -455,7 +456,7 @@ func TestMemoryPerRequest(t *testing.T) {
 	mallocsPerReq := int64(0)
 	heapPerReq := int64(0)
 	if processed > 0 {
-		mallocsPerReq = int64(totalMallocs) / processed
+		mallocsPerReq = int64(totalMallocs) / processed // nolint:gosec // Overflow is fine for tests
 		heapPerReq = heapDelta / processed
 	}
 

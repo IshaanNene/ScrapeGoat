@@ -65,7 +65,7 @@ jobs:
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           THRESHOLD=50
           {
-            echo "## 📊 Coverage Report"
+            echo "## Coverage Report"
             echo ""
             echo "**Total Coverage: ${COVERAGE}%**"
             echo ""
@@ -76,7 +76,7 @@ jobs:
             echo "::error::Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
             exit 1
           fi
-          echo "✅ Coverage ${COVERAGE}% meets threshold ${THRESHOLD}%"
+          echo "Coverage ${COVERAGE}% meets threshold ${THRESHOLD}%"
 
   # ── Tool 2: gosec (Go Security Scanner) ────────────────────────────────
   gosec:
@@ -110,7 +110,7 @@ jobs:
       - name: Run govulncheck
         run: |
           {
-            echo "## 🛡️ Go Vulnerability Check"
+            echo "## Go Vulnerability Check"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
           govulncheck ./... 2>&1 | tee vuln-report.txt
@@ -218,7 +218,7 @@ jobs:
       - name: Check Licenses
         run: |
           {
-            echo "## 📜 License Compliance Report"
+            echo "## License Compliance Report"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
           go-licenses report ./... 2>&1 | tee license-report.txt || true

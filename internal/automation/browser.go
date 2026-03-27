@@ -249,7 +249,9 @@ func (ba *BrowserAutomation) HandlePagination(ctx context.Context, cfg Paginatio
 
 		case PaginationScroll:
 			oldHeight, _ := ba.page.Eval(`document.body.scrollHeight`)
-			ba.ScrollToBottom()
+			if err := ba.ScrollToBottom(); err != nil {
+				// Ignore scroll errors at bottom of infinite scroll
+			}
 			time.Sleep(cfg.WaitBetween)
 			newHeight, _ := ba.page.Eval(`document.body.scrollHeight`)
 			if oldHeight.Value.Int() == newHeight.Value.Int() {
@@ -271,7 +273,7 @@ func (ba *BrowserAutomation) HandlePagination(ctx context.Context, cfg Paginatio
 		}
 
 		time.Sleep(cfg.WaitBetween)
-		ba.page.WaitStable(300 * time.Millisecond)
+		_ = ba.page.WaitStable(300 * time.Millisecond)
 	}
 
 	return nil

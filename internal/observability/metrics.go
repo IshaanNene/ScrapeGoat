@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync/atomic"
+	"time"
 )
 
 // Metrics tracks operational metrics for the crawler.
@@ -92,7 +93,14 @@ func (m *Metrics) StartServer(port int, path string) error {
 	m.logger.Info("metrics server starting", "addr", addr, "path", path)
 
 	go func() {
-		if err := http.ListenAndServe(addr, mux); err != nil {
+		server := &http.Server{
+			Addr:              addr,
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+		}
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			m.logger.Error("metrics server error", "error", err)
 		}
 	}()

@@ -41,7 +41,14 @@ func (d *Dashboard) Start() error {
 	d.logger.Info("dashboard starting", "addr", addr)
 
 	go func() {
-		if err := http.ListenAndServe(addr, mux); err != nil {
+		server := &http.Server{
+			Addr:              addr,
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+		}
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			d.logger.Error("dashboard error", "error", err)
 		}
 	}()
@@ -51,7 +58,7 @@ func (d *Dashboard) Start() error {
 
 func (d *Dashboard) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(dashboardHTML))
+	_, _ = w.Write([]byte(dashboardHTML))
 }
 
 func (d *Dashboard) handleAPIStats(w http.ResponseWriter, r *http.Request) {
@@ -67,5 +74,5 @@ func (d *Dashboard) handleAPIStats(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	json.NewEncoder(w).Encode(stats)
+	_ = json.NewEncoder(w).Encode(stats)
 }

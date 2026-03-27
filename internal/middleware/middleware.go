@@ -478,7 +478,7 @@ func (rp *RequestPipeline) Describe() string {
 	rp.mu.RLock()
 	defer rp.mu.RUnlock()
 
-	var parts []string
+	parts := make([]string, 0, len(rp.middlewares))
 	for _, mw := range rp.middlewares {
 		parts = append(parts, fmt.Sprintf("%s (priority=%d)", mw.Name(), mw.Priority()))
 	}

@@ -18,7 +18,6 @@ import (
 // JSONStorage writes items as a JSON array to a file.
 type JSONStorage struct {
 	path   string
-	file   *os.File
 	items  []*types.Item
 	mu     sync.Mutex
 	logger *slog.Logger

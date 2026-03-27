@@ -19,7 +19,7 @@ func TestPipelineBasic(t *testing.T) {
 	item.Set("title", "  Hello World  ")
 	item.Set("extra", " spaces ")
 
-	result, err := p.Process(item)
+	result, err := _, _ = p.Process(item)
 	if err != nil {
 		t.Fatalf("pipeline error: %v", err)
 	}
@@ -231,6 +231,6 @@ func BenchmarkPipeline(b *testing.B) {
 		item.Set("title", "  Hello <b>World</b>  ")
 		item.Set("body", "  <p>Content</p>  ")
 		item.Set("date", "January 15, 2024")
-		p.Process(item)
+		_, _ = p.Process(item)
 	}
 }
