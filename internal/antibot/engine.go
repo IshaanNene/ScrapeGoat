@@ -91,29 +91,22 @@ func (d *BlockDetector) Detect(resp *types.Response) DetectionResult {
 	defer d.mu.RUnlock()
 
 	result := DetectionResult{Blocked: false, Reason: NotBlocked}
-	var totalScore float64
-	var matchCount int
+	var maxWeightedScore float64
 
 	for _, pattern := range d.patterns {
 		score := d.matchPattern(resp, pattern)
 		if score > 0 {
-			totalScore += score * pattern.Weight
-			matchCount++
-			if score > 0.5 {
+			weightedScore := score * pattern.Weight
+			if weightedScore > maxWeightedScore {
+				maxWeightedScore = weightedScore
 				result.Reason = pattern.Reason
 				result.Details = pattern.Name
 			}
 		}
 	}
 
-	if matchCount > 0 {
-		result.Score = totalScore / float64(matchCount)
-		if result.Score > 0.5 {
-			result.Score = min(1.0, totalScore)
-		}
-	}
-
-	result.Blocked = result.Score >= 0.6
+	result.Score = maxWeightedScore
+	result.Blocked = result.Score >= 0.4
 	return result
 }
 

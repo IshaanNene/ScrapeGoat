@@ -93,7 +93,7 @@ func (c *Cache) Get(ctx context.Context, key string) (*CacheEntry, error) {
 	if expiresStr.Valid {
 		expiresAt, err := time.Parse(time.RFC3339, expiresStr.String)
 		if err == nil && time.Now().After(expiresAt) {
-			c.logger.Debug("cache entry expired", "key", key[:16])
+			c.logger.Debug("cache entry expired", "key", truncateKey(key, 16))
 			return nil, nil
 		}
 	}
@@ -142,7 +142,7 @@ func (c *Cache) Put(ctx context.Context, key string, entry *CacheEntry, ttl time
 		return fmt.Errorf("insert cache entry: %w", err)
 	}
 
-	c.logger.Debug("cached extraction result", "key", key[:16], "model", entry.Model)
+	c.logger.Debug("cached extraction result", "key", truncateKey(key, 16), "model", entry.Model)
 	return nil
 }
 
@@ -213,6 +213,13 @@ type CacheStats struct {
 	ExpiredCount int     `json:"expired_count"`
 	TotalTokens  int     `json:"total_tokens"`
 	TotalCostUSD float64 `json:"total_cost_usd"`
+}
+
+func truncateKey(key string, maxLen int) string {
+	if len(key) <= maxLen {
+		return key
+	}
+	return key[:maxLen]
 }
 
 // --- Cached Extractor Wrapper ---
