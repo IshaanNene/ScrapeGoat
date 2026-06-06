@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/IshaanNene/ScrapeGoat/internal/ai"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
@@ -19,6 +18,7 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
 	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/PuerkitoBio/goquery"
 )
 
 func main() {

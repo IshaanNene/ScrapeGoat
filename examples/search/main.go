@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	scrapegoat "github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat"
+	"github.com/PuerkitoBio/goquery"
 )
 
 func main() {

@@ -26,7 +26,7 @@ What actually happened. Include error messages or logs if available.
 ## Environment
 
 - **OS**: (e.g., macOS 14, Ubuntu 22.04)
-- **Go version**: (e.g., 1.21.5)
+- **Go version**: (e.g., 1.24.0)
 - **ScrapeGoat version**: (run `./bin/scrapegoat version`)
 
 ## Additional Context

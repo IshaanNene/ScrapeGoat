@@ -19,9 +19,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andybalholm/brotli"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/andybalholm/brotli"
 )
 
 // HTTPFetcher implements Fetcher using net/http.

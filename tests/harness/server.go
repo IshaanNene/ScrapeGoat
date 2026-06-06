@@ -31,7 +31,7 @@ const (
 	ModeConcurrencyStampede
 	ModeJSHeavy
 	ModeRobotsTxtAdversarial
-	ModeCookieJarPoisoning  // MODE 11
+	ModeCookieJarPoisoning // MODE 11
 	ModeGzipBomb           // MODE 12
 	ModeCharsetConfusion   // MODE 13
 	ModeLinkFarm           // MODE 14
@@ -102,7 +102,7 @@ func infinitePaginationHandler(stats *Stats) http.Handler {
 		stats.RequestsServed.Add(1)
 
 		page := 1
-		fmt.Sscanf(r.URL.Path, "/page/%d", &page)
+		_, _ = fmt.Sscanf(r.URL.Path, "/page/%d", &page)
 
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprintf(w, `<!DOCTYPE html>
@@ -176,7 +176,7 @@ func hugeBombHandler(stats *Stats) http.Handler {
 		w.WriteHeader(200)
 
 		// Stream 500MB
-		w.Write([]byte("<html><body>"))
+		_, _ = w.Write([]byte("<html><body>"))
 		chunk := []byte(strings.Repeat("A", 64*1024)) // 64KB chunks
 		for sent := 0; sent < 500*1024*1024; sent += len(chunk) {
 			_, err := w.Write(chunk)
@@ -184,7 +184,7 @@ func hugeBombHandler(stats *Stats) http.Handler {
 				return // client disconnected
 			}
 		}
-		w.Write([]byte("</body></html>"))
+		_, _ = w.Write([]byte("</body></html>"))
 	})
 }
 
@@ -208,10 +208,10 @@ func malformedHTMLHandler(stats *Stats, variant string) http.Handler {
 				b.WriteString("</div>")
 			}
 			b.WriteString("</body></html>")
-			w.Write([]byte(b.String()))
+			_, _ = w.Write([]byte(b.String()))
 
 		case "unclosed_tags":
-			w.Write([]byte(`<html><body>
+			_, _ = w.Write([]byte(`<html><body>
 <div><p>Paragraph 1<p>Paragraph 2<div>Nested without close
 <table><tr><td>Cell 1<td>Cell 2<tr><td>Cell 3<td>Cell 4
 <a href="/link1">Link 1<a href="/link2">Link 2
@@ -222,7 +222,7 @@ Some text with <b>bold <i>and italic</b> crossed</i> tags
 		case "mixed_encoding":
 			// UTF-8 body declared as ISO-8859-1
 			w.Header().Set("Content-Type", "text/html; charset=iso-8859-1")
-			w.Write([]byte(`<html><head><meta charset="iso-8859-1"></head>
+			_, _ = w.Write([]byte(`<html><head><meta charset="iso-8859-1"></head>
 <body>
 <h1>Ünïcödé Tëxt</h1>
 <p>Price: €99.99 — Special™ Çhàracters</p>
@@ -231,7 +231,7 @@ Some text with <b>bold <i>and italic</b> crossed</i> tags
 
 		case "null_bytes":
 			content := "<html><body>\x00<h1>Title\x00with\x00nulls</h1>\x00<p>Content\x00here</p></body></html>"
-			w.Write([]byte(content))
+			_, _ = w.Write([]byte(content))
 
 		default:
 			// All combined
@@ -243,7 +243,7 @@ Some text with <b>bold <i>and italic</b> crossed</i> tags
 			b.WriteString("<p>Unclosed paragraph<p>Another unclosed")
 			b.WriteString("\x00null\x00bytes\x00here")
 			b.WriteString("</body></html>")
-			w.Write([]byte(b.String()))
+			_, _ = w.Write([]byte(b.String()))
 		}
 	})
 }
@@ -268,7 +268,7 @@ func NewTLSServer(variant string) (*httptest.Server, *Stats) {
 	stats := &Stats{}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		stats.RequestsServed.Add(1)
-		w.Write([]byte("<html><body>TLS test page</body></html>"))
+		_, _ = w.Write([]byte("<html><body>TLS test page</body></html>"))
 	})
 
 	ts := httptest.NewTLSServer(handler)
@@ -336,20 +336,20 @@ func robotsTxtAdversarialHandler(stats *Stats, variant string) http.Handler {
 			case "timeout":
 				// 5-second delay (simulates timeout)
 				time.Sleep(5 * time.Second)
-				w.Write([]byte("User-agent: *\nDisallow: /private/\n"))
+				_, _ = w.Write([]byte("User-agent: *\nDisallow: /private/\n"))
 			case "500":
 				w.WriteHeader(500)
-				w.Write([]byte("Internal Server Error"))
+				_, _ = w.Write([]byte("Internal Server Error"))
 			case "huge":
 				// 10MB robots.txt
-				w.Write([]byte("User-agent: *\n"))
+				_, _ = w.Write([]byte("User-agent: *\n"))
 				for i := 0; i < 500000; i++ {
 					fmt.Fprintf(w, "Disallow: /path-%d/\n", i)
 				}
 			case "disallow_all":
-				w.Write([]byte("User-agent: *\nDisallow: /\n"))
+				_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
 			default:
-				w.Write([]byte("User-agent: *\nDisallow: /private/\nAllow: /\n"))
+				_, _ = w.Write([]byte("User-agent: *\nDisallow: /private/\nAllow: /\n"))
 			}
 			return
 		}
@@ -426,9 +426,13 @@ func gzipBombHandler(stats *Stats) http.Handler {
 	// 1GB of zeros compresses to ~1MB
 	chunk := make([]byte, 1024*1024) // 1MB of zeros
 	for i := 0; i < 100; i++ {       // 100MB uncompressed (smaller for test speed)
-		gw.Write(chunk)
+		if _, err := gw.Write(chunk); err != nil {
+			panic(err)
+		}
 	}
-	gw.Close()
+	if err := gw.Close(); err != nil {
+		panic(err)
+	}
 	body := compressed.Bytes()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -437,7 +441,7 @@ func gzipBombHandler(stats *Stats) http.Handler {
 		w.Header().Set("Content-Type", "text/html")
 		w.Header().Set("Content-Encoding", "gzip")
 		w.WriteHeader(200)
-		w.Write(body)
+		_, _ = w.Write(body)
 	})
 }
 
@@ -460,7 +464,7 @@ func charsetConfusionHandler(stats *Stats) http.Handler {
 <a href="/page/2">Next</a>
 </body></html>`, string(shiftJISBytes))
 
-		w.Write([]byte(body))
+		_, _ = w.Write([]byte(body))
 	})
 }
 
@@ -481,7 +485,7 @@ func linkFarmHandler(stats *Stats) http.Handler {
 		}
 
 		b.WriteString(`</body></html>`)
-		w.Write([]byte(b.String()))
+		_, _ = w.Write([]byte(b.String()))
 	})
 }
 
@@ -494,7 +498,7 @@ func honeypotTrapHandler(stats *Stats) http.Handler {
 		// If crawling hidden link targets, return a warning
 		if strings.HasPrefix(r.URL.Path, "/trap/") {
 			w.WriteHeader(403)
-			w.Write([]byte(`<html><body><h1>TRAP TRIGGERED</h1>
+			_, _ = w.Write([]byte(`<html><body><h1>TRAP TRIGGERED</h1>
 <p>You followed a honeypot link. Real scrapers should skip hidden links.</p>
 </body></html>`))
 			stats.ErrorsReturned.Add(1)

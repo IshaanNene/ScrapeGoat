@@ -1,6 +1,6 @@
 # Distributed Crawling
 
-ScrapeGoat supports distributed crawling via a master/worker architecture.
+ScrapeGoat supports distributed crawling via a master/worker HTTP coordinator and an in-memory task queue.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ ScrapeGoat supports distributed crawling via a master/worker architecture.
 └──────┬──────┘
        │ HTTP API
   ┌────┴────┐
-  │  Redis  │  (task queue)
+  │ Queue   │  (in-memory today)
   └────┬────┘
   ┌────┼────────┐
   ▼    ▼        ▼
@@ -56,6 +56,7 @@ curl http://localhost:8081/api/status
 distributed:
   enabled: true
   master_addr: ":8081"
+  # Redis fields are placeholders until the real Redis queue backend lands.
   redis_addr: "localhost:6379"
   redis_db: 0
   redis_key: "scrapegoat:tasks"
@@ -99,3 +100,5 @@ services:
     image: redis:7-alpine
     ports: ["6379:6379"]
 ```
+
+> Redis appears in the example compose stack for future queue/backplane work. The current `RedisQueue` implementation falls back to the in-memory queue.

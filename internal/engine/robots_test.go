@@ -9,12 +9,14 @@ import (
 func TestRobotsManagerIsAllowed(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/robots.txt" {
-			w.Write([]byte(`User-agent: *
+			if _, err := w.Write([]byte(`User-agent: *
 Disallow: /private/
 Disallow: /admin
 Allow: /private/public
 Crawl-delay: 2
-Sitemap: https://example.com/sitemap.xml`))
+Sitemap: https://example.com/sitemap.xml`)); err != nil {
+				t.Errorf("write robots response: %v", err)
+			}
 			return
 		}
 		w.WriteHeader(200)
@@ -65,10 +67,12 @@ func TestRobotsManagerDisabled(t *testing.T) {
 func TestRobotsManagerSitemaps(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/robots.txt" {
-			w.Write([]byte(`User-agent: *
+			if _, err := w.Write([]byte(`User-agent: *
 Disallow: /private/
 Sitemap: https://example.com/sitemap1.xml
-Sitemap: https://example.com/sitemap2.xml`))
+Sitemap: https://example.com/sitemap2.xml`)); err != nil {
+				t.Errorf("write robots response: %v", err)
+			}
 			return
 		}
 	}))

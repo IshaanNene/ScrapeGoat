@@ -101,7 +101,7 @@ func (p *AutoscaledPool) RecordWorkerIdle() {
 // SetWorkerCounts sets the current worker counts directly.
 func (p *AutoscaledPool) SetWorkerCounts(active, idle int) {
 	p.activeWorkers.Store(int32(active)) // nolint:gosec // Always small positive int
-	p.idleWorkers.Store(int32(idle))   // nolint:gosec // Always small positive int
+	p.idleWorkers.Store(int32(idle))     // nolint:gosec // Always small positive int
 }
 
 // Evaluate checks current system load and decides whether to scale up or down.

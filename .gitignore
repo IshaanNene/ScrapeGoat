@@ -48,6 +48,7 @@ checkpoints/
 
 # Logs
 *.log
+lint_output.txt
 logs/
 
 # macOS

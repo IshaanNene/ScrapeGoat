@@ -15,28 +15,28 @@ func TestBloomFilter(t *testing.T) {
 		wantFound []bool
 	}{
 		{
-			name: "basic add and contains",
+			name:     "basic add and contains",
 			elements: 1000, fpRate: 0.01,
 			addURLs:   []string{"https://a.com", "https://b.com"},
 			checkURLs: []string{"https://a.com", "https://b.com", "https://c.com"},
 			wantFound: []bool{true, true, false},
 		},
 		{
-			name: "empty filter returns false",
+			name:     "empty filter returns false",
 			elements: 100, fpRate: 0.01,
 			addURLs:   nil,
 			checkURLs: []string{"https://anything.com"},
 			wantFound: []bool{false},
 		},
 		{
-			name: "default params for invalid inputs",
+			name:     "default params for invalid inputs",
 			elements: -1, fpRate: 2.0,
 			addURLs:   []string{"https://x.com"},
 			checkURLs: []string{"https://x.com"},
 			wantFound: []bool{true},
 		},
 		{
-			name: "many URLs no false negatives",
+			name:     "many URLs no false negatives",
 			elements: 10000, fpRate: 0.01,
 			addURLs: func() []string {
 				urls := make([]string, 500)

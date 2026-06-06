@@ -274,7 +274,10 @@ func (cs *CAPTCHASolver) solveAntiCaptcha(ctx context.Context, req *CAPTCHAReque
 			} `json:"solution"`
 			Cost string `json:"cost"`
 		}
-		json.NewDecoder(pollResp.Body).Decode(&result)
+		if err := json.NewDecoder(pollResp.Body).Decode(&result); err != nil {
+			pollResp.Body.Close()
+			continue
+		}
 		pollResp.Body.Close()
 
 		if result.Status == "ready" {
@@ -332,7 +335,9 @@ func (cs *CAPTCHASolver) solveCapsolver(ctx context.Context, req *CAPTCHARequest
 		TaskId    string `json:"taskId"`
 		ErrorDesc string `json:"errorDescription"`
 	}
-	json.NewDecoder(resp.Body).Decode(&createResult)
+	if err := json.NewDecoder(resp.Body).Decode(&createResult); err != nil {
+		return nil, err
+	}
 	if createResult.ErrorId != 0 {
 		return nil, fmt.Errorf("capsolver error: %s", createResult.ErrorDesc)
 	}
@@ -361,7 +366,10 @@ func (cs *CAPTCHASolver) solveCapsolver(ctx context.Context, req *CAPTCHARequest
 				Token              string `json:"token"`
 			} `json:"solution"`
 		}
-		json.NewDecoder(pollResp.Body).Decode(&result)
+		if err := json.NewDecoder(pollResp.Body).Decode(&result); err != nil {
+			pollResp.Body.Close()
+			continue
+		}
 		pollResp.Body.Close()
 
 		if result.Status == "ready" {

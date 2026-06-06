@@ -15,8 +15,12 @@ func TestInMemoryQueuePushPopLen(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_ = q.Push(ctx, &Task{ID: "task-1", Type: "crawl", URLs: []string{"https://example.com"}})
-	q.Push(ctx, &Task{ID: "task-2", Type: "crawl", URLs: []string{"https://example.com/2"}})
+	if err := q.Push(ctx, &Task{ID: "task-1", Type: "crawl", URLs: []string{"https://example.com"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := q.Push(ctx, &Task{ID: "task-2", Type: "crawl", URLs: []string{"https://example.com/2"}}); err != nil {
+		t.Fatal(err)
+	}
 
 	if q.Len() != 2 {
 		t.Errorf("len=%d, want 2", q.Len())
@@ -37,8 +41,12 @@ func TestInMemoryQueuePushPopLen(t *testing.T) {
 func TestInMemoryQueueClose(t *testing.T) {
 	q := NewInMemoryQueue(testLogger)
 	ctx := context.Background()
-	q.Push(ctx, &Task{ID: "t1"})
-	q.Close()
+	if err := q.Push(ctx, &Task{ID: "t1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := q.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Pop after close should return error or nil
 	_, err := q.Pop(ctx)
@@ -51,8 +59,12 @@ func TestInMemoryQueueClose(t *testing.T) {
 func TestExportImportQueue(t *testing.T) {
 	q := NewInMemoryQueue(testLogger)
 	ctx := context.Background()
-	q.Push(ctx, &Task{ID: "t1", Type: "crawl"})
-	q.Push(ctx, &Task{ID: "t2", Type: "crawl"})
+	if err := q.Push(ctx, &Task{ID: "t1", Type: "crawl"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := q.Push(ctx, &Task{ID: "t2", Type: "crawl"}); err != nil {
+		t.Fatal(err)
+	}
 
 	exported, err := ExportQueue(q)
 	if err != nil {

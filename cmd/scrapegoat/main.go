@@ -1,16 +1,17 @@
 package main
 
 import (
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -636,7 +637,11 @@ func dashboardCmd() *cobra.Command {
 			// Parse port from address
 			dashPort := 8080
 			if len(dashAddr) > 1 && dashAddr[0] == ':' {
-				fmt.Sscanf(dashAddr[1:], "%d", &dashPort)
+				port, err := strconv.Atoi(dashAddr[1:])
+				if err != nil {
+					return fmt.Errorf("parse dashboard address %q: %w", dashAddr, err)
+				}
+				dashPort = port
 			}
 
 			// Create a stats provider that serves demo data
@@ -750,7 +755,9 @@ func scaleCmd() *cobra.Command {
 			defer resp.Body.Close()
 
 			var status map[string]any
-			json.NewDecoder(resp.Body).Decode(&status)
+			if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+				return fmt.Errorf("decode scale response: %w", err)
+			}
 
 			fmt.Printf("✅ Scale request sent. Current workers: %v\n", status["current_workers"])
 			return nil

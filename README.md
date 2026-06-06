@@ -2,12 +2,12 @@
 
 # ScrapeGoat
 
-### The high-performance distributed web scraping framework written in Go.
+### The high-performance web scraping framework written in Go.
 
-**Scrapy's architecture + Go's concurrency + distributed crawling. One binary, zero dependencies.**
+**Scrapy's architecture + Go's concurrency + file-based defaults. One binary, no required services.**
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/IshaanNene/ScrapeGoat)](https://goreportcard.com/report/github.com/IshaanNene/ScrapeGoat)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Reference](https://pkg.go.dev/badge/github.com/IshaanNene/ScrapeGoat.svg)](https://pkg.go.dev/github.com/IshaanNene/ScrapeGoat)
 
 </div>
@@ -21,9 +21,9 @@
 | **Scrapy** | Python, slower concurrency | Go goroutines = 10x throughput |
 | **Playwright** | Heavy browser automation | Lightweight HTTP + optional browser |
 | **Apify** | SaaS lock-in, paid tiers | Self-hosted, open-source |
-| **Colly** | Not distributed, limited pipeline | Distributed + full middleware pipeline |
+| **Colly** | Limited pipeline | Full middleware pipeline + checkpointing |
 
-> **ScrapeGoat combines Scrapy's architecture + Go's concurrency + distributed crawling.**
+> **ScrapeGoat combines Scrapy's architecture with Go's concurrency and a production-oriented crawler pipeline.**
 
 ---
 
@@ -82,7 +82,8 @@ graph TD
     FET -->|"response"| PAR["Parser<br>(CSS / XPath / Regex)"]
     PAR -->|"items"| PIP["Item Pipeline<br>(12 middlewares)"]
     PAR -->|"new URLs"| FRT
-    PIP --> STR["Storage<br>(JSON / CSV / S3 / Kafka / Postgres)"]
+    PIP --> STR["Storage<br>(JSON / JSONL / CSV)"]
+    PIP -. "experimental plugin stubs" .-> PLG["S3 / Kafka / Postgres"]
 
     style CLI fill:#4A90D9,color:#fff
     style ENG fill:#E67E22,color:#fff
@@ -95,6 +96,7 @@ graph TD
     style PAR fill:#1ABC9C,color:#fff
     style PIP fill:#E74C3C,color:#fff
     style STR fill:#3498DB,color:#fff
+    style PLG fill:#7F8C8D,color:#fff
 ```
 
 ---
@@ -140,8 +142,8 @@ func main() {
 | **Parsing** | CSS selectors, XPath, Regex, JSON-LD, OpenGraph, structured data, auto-extraction |
 | **Anti-Bot** | 50+ user agents, TLS fingerprinting, header rotation, session pools, Cloudflare detection, CAPTCHA solving |
 | **Middleware** | 7 request middlewares + 12 item pipeline middlewares, fully extensible |
-| **Storage** | JSON, JSONL, CSV, S3, Kafka, PostgreSQL plugins |
-| **Distributed** | Master/worker architecture, Redis queue, horizontal scaling |
+| **Storage** | JSON, JSONL, CSV file storage; experimental S3/Kafka/PostgreSQL plugin stubs with local/logging fallbacks |
+| **Distributed** | Master/worker HTTP coordination with an in-memory queue; Redis configuration is reserved for a future real backend |
 | **Browser** | Headless Chromium via go-rod, JS rendering, form filling, infinite scroll |
 | **Observability** | Prometheus metrics, OpenTelemetry tracing, web dashboard, real-time stats |
 | **DevEx** | CLI scaffolding, REPL, YAML config, checkpoint pause/resume, `robots.txt` compliance |
@@ -175,10 +177,10 @@ scrapegoat version               # Print version
 registry := plugin.NewRegistry(logger)
 builtin.RegisterBuiltinPlugins(registry, logger)
 
-// Available plugins:
-// • scrapegoat-s3        — S3 storage
-// • scrapegoat-kafka     — Kafka publisher
-// • scrapegoat-postgres  — PostgreSQL storage
+// Experimental built-in plugin stubs:
+// • scrapegoat-s3        — writes S3-shaped batches to a local fallback
+// • scrapegoat-kafka     — logs publish operations for future Kafka integration
+// • scrapegoat-postgres  — buffers/logs inserts for future PostgreSQL integration
 
 // Custom plugin
 type MyPlugin struct{}
@@ -233,6 +235,7 @@ storage:
 distributed:
   enabled: false
   master_addr: ":8081"
+  # Redis fields are placeholders until the real Redis queue backend lands.
   redis_addr: "localhost:6379"
 ```
 
@@ -260,8 +263,8 @@ ScrapeGoat/
 │   ├── parser/              # CSS, XPath, regex, structured data, auto-extractor
 │   ├── pipeline/            # Item processing pipeline (12 middlewares)
 │   ├── storage/             # JSON, JSONL, CSV storage
-│   ├── distributed/         # Master/worker, task queue
-│   ├── plugin/              # Plugin registry + S3/Kafka/Postgres plugins
+│   ├── distributed/         # Master/worker, in-memory task queue
+│   ├── plugin/              # Plugin registry + experimental storage stubs
 │   ├── observability/       # Prometheus metrics, OpenTelemetry tracing
 │   ├── dashboard/           # Web dashboard
 │   ├── automation/          # Browser automation (go-rod)
@@ -306,13 +309,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+Apache License 2.0 — see [LICENSE](LICENSE) for details.
 
 ---
 
 <div align="center">
 
-**Built with in Go**
+**Built in Go**
 
 [Star on GitHub](https://github.com/IshaanNene/ScrapeGoat) · [Docs](docs/) · [Issues](https://github.com/IshaanNene/ScrapeGoat/issues)
 

@@ -135,7 +135,9 @@ func TestProxyAddRuntime(t *testing.T) {
 		t.Fatal("should start empty")
 	}
 
-	pm.AddProxy("http://new-proxy.test:8080")
+	if err := pm.AddProxy("http://new-proxy.test:8080"); err != nil {
+		t.Fatal(err)
+	}
 	if pm.Count() != 1 {
 		t.Errorf("expected 1 proxy after add, got %d", pm.Count())
 	}

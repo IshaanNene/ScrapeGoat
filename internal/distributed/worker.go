@@ -363,7 +363,9 @@ func (api *MasterAPI) handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	api.master.RegisterNode(&node)
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "registered"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "registered"}); err != nil {
+		api.logger.Error("encode register response failed", "error", err)
+	}
 }
 
 func (api *MasterAPI) handleUnregister(w http.ResponseWriter, r *http.Request) {
@@ -399,7 +401,9 @@ func (api *MasterAPI) handleGetTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(workerTasks)
+	if err := json.NewEncoder(w).Encode(workerTasks); err != nil {
+		api.logger.Error("encode tasks response failed", "error", err)
+	}
 }
 
 func (api *MasterAPI) handleComplete(w http.ResponseWriter, r *http.Request) {
@@ -425,22 +429,28 @@ func (api *MasterAPI) handleSubmit(w http.ResponseWriter, r *http.Request) {
 
 	api.master.SubmitTask(&task)
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"task_id": task.ID})
+	if err := json.NewEncoder(w).Encode(map[string]string{"task_id": task.ID}); err != nil {
+		api.logger.Error("encode submit response failed", "error", err)
+	}
 }
 
 func (api *MasterAPI) handleStatus(w http.ResponseWriter, r *http.Request) {
 	status := api.master.GetClusterStatus()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		api.logger.Error("encode status response failed", "error", err)
+	}
 }
 
 func (api *MasterAPI) handleScale(w http.ResponseWriter, r *http.Request) {
 	status := api.master.GetClusterStatus()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"current_workers": status.TotalNodes,
 		"status":          "scale command received",
-	})
+	}); err != nil {
+		api.logger.Error("encode scale response failed", "error", err)
+	}
 }
 
 // jsonReader wraps JSON bytes in an io.Reader.

@@ -337,7 +337,7 @@ func BenchmarkCSSParse(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		p.Parse(resp, rules)
+		_, _, _ = p.Parse(resp, rules)
 	}
 }
 
@@ -350,7 +350,7 @@ func BenchmarkXPathParse(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		p.Parse(resp, rules)
+		_, _, _ = p.Parse(resp, rules)
 	}
 }
 
@@ -360,7 +360,7 @@ func BenchmarkStructuredData(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sde.Extract(resp)
+		_, _ = sde.Extract(resp)
 	}
 }
 
@@ -375,6 +375,6 @@ func BenchmarkCompositeParser(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cp.Parse(resp, rules)
+		_, _, _ = cp.Parse(resp, rules)
 	}
 }

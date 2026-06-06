@@ -16,8 +16,8 @@ import (
 
 // --- S3 Storage Plugin ---
 
-// S3StoragePlugin stores scraped items in Amazon S3.
-// Requires AWS credentials to be configured via environment variables or AWS config.
+// S3StoragePlugin stores scraped items in S3-shaped local fallback files.
+// A real S3 backend should replace this with AWS SDK upload calls.
 type S3StoragePlugin struct {
 	bucket     string
 	prefix     string
@@ -145,7 +145,7 @@ func NewS3StoragePlugin(logger *slog.Logger) *S3StoragePlugin {
 
 // --- Kafka Publisher Plugin ---
 
-// KafkaPublisherPlugin publishes scraped items to Apache Kafka.
+// KafkaPublisherPlugin logs Kafka publish operations until a real Kafka client is wired in.
 type KafkaPublisherPlugin struct {
 	brokers   []string
 	topic     string
@@ -219,7 +219,7 @@ func NewKafkaPublisherPlugin(logger *slog.Logger) *KafkaPublisherPlugin {
 
 // --- PostgreSQL Storage Plugin ---
 
-// PostgresStoragePlugin stores scraped items in PostgreSQL.
+// PostgresStoragePlugin buffers and logs PostgreSQL inserts until a real driver is wired in.
 type PostgresStoragePlugin struct {
 	dsn       string
 	table     string

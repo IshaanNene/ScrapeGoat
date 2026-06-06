@@ -5,6 +5,7 @@ import (
 	"html"
 	"log/slog"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -166,13 +167,13 @@ func (m *TypeCoercionMiddleware) Process(item *types.Item) (*types.Item, error) 
 
 		switch targetType {
 		case "int":
-			var i int64
-			fmt.Sscanf(s, "%d", &i)
-			item.Set(field, i)
+			if i, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64); err == nil {
+				item.Set(field, i)
+			}
 		case "float":
-			var f float64
-			fmt.Sscanf(s, "%f", &f)
-			item.Set(field, f)
+			if f, err := strconv.ParseFloat(strings.TrimSpace(s), 64); err == nil {
+				item.Set(field, f)
+			}
 		case "bool":
 			lower := strings.ToLower(s)
 			item.Set(field, lower == "true" || lower == "1" || lower == "yes")

@@ -3,6 +3,8 @@
 BINARY_NAME=scrapegoat
 BUILD_DIR=./bin
 MAIN_PATH=./cmd/scrapegoat
+GOLANGCI_LINT_VERSION ?= v1.64.8
+GOLANGCI_LINT_BIN ?= $(shell go env GOPATH)/bin/golangci-lint
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS=-ldflags "-X github.com/IshaanNene/ScrapeGoat/internal/config.Version=$(VERSION)"
@@ -25,8 +27,15 @@ test-short: ## Run tests (short mode)
 	go test ./... -short -count=1 -timeout 60s
 
 lint: ## Run linters
-	@which golangci-lint > /dev/null 2>&1 || (echo "Installing golangci-lint..." && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
-	golangci-lint run ./...
+	@if ! command -v golangci-lint > /dev/null 2>&1 && [ ! -x "$(GOLANGCI_LINT_BIN)" ]; then \
+		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
+		go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION); \
+	fi
+	@if command -v golangci-lint > /dev/null 2>&1; then \
+		golangci-lint run ./...; \
+	else \
+		"$(GOLANGCI_LINT_BIN)" run ./...; \
+	fi
 
 clean: ## Clean build artifacts
 	rm -rf $(BUILD_DIR)

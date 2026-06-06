@@ -26,7 +26,7 @@ var testLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Le
 func interlinkedServer(pageCount int) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		page := 0
-		fmt.Sscanf(r.URL.Path, "/page/%d", &page)
+		_, _ = fmt.Sscanf(r.URL.Path, "/page/%d", &page)
 		if page < 0 || page >= pageCount {
 			page = 0
 		}

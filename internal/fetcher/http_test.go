@@ -134,7 +134,9 @@ func TestFetchSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(200)
-		w.Write([]byte("<html><body>Hello</body></html>"))
+		if _, err := w.Write([]byte("<html><body>Hello</body></html>")); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -168,7 +170,9 @@ func TestFetch429(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Retry-After", "5")
 		w.WriteHeader(429)
-		w.Write([]byte("rate limited"))
+		if _, err := w.Write([]byte("rate limited")); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -201,7 +205,9 @@ func TestFetch429(t *testing.T) {
 func TestFetch5xx(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(503)
-		w.Write([]byte("service unavailable"))
+		if _, err := w.Write([]byte("service unavailable")); err != nil {
+			t.Errorf("write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -233,8 +239,12 @@ func TestFetchGzipDecompression(t *testing.T) {
 		w.Header().Set("Content-Encoding", "gzip")
 		w.Header().Set("Content-Type", "text/html")
 		gz := gzip.NewWriter(w)
-		gz.Write([]byte("<html><body>Compressed</body></html>"))
-		gz.Close()
+		if _, err := gz.Write([]byte("<html><body>Compressed</body></html>")); err != nil {
+			t.Errorf("write gzip response: %v", err)
+		}
+		if err := gz.Close(); err != nil {
+			t.Errorf("close gzip response: %v", err)
+		}
 	}))
 	defer server.Close()
 

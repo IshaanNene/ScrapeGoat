@@ -173,10 +173,14 @@ func TestLiveCrawl(t *testing.T) {
 	store, _ := storage.NewFileStorage("jsonl", cfg.Storage.OutputPath, testLogger)
 	eng.SetStorage(store)
 
-	eng.AddSeed("https://quotes.toscrape.com")
+	if err := eng.AddSeed("https://quotes.toscrape.com"); err != nil {
+		t.Fatal(err)
+	}
 
 	// Start with timeout
-	eng.Start()
+	if err := eng.Start(); err != nil {
+		t.Fatal(err)
+	}
 
 	done := make(chan struct{})
 	go func() {

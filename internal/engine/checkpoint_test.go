@@ -122,19 +122,25 @@ func TestCheckpointOverwrite(t *testing.T) {
 	req, _ := types.NewRequest("https://first.com")
 	frontier.Push(req)
 	stats.RequestsSent.Store(10)
-	cm.Save(frontier, dedup, stats)
+	if err := cm.Save(frontier, dedup, stats); err != nil {
+		t.Fatal(err)
+	}
 
 	// Save second checkpoint (overwrites)
 	req2, _ := types.NewRequest("https://second.com")
 	frontier.Push(req2)
 	stats.RequestsSent.Store(20)
-	cm.Save(frontier, dedup, stats)
+	if err := cm.Save(frontier, dedup, stats); err != nil {
+		t.Fatal(err)
+	}
 
 	// Load should reflect second save
 	f2 := NewFrontier()
 	d2 := NewDeduplicator(100)
 	s2 := &Stats{domainStats: make(map[string]*DomainStats)}
-	cm.Load(f2, d2, s2)
+	if err := cm.Load(f2, d2, s2); err != nil {
+		t.Fatal(err)
+	}
 
 	if s2.RequestsSent.Load() != 20 {
 		t.Errorf("RequestsSent=%d, want 20 (from second save)", s2.RequestsSent.Load())
