@@ -45,7 +45,7 @@ func TestRequiredFieldsMiddleware(t *testing.T) {
 	// Should drop — missing required field (returns nil, nil)
 	item2 := types.NewItem("https://example.com")
 	item2.Set("body", "no title")
-	result, err = m.Process(item2)
+	result, _ = m.Process(item2)
 	if result != nil {
 		t.Error("item missing required field should be dropped (nil)")
 	}

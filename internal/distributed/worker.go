@@ -335,8 +335,15 @@ func (api *MasterAPI) ServeMux() *http.ServeMux {
 func (api *MasterAPI) Start(addr string) error {
 	api.logger.Info("master API starting", "addr", addr)
 	go func() {
-		if err := http.ListenAndServe(addr, api.ServeMux()); err != nil {
-			api.logger.Error("master API error", "error", err)
+		server := &http.Server{
+			Addr:              addr,
+			Handler:           api.ServeMux(),
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+		}
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			api.logger.Error("master api server failed", "error", err)
 		}
 	}()
 	return nil

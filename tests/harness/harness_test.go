@@ -224,7 +224,7 @@ func TestMode4_HugeResponseBomb(t *testing.T) {
 	var memAfter runtime.MemStats
 	runtime.ReadMemStats(&memAfter)
 
-	heapDeltaMB := float64(int64(memAfter.HeapAlloc)-int64(memBefore.HeapAlloc)) / 1024 / 1024
+	heapDeltaMB := float64(int64(memAfter.HeapAlloc)-int64(memBefore.HeapAlloc)) / 1024 / 1024 // nolint:gosec // fine for tests
 	// NOTE: The framework currently lacks MaxBodySize enforcement (reads full body).
 	// This test documents the behavior. Heap spikes are expected without io.LimitReader.
 	if heapDeltaMB > 600 {

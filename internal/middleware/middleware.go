@@ -251,12 +251,12 @@ func (m *RequestFingerprintMiddleware) Priority() int { return 90 }
 
 func (m *RequestFingerprintMiddleware) ProcessRequest(req *types.Request) *types.Request {
 	if req.Headers.Get("Sec-Ch-Ua") == "" {
-		ua := m.secChUa[rand.Intn(len(m.secChUa))]
+		ua := m.secChUa[rand.Intn(len(m.secChUa))] // nolint:gosec // weak rng is safe for ua
 		req.Headers.Set("Sec-Ch-Ua", ua)
 		req.Headers.Set("Sec-Ch-Ua-Mobile", "?0")
 
 		platforms := []string{`"Windows"`, `"macOS"`, `"Linux"`}
-		req.Headers.Set("Sec-Ch-Ua-Platform", platforms[rand.Intn(len(platforms))])
+		req.Headers.Set("Sec-Ch-Ua-Platform", platforms[rand.Intn(len(platforms))]) // nolint:gosec // weak rng is safe for ua
 	}
 
 	if req.Headers.Get("Sec-Fetch-Dest") == "" {
@@ -348,7 +348,7 @@ func (m *ProxyRotationMiddleware) ProcessRequest(req *types.Request) *types.Requ
 	var proxy string
 	switch m.rotation {
 	case "random":
-		proxy = m.proxies[rand.Intn(len(m.proxies))]
+		proxy = m.proxies[rand.Intn(len(m.proxies))] // nolint:gosec // weak rng is safe for ua
 	default: // round_robin
 		idx := m.index.Add(1) % int64(len(m.proxies))
 		proxy = m.proxies[idx]

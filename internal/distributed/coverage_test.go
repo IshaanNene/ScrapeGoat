@@ -15,7 +15,7 @@ func TestInMemoryQueuePushPopLen(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	q.Push(ctx, &Task{ID: "task-1", Type: "crawl", URLs: []string{"https://example.com"}})
+	_ = q.Push(ctx, &Task{ID: "task-1", Type: "crawl", URLs: []string{"https://example.com"}})
 	q.Push(ctx, &Task{ID: "task-2", Type: "crawl", URLs: []string{"https://example.com/2"}})
 
 	if q.Len() != 2 {

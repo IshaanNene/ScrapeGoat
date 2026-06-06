@@ -836,7 +836,7 @@ logging:
   format: text
 `, name, name)
 
-	if err := os.WriteFile(filepath.Join(dir, "scrapegoat.yaml"), []byte(configContent), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "scrapegoat.yaml"), []byte(configContent), 0o600); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 
