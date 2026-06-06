@@ -18,6 +18,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/IshaanNene/ScrapeGoat/internal/apiserver"
 	"github.com/IshaanNene/ScrapeGoat/internal/benchmark"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/dashboard"
@@ -80,6 +81,7 @@ Features:
 	rootCmd.AddCommand(benchmarkCmd())
 	rootCmd.AddCommand(scaleCmd())
 	rootCmd.AddCommand(mcpCmd())
+	rootCmd.AddCommand(serveCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -1008,6 +1010,86 @@ Examples:
 	cmd.Flags().StringVar(&mcpTransport, "transport", "stdio", "transport type: stdio or http")
 	cmd.Flags().IntVar(&mcpPort, "port", 8090, "HTTP server port (only for http transport)")
 	cmd.Flags().StringVar(&mcpAPIKey, "api-key", "", "API key for HTTP transport authentication (or set SCRAPEGOAT_API_KEY)")
+
+	return cmd
+}
+
+// serveCmd creates the "serve" subcommand to start the API server.
+func serveCmd() *cobra.Command {
+	var (
+		servePort   int
+		serveAPIKey string
+		serveDB     string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "serve",
+		Short: "Start the REST/WebSocket API server",
+		Long: `Start a headless API server for programmatic access to ScrapeGoat.
+
+Provides REST endpoints for crawling, extraction, and job management,
+plus WebSocket streaming for real-time item delivery.
+
+Examples:
+  scrapegoat serve --port=8080 --api-key=sk-...
+  scrapegoat serve --db=./jobs.db
+  SCRAPEGOAT_API_KEY=sk-... scrapegoat serve`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			logger := setupLogger()
+			cfg := loadConfig(logger)
+
+			if servePort > 0 {
+				cfg.APIServer.Port = servePort
+			}
+			if cfg.APIServer.Port == 0 {
+				cfg.APIServer.Port = 8080
+			}
+
+			if serveAPIKey != "" {
+				cfg.APIServer.APIKey = serveAPIKey
+			}
+			if cfg.APIServer.APIKey == "" {
+				cfg.APIServer.APIKey = os.Getenv("SCRAPEGOAT_API_KEY")
+			}
+
+			if serveDB != "" {
+				cfg.APIServer.DBPath = serveDB
+			}
+			if cfg.APIServer.DBPath == "" {
+				cfg.APIServer.DBPath = "./scrapegoat_jobs.db"
+			}
+
+			cfg.APIServer.CORS = true
+
+			srv, err := apiserver.NewServer(cfg, logger)
+			if err != nil {
+				return fmt.Errorf("create server: %w", err)
+			}
+
+			fmt.Printf("🐐 ScrapeGoat API Server at http://localhost:%d\n", cfg.APIServer.Port)
+			fmt.Printf("   Health: http://localhost:%d/health\n", cfg.APIServer.Port)
+			if cfg.APIServer.APIKey != "" {
+				fmt.Printf("   API Key: %s...%s\n", cfg.APIServer.APIKey[:4], cfg.APIServer.APIKey[len(cfg.APIServer.APIKey)-4:])
+			}
+			fmt.Println("\nPress Ctrl+C to stop.")
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+			go func() {
+				<-sigCh
+				cancel()
+			}()
+
+			return srv.Start(ctx)
+		},
+	}
+
+	cmd.Flags().IntVar(&servePort, "port", 8080, "API server port")
+	cmd.Flags().StringVar(&serveAPIKey, "api-key", "", "API key for authentication (or set SCRAPEGOAT_API_KEY)")
+	cmd.Flags().StringVar(&serveDB, "db", "", "SQLite database path for job persistence")
 
 	return cmd
 }

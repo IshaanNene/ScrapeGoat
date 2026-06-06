@@ -16,6 +16,9 @@ type Config struct {
 	Pipeline    PipelineConfig        `mapstructure:"pipeline"    yaml:"pipeline"`
 	Storage     StorageConfig         `mapstructure:"storage"     yaml:"storage"`
 	AI          AIConfig              `mapstructure:"ai"          yaml:"ai"`
+	LLM         LLMConfig             `mapstructure:"llm"         yaml:"llm"`
+	APIServer   APIServerConfig       `mapstructure:"api_server"  yaml:"api_server"`
+	MCP         MCPConfig             `mapstructure:"mcp"         yaml:"mcp"`
 	Logging     LoggingConfig         `mapstructure:"logging"     yaml:"logging"`
 	Metrics     MetricsConfig         `mapstructure:"metrics"     yaml:"metrics"`
 	Browser     BrowserConfig         `mapstructure:"browser"     yaml:"browser"`
@@ -215,4 +218,33 @@ type ProjectConfig struct {
 	Name      string   `mapstructure:"name"       yaml:"name"`
 	Version   string   `mapstructure:"version"    yaml:"version"`
 	StartURLs []string `mapstructure:"start_urls" yaml:"start_urls"`
+}
+
+// LLMConfig configures the LLM extraction engine.
+type LLMConfig struct {
+	Enabled    bool          `mapstructure:"enabled"      yaml:"enabled"`
+	Provider   string        `mapstructure:"provider"     yaml:"provider"` // openai, anthropic, ollama
+	Model      string        `mapstructure:"model"        yaml:"model"`
+	APIKey     string        `mapstructure:"api_key"      yaml:"api_key"`
+	Endpoint   string        `mapstructure:"endpoint"     yaml:"endpoint"`
+	CachePath  string        `mapstructure:"cache_path"   yaml:"cache_path"`
+	CacheTTL   time.Duration `mapstructure:"cache_ttl"    yaml:"cache_ttl"`
+	MaxTokens  int           `mapstructure:"max_tokens"   yaml:"max_tokens"`
+}
+
+// APIServerConfig configures the REST/WebSocket API server.
+type APIServerConfig struct {
+	Enabled  bool   `mapstructure:"enabled"   yaml:"enabled"`
+	Port     int    `mapstructure:"port"      yaml:"port"`
+	APIKey   string `mapstructure:"api_key"   yaml:"api_key"`
+	DBPath   string `mapstructure:"db_path"   yaml:"db_path"`
+	CORS     bool   `mapstructure:"cors"      yaml:"cors"`
+	RateRPS  int    `mapstructure:"rate_rps"  yaml:"rate_rps"` // requests per second per key
+}
+
+// MCPConfig configures the MCP server.
+type MCPConfig struct {
+	Transport string `mapstructure:"transport" yaml:"transport"` // stdio or http
+	Port      int    `mapstructure:"port"      yaml:"port"`
+	APIKey    string `mapstructure:"api_key"   yaml:"api_key"`
 }
