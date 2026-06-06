@@ -24,6 +24,7 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/distributed"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
+	"github.com/IshaanNene/ScrapeGoat/internal/mcp"
 	"github.com/IshaanNene/ScrapeGoat/internal/observability"
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
@@ -78,6 +79,7 @@ Features:
 	rootCmd.AddCommand(dashboardCmd())
 	rootCmd.AddCommand(benchmarkCmd())
 	rootCmd.AddCommand(scaleCmd())
+	rootCmd.AddCommand(mcpCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -935,4 +937,77 @@ func main() {
 `, cases.Title(language.Und).String(name), cases.Title(language.Und).String(name), name, cases.Title(language.Und).String(name), cases.Title(language.Und).String(name), name, cases.Title(language.Und).String(name))
 
 	return os.WriteFile(filepath.Join(dir, "main.go"), []byte(template), 0o644)
+}
+
+// mcpCmd creates the "mcp" subcommand to start the MCP server.
+func mcpCmd() *cobra.Command {
+	var (
+		mcpTransport string
+		mcpPort      int
+		mcpAPIKey    string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "mcp",
+		Short: "Start the MCP (Model Context Protocol) server",
+		Long: `Start an MCP server so AI agents (Claude, GPT-4, Cursor, Cline) can use
+ScrapeGoat as a native tool. Supports stdio and HTTP transports.
+
+Stdio transport (default):
+  Reads JSON-RPC 2.0 from stdin, writes responses to stdout.
+  Use this for Claude Desktop and Cursor integration.
+
+HTTP transport:
+  Starts an HTTP server with JSON-RPC endpoint and SSE streaming.
+  Requires an API key for authentication (--api-key or SCRAPEGOAT_API_KEY).
+
+Examples:
+  scrapegoat mcp                                  # stdio mode (for Claude Desktop)
+  scrapegoat mcp --transport=http --port=8090      # HTTP mode
+  scrapegoat mcp --transport=http --api-key=sk-... # HTTP with auth`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			logger := setupLogger()
+
+			// For HTTP transport, require an API key.
+			if mcpTransport == "http" && mcpAPIKey == "" {
+				mcpAPIKey = os.Getenv("SCRAPEGOAT_API_KEY")
+				if mcpAPIKey == "" {
+					return fmt.Errorf("HTTP transport requires an API key: use --api-key or set SCRAPEGOAT_API_KEY")
+				}
+			}
+
+			server := mcp.NewServer(logger, mcpAPIKey)
+
+			switch mcpTransport {
+			case "stdio":
+				server.SetTransport(mcp.NewStdioTransport(logger))
+			case "http":
+				server.SetTransport(mcp.NewHTTPTransport(mcpPort, mcpAPIKey, logger))
+				fmt.Printf("🐐 ScrapeGoat MCP Server (HTTP) at http://localhost:%d/mcp\n", mcpPort)
+				fmt.Printf("   SSE endpoint: http://localhost:%d/mcp/sse\n", mcpPort)
+				fmt.Printf("   API Key: %s...%s\n", mcpAPIKey[:4], mcpAPIKey[len(mcpAPIKey)-4:])
+				fmt.Println("\nPress Ctrl+C to stop.")
+			default:
+				return fmt.Errorf("unknown transport %q (available: stdio, http)", mcpTransport)
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+			go func() {
+				<-sigCh
+				cancel()
+			}()
+
+			return server.Run(ctx)
+		},
+	}
+
+	cmd.Flags().StringVar(&mcpTransport, "transport", "stdio", "transport type: stdio or http")
+	cmd.Flags().IntVar(&mcpPort, "port", 8090, "HTTP server port (only for http transport)")
+	cmd.Flags().StringVar(&mcpAPIKey, "api-key", "", "API key for HTTP transport authentication (or set SCRAPEGOAT_API_KEY)")
+
+	return cmd
 }
