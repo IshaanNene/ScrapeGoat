@@ -1036,7 +1036,7 @@ Examples:
   SCRAPEGOAT_API_KEY=sk-... scrapegoat serve`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger := setupLogger()
-			cfg := loadConfig(logger)
+			cfg := config.DefaultConfig()
 
 			if servePort > 0 {
 				cfg.APIServer.Port = servePort
