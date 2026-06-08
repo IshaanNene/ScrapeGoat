@@ -88,6 +88,32 @@ ai:
   provider: "openai"
   model: "gpt-4"
 
+# LLM extraction engine configuration.
+llm:
+  enabled: false
+  provider: "openai"        # openai, anthropic, ollama
+  model: "gpt-4o"
+  api_key: ""               # Or set OPENAI_API_KEY / ANTHROPIC_API_KEY env var
+  endpoint: ""              # Custom endpoint (e.g. for Ollama: http://localhost:11434)
+  cache_path: "./llm_cache.db"
+  cache_ttl: 24h
+  max_tokens: 4096
+
+# REST/WebSocket API server.
+api_server:
+  enabled: false
+  port: 8080
+  api_key: ""               # Or set SCRAPEGOAT_API_KEY env var
+  db_path: "./scrapegoat_jobs.db"
+  cors: true
+  rate_rps: 100             # Requests per second per key
+
+# MCP (Model Context Protocol) server for LLM tool use.
+mcp:
+  transport: "stdio"        # stdio or http
+  port: 3333
+  api_key: ""               # Required for HTTP transport
+
 metrics:
   enabled: true
   port: 9090
@@ -97,3 +123,4 @@ logging:
   level: info
   format: text
   output: stderr
+

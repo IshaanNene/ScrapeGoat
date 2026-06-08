@@ -4,26 +4,28 @@
 
 ### The high-performance web scraping framework written in Go.
 
-**Scrapy's architecture + Go's concurrency + file-based defaults. One binary, no required services.**
+**Scrapy's architecture + Go's concurrency + MCP integration + LLM extraction. One binary, no required services.**
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/IshaanNene/ScrapeGoat)](https://goreportcard.com/report/github.com/IshaanNene/ScrapeGoat)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Reference](https://pkg.go.dev/badge/github.com/IshaanNene/ScrapeGoat.svg)](https://pkg.go.dev/github.com/IshaanNene/ScrapeGoat)
+[![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-6366f1)](docs/mcp.md)
 
 </div>
 
 ---
 
-## Why ScrapeGoat?
+## Why ScrapeGoat in 2025?
 
 | Tool | Weakness | ScrapeGoat's Advantage |
 |------|----------|----------------------|
-| **Scrapy** | Python, slower concurrency | Go goroutines = 10x throughput |
-| **Playwright** | Heavy browser automation | Lightweight HTTP + optional browser |
-| **Apify** | SaaS lock-in, paid tiers | Self-hosted, open-source |
-| **Colly** | Limited pipeline | Full middleware pipeline + checkpointing |
+| **Scrapy** | Python, slower concurrency, no MCP | Go goroutines = 10x throughput + native MCP server |
+| **Playwright** | Heavy browser automation, no extraction | Lightweight HTTP + LLM-powered structured extraction |
+| **Apify** | SaaS lock-in, paid tiers | Self-hosted, open-source, REST API included |
+| **Colly** | Limited pipeline, no anti-bot | Full middleware pipeline + adaptive anti-bot engine |
+| **FireCrawl** | SaaS only, API limits | Self-hosted, unlimited, same LLM extraction |
 
-> **ScrapeGoat combines Scrapy's architecture with Go's concurrency and a production-oriented crawler pipeline.**
+> **ScrapeGoat combines Scrapy's architecture with Go's concurrency, MCP tool integration, and LLM-powered extraction — all in a single binary.**
 
 ---
 
@@ -139,15 +141,22 @@ func main() {
 | Category | Features |
 |----------|----------|
 | **Core Engine** | Priority queue frontier, per-domain throttling, autoscaled worker pool, Bloom filter dedup |
+| **MCP Server** | JSON-RPC 2.0, stdio + HTTP/SSE transports, 8 tools for Claude/Cursor/Cline |
+| **LLM Extraction** | OpenAI, Anthropic, Ollama backends; schema-based extraction; SQLite caching |
+| **API Server** | REST + WebSocket, job management, real-time streaming, API key auth, CORS |
+| **Anti-Bot** | Pattern-based block detection (Cloudflare, DataDome, PerimeterX, Akamai), adaptive strategy escalation, human behaviour simulation, 5 stealth browser profiles |
 | **Parsing** | CSS selectors, XPath, Regex, JSON-LD, OpenGraph, structured data, auto-extraction |
-| **Anti-Bot** | 50+ user agents, TLS fingerprinting, header rotation, session pools, Cloudflare detection, CAPTCHA solving |
+| **Transforms** | Schema validation (7 types), 6 composable transforms, drop/annotate/log failure modes |
+| **Change Detection** | SQLite-persisted monitoring, hash/selector diffing, webhook notifications |
+| **SDKs** | Python (sync + async, httpx + pydantic) and TypeScript (native fetch, zero deps) |
+| **Crawl Graph** | SQLite-backed URL graph, DOT/Mermaid/JSON/CSV export, replay strategies |
+| **Plugin SDK** | init() registration, BasePlugin embeddable, filter/transform middleware helpers |
 | **Middleware** | 7 request middlewares + 12 item pipeline middlewares, fully extensible |
-| **Storage** | JSON, JSONL, CSV file storage; experimental S3/Kafka/PostgreSQL plugin stubs with local/logging fallbacks |
-| **Distributed** | Master/worker HTTP coordination with an in-memory queue; Redis configuration is reserved for a future real backend |
+| **Storage** | JSON, JSONL, CSV file storage; experimental S3/Kafka/PostgreSQL plugin stubs |
+| **Distributed** | Master/worker HTTP coordination with an in-memory queue |
 | **Browser** | Headless Chromium via go-rod, JS rendering, form filling, infinite scroll |
 | **Observability** | Prometheus metrics, OpenTelemetry tracing, web dashboard, real-time stats |
 | **DevEx** | CLI scaffolding, REPL, YAML config, checkpoint pause/resume, `robots.txt` compliance |
-| **Extras** | SEO audit, sitemap crawler, content change detection, scheduled re-crawling |
 
 ---
 
@@ -157,6 +166,12 @@ func main() {
 scrapegoat crawl <url>           # Crawl with link following
 scrapegoat extract <url>         # Auto-extract structured data
 scrapegoat search <url>          # Full-text search indexing
+scrapegoat serve                 # Start REST/WebSocket API server
+scrapegoat mcp                   # Start MCP server (stdio or HTTP)
+scrapegoat graph                 # Export crawl graph (json/dot/mermaid/csv)
+scrapegoat replay                # Generate re-crawl URL list from graph
+scrapegoat watch <urls...>       # Monitor URLs for content changes
+scrapegoat diff <url>            # Show change history for a URL
 scrapegoat new spider <name>     # Scaffold a spider
 scrapegoat new project <name>    # Scaffold entire project
 scrapegoat master                # Start distributed coordinator
@@ -254,29 +269,38 @@ scrapegoat crawl https://example.com
 
 ```
 ScrapeGoat/
-├── cmd/scrapegoat/          # CLI entry point (12 commands)
+├── cmd/scrapegoat/          # CLI entry point (20 commands)
 ├── pkg/scrapegoat/          # Public SDK (Spider + Crawler APIs)
 ├── internal/
 │   ├── engine/              # Core: scheduler, frontier, dedup, bloom, autoscale, checkpoint, robots
+│   ├── mcp/                 # MCP server (JSON-RPC 2.0, stdio+HTTP transport, 8 tools)
+│   ├── llmextract/          # LLM extraction engine (OpenAI, Anthropic, Ollama + SQLite cache)
+│   ├── apiserver/           # REST + WebSocket API server with job management
+│   ├── antibot/             # Adaptive anti-bot engine, stealth profiles, human simulation
+│   ├── crawlgraph/          # Crawl graph with SQLite, export (DOT/Mermaid/JSON/CSV), replay
+│   ├── changedetect/        # Content change monitoring with notifications
+│   ├── transforms/          # Schema validation + composable data transforms
 │   ├── middleware/           # Request middleware pipeline (7 built-in)
-│   ├── fetcher/             # HTTP/browser fetcher, proxy, stealth, CAPTCHA, session pool, fingerprint
+│   ├── fetcher/             # HTTP/browser fetcher, proxy, stealth, CAPTCHA, session pool
 │   ├── parser/              # CSS, XPath, regex, structured data, auto-extractor
 │   ├── pipeline/            # Item processing pipeline (12 middlewares)
 │   ├── storage/             # JSON, JSONL, CSV storage
+│   ├── plugin/              # Plugin registry + SDK + experimental storage stubs
 │   ├── distributed/         # Master/worker, in-memory task queue
-│   ├── plugin/              # Plugin registry + experimental storage stubs
 │   ├── observability/       # Prometheus metrics, OpenTelemetry tracing
 │   ├── dashboard/           # Web dashboard
 │   ├── automation/          # Browser automation (go-rod)
 │   ├── benchmark/           # Performance comparison tool
-│   ├── monitor/             # Change detection, scheduled crawling, notifications
-│   ├── seo/                 # SEO audit, sitemap crawler, backlinks
+│   ├── seo/                 # SEO audit, sitemap crawler
 │   ├── repl/                # Interactive REPL
-│   └── config/              # Configuration management
+│   └── config/              # Configuration management + validation
+├── sdks/
+│   ├── python/              # Python SDK (httpx + pydantic, sync + async)
+│   └── typescript/          # TypeScript SDK (native fetch, zero deps)
 ├── examples/                # 9 example spiders
-├── docs/                    # Architecture, quickstart, middleware, distributed, examples
+├── docs/                    # Architecture, API spec (OpenAPI), MCP setup, quickstart
 ├── configs/                 # Default YAML configs
-└── scripts/                 # Build, test, benchmark scripts
+└── .github/workflows/       # CI: tests, benchmarks, Python SDK
 ```
 
 ---
@@ -297,8 +321,12 @@ make build          # Build binary
 
 - **[Quick Start](docs/quickstart.md)** — Get running in 3 minutes
 - **[Architecture](docs/architecture.md)** — How the components fit together
+- **[API Reference](docs/api.yaml)** — OpenAPI 3.1 specification
+- **[MCP Integration](docs/mcp.md)** — Claude Desktop / Cursor / Cline setup
 - **[Middleware](docs/middleware.md)** — Request and item middleware system
 - **[Distributed](docs/distributed.md)** — Master/worker setup
+- **[Python SDK](sdks/python/README.md)** — Python client (sync + async)
+- **[TypeScript SDK](sdks/typescript/README.md)** — TypeScript/JavaScript client
 - **[Examples](docs/examples.md)** — All example spiders
 
 ---

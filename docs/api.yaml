@@ -1,0 +1,359 @@
+openapi: "3.1.0"
+info:
+  title: ScrapeGoat API
+  description: |
+    REST and WebSocket API for the ScrapeGoat web scraping framework.
+    Start the server with `scrapegoat serve --port=8080 --api-key=sk-...`
+  version: "1.0.0"
+  license:
+    name: MIT
+    url: https://github.com/IshaanNene/ScrapeGoat/blob/main/LICENSE
+  contact:
+    name: Ishaan Nene
+    url: https://github.com/IshaanNene/ScrapeGoat
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key passed as Bearer token
+
+  schemas:
+    CrawlRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: Seed URL to crawl
+          example: https://example.com
+        depth:
+          type: integer
+          default: 3
+          minimum: 0
+          maximum: 100
+        concurrency:
+          type: integer
+          default: 10
+          minimum: 1
+          maximum: 100
+        selectors:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            title: h1
+            links: a[href]
+        allowed_domains:
+          type: array
+          items:
+            type: string
+        max_requests:
+          type: integer
+          default: 0
+        respect_robots:
+          type: boolean
+          default: true
+        user_agent:
+          type: string
+
+    ExtractRequest:
+      type: object
+      required: [url, schema]
+      properties:
+        url:
+          type: string
+          example: https://example.com/product
+        schema:
+          type: object
+          description: JSON schema defining fields to extract
+          example:
+            title: string
+            price: number
+            in_stock: boolean
+        model:
+          type: string
+          description: LLM model override
+          example: gpt-4o
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+          example: job_abc123
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        error:
+          type: string
+        items_count:
+          type: integer
+        pages_crawled:
+          type: integer
+
+    CrawlResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+        items_count:
+          type: integer
+        pages_crawled:
+          type: integer
+        duration_ms:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    ExtractResult:
+      type: object
+      properties:
+        data:
+          type: object
+        model:
+          type: string
+        tokens_used:
+          type: integer
+        cached:
+          type: boolean
+        cost_usd:
+          type: number
+          format: double
+
+    SEOAuditResult:
+      type: object
+      properties:
+        url:
+          type: string
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        issues:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              severity:
+                type: string
+                enum: [info, warning, error]
+              message:
+                type: string
+        meta:
+          type: object
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: integer
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      operationId: getHealth
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  version:
+                    type: string
+                  uptime:
+                    type: string
+
+  /api/v1/crawl:
+    post:
+      summary: Submit a crawl job
+      operationId: submitCrawl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrawlRequest"
+      responses:
+        "202":
+          description: Crawl job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+
+  /api/v1/extract:
+    post:
+      summary: Extract structured data using LLM
+      operationId: extract
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtractRequest"
+      responses:
+        "200":
+          description: Extraction result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractResult"
+        "400":
+          description: Bad request
+        "401":
+          description: Unauthorized
+
+  /api/v1/seo/audit:
+    post:
+      summary: Run SEO audit on a URL
+      operationId: seoAudit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+      responses:
+        "200":
+          description: SEO audit results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SEOAuditResult"
+
+  /api/v1/jobs:
+    get:
+      summary: List recent jobs
+      operationId: listJobs
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Job list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Job"
+
+  /api/v1/jobs/{jobId}:
+    get:
+      summary: Get job status
+      operationId: getJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Job not found
+    delete:
+      summary: Cancel a job
+      operationId: cancelJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+
+  /api/v1/jobs/{jobId}/results:
+    get:
+      summary: Get crawl results
+      operationId: getJobResults
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Crawl results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrawlResult"
+        "404":
+          description: Job not found
+
+  /ws:
+    get:
+      summary: WebSocket endpoint for real-time item streaming
+      operationId: wsStream
+      description: |
+        Connect via WebSocket to receive items in real-time during a crawl.
+        Send `{"action": "subscribe", "job_id": "..."}` to start.
+      responses:
+        "101":
+          description: Switching protocols to WebSocket
