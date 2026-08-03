@@ -2,22 +2,28 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // Scheduler manages worker goroutines that dequeue from the frontier and dispatch fetches.
 type Scheduler struct {
-	engine      *Engine
-	logger      *slog.Logger
-	wg          sync.WaitGroup
-	paused      atomic.Bool
-	pauseCh     chan struct{}
-	resumeCh    chan struct{}
+	engine *Engine
+	logger *slog.Logger
+	wg     sync.WaitGroup
+
+	// paused is read on the worker fast path without locking; pauseMu guards the
+	// resumeCh swap so a worker never parks on a channel that Resume has already
+	// closed past.
+	paused   atomic.Bool
+	pauseMu  sync.RWMutex
+	resumeCh chan struct{}
+
 	throttle    map[string]*domainThrottle
 	throttleMu  sync.RWMutex
 	idleWorkers atomic.Int32
@@ -35,7 +41,6 @@ func NewScheduler(e *Engine) *Scheduler {
 	return &Scheduler{
 		engine:   e,
 		logger:   e.logger.With("component", "scheduler"),
-		pauseCh:  make(chan struct{}),
 		resumeCh: make(chan struct{}),
 		throttle: make(map[string]*domainThrottle),
 		done:     make(chan struct{}),
@@ -62,16 +67,40 @@ func (s *Scheduler) Wait() {
 }
 
 // Pause pauses all workers.
+//
+// The gate channel is swapped under pauseMu rather than reassigned in place: workers
+// read it in a select, and an unsynchronised write both races with that read and can
+// park a worker on the *new* channel, which the matching Resume has already closed
+// past — a permanent missed wakeup.
 func (s *Scheduler) Pause() {
+	s.pauseMu.Lock()
+	defer s.pauseMu.Unlock()
+
+	if s.paused.Load() {
+		return
+	}
+	s.resumeCh = make(chan struct{})
 	s.paused.Store(true)
 }
 
 // Resume resumes all workers.
 func (s *Scheduler) Resume() {
+	s.pauseMu.Lock()
+	defer s.pauseMu.Unlock()
+
+	if !s.paused.Load() {
+		return
+	}
 	s.paused.Store(false)
-	// Unblock paused workers using a fresh channel
 	close(s.resumeCh)
-	s.resumeCh = make(chan struct{})
+}
+
+// resumeGate returns the channel a worker should wait on while paused, read under
+// the same lock that Pause and Resume write it under.
+func (s *Scheduler) resumeGate() <-chan struct{} {
+	s.pauseMu.RLock()
+	defer s.pauseMu.RUnlock()
+	return s.resumeCh
 }
 
 // idleMonitor checks if all workers are idle and frontier is empty.
@@ -113,58 +142,42 @@ func (s *Scheduler) worker(ctx context.Context, id int) {
 	logger := s.logger.With("worker_id", id)
 
 	for {
-		// Check if paused
+		// Check if paused. Read the gate through resumeGate so the channel we park
+		// on is the one Resume will close.
 		if s.paused.Load() {
 			logger.Debug("worker paused")
 			select {
 			case <-ctx.Done():
 				return
-			case <-s.resumeCh:
+			case <-s.resumeGate():
 				logger.Debug("worker resumed")
 			}
 		}
 
-		// Mark as idle while waiting for work
+		// Mark as idle while parked on the frontier. Pop blocks until a Push wakes
+		// it, the frontier closes, or ctx is cancelled — no polling.
 		s.idleWorkers.Add(1)
-
-		// Try to dequeue with short polling
-		var req *types.Request
-		for {
-			req = s.engine.frontier.TryPop()
-			if req != nil {
-				break
-			}
-
-			// Check if frontier is closed (no more work coming)
-			if s.engine.frontier.IsClosed() {
-				s.idleWorkers.Add(-1)
-				return
-			}
-
-			// Check context cancellation
-			select {
-			case <-ctx.Done():
-				s.idleWorkers.Add(-1)
-				return
-			default:
-			}
-
-			// Brief sleep before next poll attempt
-			time.Sleep(50 * time.Millisecond)
-		}
-
+		req := s.engine.frontier.Pop(ctx)
 		s.idleWorkers.Add(-1)
+
+		if req == nil {
+			// Frontier closed or context cancelled: no more work is coming.
+			return
+		}
 
 		// Apply per-domain throttle
 		s.applyThrottle(req.Domain())
 
 		// Track active worker count
-		s.engine.stats.ActiveWorkers.Add(1)
+		active := s.engine.stats.ActiveWorkers.Add(1)
+		s.engine.metrics.SetActiveWorkers(int(active))
+		s.engine.metrics.SetFrontierDepth(s.engine.frontier.Len())
 
 		// Process the request
 		s.processRequest(ctx, logger, req)
 
-		s.engine.stats.ActiveWorkers.Add(-1)
+		active = s.engine.stats.ActiveWorkers.Add(-1)
+		s.engine.metrics.SetActiveWorkers(int(active))
 
 		// Check max requests limit
 		if s.engine.cfg.Engine.MaxRequests > 0 &&
@@ -205,14 +218,20 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 	defer fetchCancel()
 
 	s.engine.stats.RequestsSent.Add(1)
+	domain := req.Domain()
+
 	resp, err := fetcher.Fetch(fetchCtx, req)
 	if err != nil {
+		s.engine.metrics.RecordRequest(domain, "error")
 		s.handleFetchError(logger, req, err)
 		return
 	}
 
 	s.engine.stats.ResponsesOK.Add(1)
 	s.engine.stats.BytesDownloaded.Add(resp.ContentLength)
+	s.engine.metrics.RecordRequest(domain, "ok")
+	s.engine.metrics.RecordResponse(domain, fetcherType, resp.StatusCode,
+		resp.FetchDuration, resp.ContentLength)
 	logger.Debug("fetched", "status", resp.StatusCode, "size", resp.ContentLength, "duration", resp.FetchDuration)
 
 	// Invoke ALL registered callbacks on every response
@@ -232,7 +251,9 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 		for _, item := range items {
 			item.SpiderName = cbName
 			item.Depth = req.Depth
-			s.engine.itemChan <- item
+			if !s.emitItem(ctx, item) {
+				return
+			}
 		}
 		for _, r := range newReqs {
 			r.Depth = req.Depth + 1
@@ -251,7 +272,9 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 		if len(callbacksCopy) == 0 {
 			for _, item := range items {
 				item.Depth = req.Depth
-				s.engine.itemChan <- item
+				if !s.emitItem(ctx, item) {
+					return
+				}
 			}
 		}
 		for _, link := range links {
@@ -266,12 +289,30 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 	}
 }
 
+// emitItem hands an item to the pipeline, giving up if the crawl is shutting down.
+//
+// A bare send here can block forever once the consumer has stopped draining, and —
+// worse — panics with "send on closed channel" if shutdown closes itemChan while a
+// worker is mid-send. Reporting the shutdown back to the caller lets the worker
+// unwind instead.
+func (s *Scheduler) emitItem(ctx context.Context, item *types.Item) bool {
+	select {
+	case s.engine.itemChan <- item:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
 // handleFetchError handles fetch failures with retry logic.
 func (s *Scheduler) handleFetchError(logger *slog.Logger, req *types.Request, err error) {
 	s.engine.stats.RequestsFailed.Add(1)
 
-	// Check if retryable
-	fetchErr, ok := err.(*types.FetchError)
+	// Check if retryable. errors.As rather than a bare type assertion: any
+	// middleware or fetcher that wraps the error with %w would otherwise make every
+	// failure look permanent, silently disabling retries.
+	var fetchErr *types.FetchError
+	ok := errors.As(err, &fetchErr)
 	if ok && fetchErr.IsRetryable() && req.RetryCount < req.MaxRetries {
 		req.RetryCount++
 		req.Priority = types.PriorityLow // Lower priority for retries
@@ -288,6 +329,7 @@ func (s *Scheduler) handleFetchError(logger *slog.Logger, req *types.Request, er
 			)
 			time.Sleep(fetchErr.RetryAfter)
 		}
+		s.engine.metrics.RecordRequest(req.Domain(), "retry")
 		s.engine.frontier.Push(req)
 		return
 	}
