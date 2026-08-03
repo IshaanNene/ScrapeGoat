@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -268,7 +269,18 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 	}
 	s.engine.mu.RUnlock()
 
-	for cbName, cb := range callbacksCopy {
+	// Dispatch in name order. Callbacks emit items, so the order they run in is
+	// the order items reach the pipeline — and Go randomises map iteration, which
+	// would make the output ordering of a multi-callback crawl differ between runs
+	// on identical input.
+	cbNames := make([]string, 0, len(callbacksCopy))
+	for name := range callbacksCopy {
+		cbNames = append(cbNames, name)
+	}
+	sort.Strings(cbNames)
+
+	for _, cbName := range cbNames {
+		cb := callbacksCopy[cbName]
 		items, newReqs, err := cb(resp)
 		if err != nil {
 			logger.Warn("callback error", "callback", cbName, "error", err)

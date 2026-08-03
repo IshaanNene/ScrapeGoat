@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"sort"
 	"time"
 )
 
@@ -71,11 +72,19 @@ func (i *Item) Delete(key string) {
 }
 
 // Keys returns all field names.
+// Keys returns the item's field names, sorted.
+//
+// Sorted rather than in map order because callers use this to build output —
+// column headers, serialisation order — and Go randomises map iteration by
+// design. Unsorted, the same crawl produces output whose field order changes
+// between runs, which makes diffing two runs useless and breaks any downstream
+// consumer that assumes stability.
 func (i *Item) Keys() []string {
 	keys := make([]string, 0, len(i.Fields))
 	for k := range i.Fields {
 		keys = append(keys, k)
 	}
+	sort.Strings(keys)
 	return keys
 }
 

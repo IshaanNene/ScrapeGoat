@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 
@@ -94,10 +95,24 @@ type FieldRenameMiddleware struct {
 
 func (m *FieldRenameMiddleware) Name() string { return "field_rename" }
 
+// Process applies the renames in sorted order of the old name.
+//
+// Order matters and cannot be avoided: a mapping that chains (a->b together with
+// b->c) or collides (a->c together with b->c) produces a different result
+// depending on which rename runs first. Iterating the map directly made that
+// result vary between runs on identical input. Sorting does not make chained
+// mappings *sensible* — it makes them reproducible, which is the property a
+// caller can actually build on.
 func (m *FieldRenameMiddleware) Process(item *types.Item) (*types.Item, error) {
-	for oldKey, newKey := range m.Mapping {
+	oldKeys := make([]string, 0, len(m.Mapping))
+	for oldKey := range m.Mapping {
+		oldKeys = append(oldKeys, oldKey)
+	}
+	sort.Strings(oldKeys)
+
+	for _, oldKey := range oldKeys {
 		if val, ok := item.Get(oldKey); ok {
-			item.Set(newKey, val)
+			item.Set(m.Mapping[oldKey], val)
 			item.Delete(oldKey)
 		}
 	}

@@ -23,6 +23,11 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
   take `nil` to mean "the real one", so callers are unaffected. Enforced by
   `scripts/check-determinism.sh` in CI, because breaking the boundary is silent —
   nothing fails, the crawl just stops being reproducible.
+- **Output order no longer depends on map iteration.** `Item.Keys` returns sorted
+  keys, response callbacks dispatch in name order, and `FieldRenameMiddleware`
+  applies renames in sorted order. The last was a correctness bug rather than a
+  cosmetic one: a chained mapping (`a->b` with `b->c`) resolved differently between
+  runs on identical input.
 - **Nine subsystems moved to `contrib/`**: SEO auditing, crawl-graph export, change
   detection, anti-bot patterns, browser automation helpers, the plugin registry,
   the dashboard, the REPL, and the benchmark harness. They build and their tests

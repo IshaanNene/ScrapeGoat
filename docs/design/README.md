@@ -45,4 +45,4 @@ Sections, in order:
 
 | # | Title | Status |
 |---|---|---|
-| [0001](0001-deterministic-crawl.md) | Deterministic crawl and replay | Draft |
+| [0001](0001-deterministic-crawl.md) | Deterministic crawl and replay | Accepted (Phase 0 done) |

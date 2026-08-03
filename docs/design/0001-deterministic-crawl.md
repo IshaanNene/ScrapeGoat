@@ -1,6 +1,6 @@
 # 0001 — Deterministic crawl and replay
 
-**Status:** Draft
+**Status:** Accepted — Phase 0 (seams, iteration order, scope reduction) implemented
 
 ## Problem
 
@@ -76,7 +76,12 @@ Three sources of nondeterminism, each removed the same way — inject it:
   fingerprint selection). Replace with a seeded generator threaded from config, so
   a crawl's seed is part of its identity.
 - **Iteration order.** Go randomises map iteration deliberately. Anywhere output
-  order can depend on it, iterate a sorted key slice instead.
+  order can depend on it, iterate a sorted key slice instead. Three sites in
+  practice: `Item.Keys` (used to build column headers), callback dispatch (which
+  decides the order items reach the pipeline), and `FieldRenameMiddleware` — the
+  last being the one where iteration order changed the *result*, not just the
+  ordering, because a chained mapping resolves differently depending on which
+  rename runs first.
 
 The parser is already pure — it touches neither the clock nor the network — which
 is what makes this tractable rather than a rewrite.
