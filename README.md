@@ -346,6 +346,18 @@ make lint           # Linting
 make build          # Build binary
 ```
 
+### Golden-file parser tests
+
+`internal/parser/testdata/` holds a corpus of pages built around specific hazards —
+unclosed tags, attribute soup, broken JSON-LD, `<base href>`, dangerous URL schemes,
+entity edge cases — with golden files pinning the parser's output for each. It has
+already caught one real bug (`<base href>` being ignored during link resolution).
+
+```bash
+go test ./internal/parser -run TestGolden           # check
+go test ./internal/parser -run TestGolden -update   # rebaseline, then read the diff
+```
+
 ### Fuzzing
 
 Everything ScrapeGoat parses comes from a site it does not control, so the parsers

@@ -1,0 +1,11 @@
+{
+  "items": [
+    {
+      "meta_title": "Entities \u0026 Encoding",
+      "title": "Entities \u0026 Encoding"
+    }
+  ],
+  "links": [
+    "https://example.com/a?x=1\u0026y=2"
+  ]
+}

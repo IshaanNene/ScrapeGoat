@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "meta_title": "Base Tag",
+      "title": "Base Tag"
+    }
+  ],
+  "links": [
+    "https://cdn.example/absolute-path",
+    "https://cdn.example/assets/?query-only=1",
+    "https://cdn.example/assets/rel.html",
+    "https://full.example/y",
+    "https://protocol-relative.example/x"
+  ]
+}

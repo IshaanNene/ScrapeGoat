@@ -99,6 +99,19 @@ func (p *CSSParser) extractLinks(doc *goquery.Document, baseURL string) []string
 		return nil
 	}
 
+	// A <base href> overrides the document URL for resolving every relative link
+	// on the page. Ignoring it silently rewrites every relative link to the wrong
+	// host — on a site that serves content from a CDN path, that means crawling
+	// URLs that do not exist while never reaching the ones that do.
+	//
+	// Per the HTML spec only the first <base href> counts, and it is itself
+	// resolved against the document URL so a relative base works.
+	if href, ok := doc.Find("base[href]").First().Attr("href"); ok {
+		if parsed, err := url.Parse(strings.TrimSpace(href)); err == nil {
+			base = base.ResolveReference(parsed)
+		}
+	}
+
 	seen := make(map[string]bool)
 	var links []string
 

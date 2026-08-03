@@ -1,0 +1,12 @@
+{
+  "items": [
+    {
+      "h1": "Still Has A Heading",
+      "meta_title": "Malformed Structured Data",
+      "title": "Malformed Structured Data"
+    }
+  ],
+  "links": [
+    "https://example.com/ok"
+  ]
+}

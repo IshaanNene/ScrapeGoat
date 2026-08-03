@@ -1,0 +1,23 @@
+{
+  "items": [
+    {
+      "canonical": "https://blog.example/bloom-filters",
+      "h1": "How Bloom Filters Work",
+      "h2": "False positives",
+      "images": "/img/bloom.png",
+      "meta_canonical": "https://blog.example/bloom-filters",
+      "meta_description": "A short explanation of Bloom filters and their false-positive behaviour.",
+      "meta_title": "How Bloom Filters Work",
+      "meta_viewport": "width=device-width, initial-scale=1",
+      "opengraph": {
+        "image": "https://blog.example/img/bloom.png",
+        "title": "How Bloom Filters Work"
+      },
+      "title": "How Bloom Filters Work"
+    }
+  ],
+  "links": [
+    "https://example.com/kirsch-mitzenmacher",
+    "https://other.example/cuckoo"
+  ]
+}
