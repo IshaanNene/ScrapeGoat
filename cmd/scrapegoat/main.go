@@ -48,6 +48,7 @@ var (
 	maxRequests    int
 	maxRetries     int
 	allowedDomains string
+	resumeCrawl    bool
 )
 
 func main() {
@@ -64,7 +65,7 @@ Features:
   • JSON, JSONL, CSV export
   • Proxy rotation and User-Agent randomization
   • robots.txt compliance
-  • Periodic checkpoint snapshots
+  • Checkpoint pause/resume (--resume)
   • Prometheus metrics endpoint`,
 	}
 
@@ -114,6 +115,7 @@ func crawlCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&maxRequests, "max-requests", "m", 0, "maximum total requests (0 = unlimited)")
 	cmd.Flags().IntVar(&maxRetries, "max-retries", -1, "max retries per failed request (-1 = use config default of 3)")
 	cmd.Flags().StringVar(&allowedDomains, "allowed-domains", "", "comma-separated domains to stay within (e.g. en.wikipedia.org)")
+	cmd.Flags().BoolVar(&resumeCrawl, "resume", false, "resume from the last checkpoint instead of starting fresh")
 
 	return cmd
 }
@@ -189,6 +191,14 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Restore prior state before seeding, so seeds already covered by the previous
+	// run are filtered out by the restored dedup set rather than re-crawled.
+	if resumeCrawl {
+		if err := eng.ResumeFromCheckpoint(); err != nil {
+			return fmt.Errorf("resume: %w", err)
+		}
+	}
+
 	// Add seed URLs — robots-block on a seed is a warning, not fatal
 	var seedsAdded int
 	for _, rawURL := range args {
@@ -198,8 +208,12 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 			seedsAdded++
 		}
 	}
-	if seedsAdded == 0 {
-		return fmt.Errorf("all seeds were filtered or blocked — check URLs and robots.txt")
+	if seedsAdded == 0 && eng.Stats() != nil {
+		// A resumed crawl legitimately adds no new seeds: the outstanding work is
+		// already in the restored frontier, and the seeds are duplicates by design.
+		if !resumeCrawl {
+			return fmt.Errorf("all seeds were filtered or blocked — check URLs and robots.txt")
+		}
 	}
 
 	// Handle graceful shutdown

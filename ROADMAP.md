@@ -35,15 +35,6 @@ size — exact set below ~1M URLs, tiered Bloom → on-disk filter above it. The
 false-positive escape hatch before it can be the default, since a Bloom hit must not silently drop a
 URL that was never actually seen.
 
-### Checkpoint restore — `internal/engine/checkpoint.go`
-
-`Save()` runs on a ticker via `Engine.autoCheckpoint()`. `Load()` and `HasCheckpoint()` have no
-callers outside tests, and there is no `--resume` flag. The feature is write-only: it produces
-checkpoint files that nothing reads.
-
-**To integrate:** add `scrapegoat crawl --resume`, call `Load()` before seeding, and decide the
-merge semantics when both a checkpoint and new seed URLs are present.
-
 ### Distributed tracing — `internal/observability/tracing.go`
 
 A hand-rolled `Tracer`/`Span`/`SpanExporter`. `go.mod` contains no OpenTelemetry dependency, so this

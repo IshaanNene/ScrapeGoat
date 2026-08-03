@@ -174,3 +174,6 @@ func newRequestFromCheckpoint(cr checkpointReq) (*types.Request, error) {
 	req.ParentURL = cr.ParentURL
 	return req, nil
 }
+
+// Dir returns the directory checkpoints are written to.
+func (cm *CheckpointManager) Dir() string { return cm.checkpointDir }

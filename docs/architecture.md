@@ -183,9 +183,9 @@ Periodically snapshots crawl state to disk:
 - **Atomic writes** (write to temp file, then rename)
 - Automatic periodic checkpointing (configurable interval)
 
-> **Save only.** `CheckpointManager.Load` is implemented and unit-tested but has no caller in the
-> crawl path — there is no `--resume` flag yet, so checkpoint files are written and never read.
-> Wiring restore is tracked in [ROADMAP.md](../ROADMAP.md).
+Restore runs on `scrapegoat crawl --resume`, which loads the frontier, dedup set, and stats
+before seeding — so seeds the previous run already covered are filtered out rather than
+re-crawled.
 
 ---
 
@@ -261,6 +261,6 @@ Not all URLs are equally important. Retried requests get `PriorityLow`, while se
 ### Why Checkpoint Persistence?
 
 Large crawls may take hours. Checkpointing is the substrate for:
-- Resume after crashes (snapshot format in place; restore not yet wired — see ROADMAP)
+- Resume after crashes, via `--resume`
 - Graceful shutdown on SIGINT/SIGTERM
 - In-process pause/resume via the SDK API (`Pause()` / `Resume()`, no disk round-trip)

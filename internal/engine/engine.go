@@ -527,3 +527,39 @@ func (e *Engine) autoCheckpoint() {
 		}
 	}
 }
+
+// HasCheckpoint reports whether a checkpoint from a previous run is available.
+func (e *Engine) HasCheckpoint() bool { return e.checkpoint.HasCheckpoint() }
+
+// ResumeFromCheckpoint restores frontier, dedup, and stats from the last
+// checkpoint. Distinct from Resume, which un-pauses a running engine.
+//
+// Call before Start and before adding seeds. Checkpointing was previously
+// write-only: Save ran on a ticker and Load had no caller outside tests, so the
+// crawler produced checkpoint files that nothing ever read.
+//
+// Seeds added after a resume are still filtered through the restored dedup set,
+// so re-running the same command with the same seeds does not re-crawl what the
+// previous run already covered — the restored frontier is the remaining work, and
+// the seeds are a no-op unless they are genuinely new.
+func (e *Engine) ResumeFromCheckpoint() error {
+	if !e.checkpoint.HasCheckpoint() {
+		return fmt.Errorf("no checkpoint found in %s", e.checkpoint.Dir())
+	}
+
+	if err := e.checkpoint.Load(e.frontier, e.dedup, e.stats); err != nil {
+		return fmt.Errorf("load checkpoint: %w", err)
+	}
+
+	e.logger.Info("resumed from checkpoint",
+		"queued", e.frontier.Len(),
+		"seen", e.dedup.Count(),
+		"requests_sent", e.stats.RequestsSent.Load(),
+	)
+	e.metrics.SetFrontierDepth(e.frontier.Len())
+	return nil
+}
+
+// ClearCheckpoint removes the checkpoint file. Called after a crawl finishes
+// normally, so the next run does not resume work that is already done.
+func (e *Engine) ClearCheckpoint() error { return e.checkpoint.Clean() }

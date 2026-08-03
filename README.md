@@ -74,7 +74,7 @@ graph TD
     ENG --> FRT["Frontier<br>(Priority Queue)"]
     ENG --> DDP["Deduplicator<br>(Exact set)"]
     ENG --> RBT["Robots Manager"]
-    ENG --> CHK["Checkpoint Manager<br>(save only)"]
+    ENG --> CHK["Checkpoint Manager"]
     ENG --> MET["Prometheus Metrics"]
     SCH --> WRK["Worker Pool<br>(Fixed size)"]
     WRK -->|"dequeue"| FRT
@@ -156,11 +156,11 @@ func main() {
 | **Distributed** | Master/worker HTTP coordination; Redis-backed task queue with at-least-once delivery and abandoned-task recovery, or in-memory for single-process |
 | **Browser** | Headless Chromium via go-rod, JS rendering, form filling, infinite scroll |
 | **Observability** | Prometheus metrics endpoint, web dashboard, real-time stats |
-| **DevEx** | CLI scaffolding, REPL, YAML config, periodic checkpoint snapshots, `robots.txt` compliance |
+| **DevEx** | CLI scaffolding, REPL, YAML config, checkpoint pause/resume (`--resume`), `robots.txt` compliance |
 
-> Subsystems that are implemented and tested but **not yet wired into the crawl path** — autoscaled pool,
-> Bloom filter dedup, checkpoint restore, and in-process tracing — are tracked in [ROADMAP.md](ROADMAP.md)
-> rather than listed above. If it is in the table, it runs.
+> Subsystems that are implemented and tested but **not yet wired into the crawl path** — the autoscaled
+> pool, Bloom filter dedup, and in-process tracing — are tracked in [ROADMAP.md](ROADMAP.md) rather than
+> listed above. If it is in the table, it runs.
 
 ---
 
