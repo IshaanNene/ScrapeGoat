@@ -68,6 +68,54 @@ jobs:
       - name: Run race tests
         run: go test ./... -race -count=1 -timeout 180s
 
+  fuzz:
+    name: Fuzz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Every parser here consumes bytes chosen by the site being crawled, so
+      # "does not panic on hostile input" is a correctness property, not a nicety.
+      # go test runs exactly one -fuzz target at a time, hence the explicit list.
+      - name: Fuzz parsers and decoders
+        run: |
+          set -euo pipefail
+          run_fuzz() {
+            echo "::group::$2 ($1)"
+            go test -run=XXX -fuzz="^$2\$" -fuzztime=60s "$1"
+            echo "::endgroup::"
+          }
+          run_fuzz ./internal/parser  FuzzCompositeParse
+          run_fuzz ./internal/parser  FuzzCSSParseWithRules
+          run_fuzz ./internal/parser  FuzzCSSSelector
+          run_fuzz ./internal/parser  FuzzRegexParse
+          run_fuzz ./internal/engine  FuzzCanonicalizeURL
+          run_fuzz ./internal/engine  FuzzDeduplicator
+          run_fuzz ./internal/engine  FuzzParseRobotsTxt
+          run_fuzz ./internal/engine  FuzzMatchRobotsPattern
+          run_fuzz ./internal/fetcher FuzzDecompressReader
+          run_fuzz ./internal/fetcher FuzzParseRetryAfter
+          run_fuzz ./internal/mcp     FuzzHandleMessage
+          run_fuzz ./internal/mcp     FuzzToolArguments
+          run_fuzz ./internal/mcp     FuzzToolURLValidation
+          run_fuzz ./internal/safety  FuzzValidateURL
+          run_fuzz ./internal/safety  FuzzBlockReason
+
+      # A crashing input is written to testdata/fuzz/<Target>/. Publish it so the
+      # failure is reproducible from the run rather than only from the log.
+      - name: Upload crashers
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashers
+          path: "**/testdata/fuzz/**"
+          retention-days: 30
+          if-no-files-found: ignore
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -82,3 +130,23 @@ jobs:
         run: go build -o bin/scrapegoat ./cmd/scrapegoat
       - name: Verify binary
         run: ./bin/scrapegoat version
+
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Nothing built this image, which is how it drifted to a builder older than
+      # go.mod's own toolchain and a base image past end of life.
+      - name: Build image
+        run: docker build -t scrapegoat:ci .
+      - name: Verify the binary runs as a non-root user
+        run: |
+          set -euo pipefail
+          docker run --rm scrapegoat:ci version
+          user="$(docker run --rm --entrypoint id scrapegoat:ci -un)"
+          if [ "$user" = "root" ]; then
+            echo "container runs as root; it drives headless Chromium against untrusted pages"
+            exit 1
+          fi
+          echo "runs as $user"
