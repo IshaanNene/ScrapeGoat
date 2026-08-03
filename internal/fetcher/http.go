@@ -20,7 +20,8 @@ import (
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/safety"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 	"github.com/andybalholm/brotli"
 )
 
@@ -31,6 +32,7 @@ type HTTPFetcher struct {
 	engineCfg  *config.EngineConfig
 	proxyCfg   *config.ProxyConfig
 	proxyMgr   *ProxyManager
+	guard      *safety.URLGuard
 	logger     *slog.Logger
 	userAgents []string
 	uaIndex    atomic.Int64
@@ -43,11 +45,21 @@ func NewHTTPFetcher(cfg *config.Config, logger *slog.Logger) (*HTTPFetcher, erro
 		return nil, fmt.Errorf("create cookie jar: %w", err)
 	}
 
+	// Every outbound connection goes through the guard's dialer, which resolves the
+	// host, refuses non-public addresses, and then connects to the address it just
+	// checked. The transport re-dials on each redirect hop, so this covers redirects
+	// too — see internal/safety for why the hostname alone is not enough.
+	guard := safety.New(safety.Config{
+		AllowedSchemes:        cfg.Safety.AllowedSchemes,
+		AllowPrivateAddresses: cfg.Safety.AllowPrivateAddresses,
+		AllowedPrivateHosts:   cfg.Safety.AllowedPrivateHosts,
+		DialTimeout:           30 * time.Second,
+		KeepAlive:             30 * time.Second,
+	})
+
 	transport := &http.Transport{
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
+		DialContext:         guard.DialContext,
+		ForceAttemptHTTP2:   true,
 		MaxIdleConns:        cfg.Fetcher.MaxIdleConns,
 		MaxIdleConnsPerHost: cfg.Fetcher.MaxIdleConns / 2,
 		IdleConnTimeout:     cfg.Fetcher.IdleConnTimeout,
@@ -64,14 +76,15 @@ func NewHTTPFetcher(cfg *config.Config, logger *slog.Logger) (*HTTPFetcher, erro
 		transport.Proxy = proxyMgr.ProxyFunc()
 	}
 
+	// The guard's scheme check runs per hop here, because a 302 to file:// or
+	// gopher:// is rejected before a connection is attempted and so would never
+	// reach the dialer.
+	guardRedirect := guard.CheckRedirect(cfg.Fetcher.MaxRedirects)
 	redirectPolicy := func(req *http.Request, via []*http.Request) error {
 		if !cfg.Fetcher.FollowRedirects {
 			return http.ErrUseLastResponse
 		}
-		if len(via) >= cfg.Fetcher.MaxRedirects {
-			return fmt.Errorf("max redirects (%d) reached", cfg.Fetcher.MaxRedirects)
-		}
-		return nil
+		return guardRedirect(req, via)
 	}
 
 	client := &http.Client{
@@ -87,6 +100,7 @@ func NewHTTPFetcher(cfg *config.Config, logger *slog.Logger) (*HTTPFetcher, erro
 		engineCfg:  &cfg.Engine,
 		proxyCfg:   &cfg.Proxy,
 		proxyMgr:   proxyMgr,
+		guard:      guard,
 		logger:     logger.With("component", "http_fetcher"),
 		userAgents: cfg.Engine.UserAgents,
 	}, nil
@@ -94,6 +108,13 @@ func NewHTTPFetcher(cfg *config.Config, logger *slog.Logger) (*HTTPFetcher, erro
 
 // Fetch executes an HTTP request and returns the response.
 func (f *HTTPFetcher) Fetch(ctx context.Context, req *types.Request) (*types.Response, error) {
+	// Reject disallowed schemes up front so the caller gets a clear error rather than
+	// an obscure transport failure. The address checks happen later, in the dialer,
+	// where they cannot be raced by DNS rebinding.
+	if err := f.guard.ValidateParsedURL(req.URL); err != nil {
+		return nil, &types.FetchError{URL: req.URLString(), Err: err, Retryable: false}
+	}
+
 	httpReq, err := http.NewRequestWithContext(ctx, req.Method, req.URLString(), nil)
 	if err != nil {
 		return nil, &types.FetchError{URL: req.URLString(), Err: err, Retryable: false}
@@ -160,21 +181,54 @@ func (f *HTTPFetcher) Fetch(ctx context.Context, req *types.Request) (*types.Res
 		}
 	}
 
-	// Read body with size limit
-	var reader io.Reader = httpResp.Body
-	if f.cfg.MaxBodySize > 0 {
-		reader = io.LimitReader(reader, f.cfg.MaxBodySize)
+	// Read the body under a hard cap on BOTH the compressed stream and the decompressed
+	// result. Capping only the compressed stream is not enough: a ~1000:1 gzip bomb slips
+	// under a 10 MB compressed limit and expands to ~10 GB inside io.ReadAll.
+	maxBody := f.cfg.MaxBodySize
+
+	counted := &countingReader{r: httpResp.Body}
+	var compressed io.Reader = counted
+	if maxBody > 0 {
+		compressed = io.LimitReader(counted, maxBody)
 	}
 
-	// Decompress if needed (gzip, deflate, brotli)
-	reader, err = decompressReader(httpResp, reader)
+	decompressed, err := decompressReader(httpResp, compressed)
 	if err != nil {
 		return nil, &types.FetchError{URL: req.URLString(), Err: err, Retryable: false}
 	}
+	defer func() { _ = decompressed.Close() }()
 
-	body, err := io.ReadAll(reader)
+	// Read one byte past the limit so that hitting it is distinguishable from a body
+	// that happens to be exactly max_body_size.
+	var plain io.Reader = decompressed
+	if maxBody > 0 {
+		plain = io.LimitReader(decompressed, maxBody+1)
+	}
+
+	body, err := io.ReadAll(plain)
 	if err != nil {
 		return nil, &types.FetchError{URL: req.URLString(), Err: err, Retryable: true}
+	}
+
+	if maxBody > 0 && int64(len(body)) > maxBody {
+		return nil, &types.FetchError{
+			URL:       req.URLString(),
+			Err:       fmt.Errorf("%w (%d bytes)", types.ErrBodyTooLarge, maxBody),
+			Retryable: false,
+		}
+	}
+
+	// Reject bombs that stay under the size cap but expand absurdly. The floor avoids
+	// false positives on tiny bodies, where a few hundred bytes of gzip framing makes
+	// the ratio meaningless.
+	if read := counted.Count(); read >= minRatioCheckBytes {
+		if ratio := int64(len(body)) / read; ratio > maxCompressionRatio {
+			return nil, &types.FetchError{
+				URL:       req.URLString(),
+				Err:       fmt.Errorf("%w: %d:1", types.ErrCompressionRatio, ratio),
+				Retryable: false,
+			}
+		}
 	}
 
 	resp := types.NewResponse(req, httpResp, body, duration)
@@ -209,18 +263,49 @@ func (f *HTTPFetcher) nextUserAgent() string {
 	return f.userAgents[idx]
 }
 
+const (
+	// maxCompressionRatio is the largest decompressed:compressed ratio we accept.
+	// Real-world HTML sits around 5–20:1; anything past 100:1 is a bomb, not a page.
+	maxCompressionRatio = 100
+
+	// minRatioCheckBytes is the compressed size below which the ratio check is skipped,
+	// since framing overhead dominates on very small bodies.
+	minRatioCheckBytes = 1024
+)
+
+// countingReader tallies the bytes pulled from the underlying reader, so the caller
+// can compare compressed input against decompressed output.
+type countingReader struct {
+	r io.Reader
+	n int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
+
+// Count returns the number of bytes read so far.
+func (c *countingReader) Count() int64 { return c.n }
+
 // decompressReader wraps a reader with the appropriate decompressor.
-// Handles gzip, deflate, and brotli (br) encodings.
-func decompressReader(resp *http.Response, reader io.Reader) (io.Reader, error) {
+// Handles gzip, deflate, and brotli (br) encodings. The returned ReadCloser must be
+// closed by the caller — gzip and flate both hold resources that leak otherwise.
+func decompressReader(resp *http.Response, reader io.Reader) (io.ReadCloser, error) {
 	switch resp.Header.Get("Content-Encoding") {
 	case "gzip":
-		return gzip.NewReader(reader)
+		zr, err := gzip.NewReader(reader)
+		if err != nil {
+			return nil, err
+		}
+		return zr, nil
 	case "deflate":
 		return flate.NewReader(reader), nil
 	case "br":
-		return brotli.NewReader(reader), nil
+		return io.NopCloser(brotli.NewReader(reader)), nil
 	default:
-		return reader, nil
+		return io.NopCloser(reader), nil
 	}
 }
 
@@ -261,8 +346,13 @@ func parseRetryAfter(header string) time.Duration {
 	if header == "" {
 		return 5 * time.Second // default back-off
 	}
-	// Try seconds integer
+	// Try seconds integer. The value is server-supplied, so it needs clamping at
+	// both ends: the HTTP-date branch below already floors at zero, and a bare
+	// "Retry-After: -1" produced a negative duration here.
 	if secs, err := strconv.Atoi(strings.TrimSpace(header)); err == nil {
+		if secs < 0 {
+			secs = 0
+		}
 		if secs > 120 {
 			secs = 120 // cap at 2 minutes
 		}
