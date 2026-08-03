@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+
 	"sync"
 	"time"
+
+	"github.com/IshaanNene/ScrapeGoat/internal/config"
 )
 
 // Queue is an interface for distributed task queues.
@@ -18,7 +21,17 @@ type Queue interface {
 	// Pop removes and returns the next task. Blocks until available or context cancelled.
 	Pop(ctx context.Context) (*Task, error)
 
-	// Len returns the current queue length.
+	// Ack marks a claimed task as complete.
+	//
+	// Implementations that can lose a task on worker death need this to
+	// distinguish "finished" from "still in flight"; the in-memory queue
+	// implements it as a no-op because a crash takes the queue with it.
+	Ack(ctx context.Context, task *Task) error
+
+	// Nack returns a claimed task to the queue.
+	Nack(ctx context.Context, task *Task) error
+
+	// Len returns the number of tasks waiting to be claimed.
 	Len() int
 
 	// Close closes the queue.
@@ -127,58 +140,6 @@ func (q *InMemoryQueue) Close() error {
 	return nil
 }
 
-// RedisQueueConfig configures a Redis-backed queue.
-type RedisQueueConfig struct {
-	Addr     string
-	Password string
-	DB       int
-	Key      string
-}
-
-// RedisQueue is a Redis-backed distributed queue.
-// This is a placeholder implementation that uses in-memory as fallback.
-// To use real Redis, add the go-redis dependency.
-type RedisQueue struct {
-	inner  *InMemoryQueue
-	config *RedisQueueConfig
-	logger *slog.Logger
-}
-
-// NewRedisQueue creates a Redis-backed queue (falls back to in-memory).
-func NewRedisQueue(cfg *RedisQueueConfig, logger *slog.Logger) *RedisQueue {
-	logger = logger.With("component", "redis_queue")
-	logger.Info("Redis queue initialized (in-memory fallback)",
-		"addr", cfg.Addr,
-		"key", cfg.Key,
-	)
-
-	return &RedisQueue{
-		inner:  NewInMemoryQueue(logger),
-		config: cfg,
-		logger: logger,
-	}
-}
-
-// Push adds a task to the queue.
-func (q *RedisQueue) Push(ctx context.Context, task *Task) error {
-	return q.inner.Push(ctx, task)
-}
-
-// Pop removes and returns the next task.
-func (q *RedisQueue) Pop(ctx context.Context) (*Task, error) {
-	return q.inner.Pop(ctx)
-}
-
-// Len returns the current queue length.
-func (q *RedisQueue) Len() int {
-	return q.inner.Len()
-}
-
-// Close closes the queue.
-func (q *RedisQueue) Close() error {
-	return q.inner.Close()
-}
-
 // BatchSubmit submits multiple URLs as a single task to the queue.
 func BatchSubmit(q Queue, urls []string, batchSize int) error {
 	ctx := context.Background()
@@ -233,4 +194,44 @@ func ImportQueue(q *InMemoryQueue, data []byte) error {
 		}
 	}
 	return nil
+}
+
+// Ack is a no-op for the in-memory queue: there is no separate in-flight state to
+// clear, and a process crash takes the queue with it either way.
+func (q *InMemoryQueue) Ack(ctx context.Context, task *Task) error { return nil }
+
+// Nack returns the task to the queue.
+func (q *InMemoryQueue) Nack(ctx context.Context, task *Task) error {
+	return q.Push(ctx, task)
+}
+
+// Compile-time confirmation that both implementations satisfy the interface. The
+// previous RedisQueue satisfied it too — by delegating every method to an
+// in-memory queue — which is exactly why an interface check is not evidence of
+// anything on its own.
+var (
+	_ Queue = (*InMemoryQueue)(nil)
+	_ Queue = (*RedisQueue)(nil)
+)
+
+// NewQueue builds the queue described by cfg: Redis-backed when a redis_addr is
+// configured, in-memory otherwise.
+//
+// It returns an error when Redis is configured but unreachable, rather than
+// quietly running in memory. The previous behaviour — log a line about Redis and
+// use an in-memory queue anyway — meant a typo in redis_addr produced a cluster
+// where every worker had its own private queue, nothing was shared, and nothing
+// survived a restart. That is a failure you find in production, at the worst
+// possible time.
+func NewQueue(ctx context.Context, cfg *config.DistributedConfig, logger *slog.Logger) (Queue, error) {
+	if cfg == nil || cfg.RedisAddr == "" {
+		logger.Info("using in-memory task queue (single process, not durable)")
+		return NewInMemoryQueue(logger), nil
+	}
+
+	return NewRedisQueue(ctx, &RedisQueueConfig{
+		Addr: cfg.RedisAddr,
+		DB:   cfg.RedisDB,
+		Key:  cfg.RedisKey,
+	}, logger)
 }

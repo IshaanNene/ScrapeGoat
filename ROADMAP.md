@@ -44,17 +44,6 @@ checkpoint files that nothing reads.
 **To integrate:** add `scrapegoat crawl --resume`, call `Load()` before seeding, and decide the
 merge semantics when both a checkpoint and new seed URLs are present.
 
-### Distributed queue backend — `internal/distributed/queue.go`
-
-`RedisQueue` is a placeholder that delegates every operation to an in-memory queue and logs
-`"Redis queue initialized (in-memory fallback)"`. It is not durable and not shared between
-processes. Master/worker coordination over HTTP works, but the queue behind it does not survive a
-restart and is not visible to a second master.
-
-**To integrate:** implement against `go-redis` with `LMOVE`-based reliable queueing and a visibility
-timeout, or delete the type. Shipping something named `RedisQueue` that is not Redis-backed is worse
-than shipping nothing.
-
 ### Distributed tracing — `internal/observability/tracing.go`
 
 A hand-rolled `Tracer`/`Span`/`SpanExporter`. `go.mod` contains no OpenTelemetry dependency, so this

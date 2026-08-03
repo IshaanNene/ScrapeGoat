@@ -153,7 +153,7 @@ func main() {
 | **Plugin SDK** | init() registration, BasePlugin embeddable, filter/transform middleware helpers |
 | **Middleware** | 7 request middlewares + 12 item pipeline middlewares, fully extensible |
 | **Storage** | JSON, JSONL, CSV file storage; experimental S3/Kafka/PostgreSQL plugin stubs |
-| **Distributed** | Master/worker HTTP coordination with an in-memory queue |
+| **Distributed** | Master/worker HTTP coordination; Redis-backed task queue with at-least-once delivery and abandoned-task recovery, or in-memory for single-process |
 | **Browser** | Headless Chromium via go-rod, JS rendering, form filling, infinite scroll |
 | **Observability** | Prometheus metrics endpoint, web dashboard, real-time stats |
 | **DevEx** | CLI scaffolding, REPL, YAML config, periodic checkpoint snapshots, `robots.txt` compliance |
