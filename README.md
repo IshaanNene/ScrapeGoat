@@ -331,6 +331,8 @@ runs.
 
 **Going deeper:** [Architecture](docs/architecture.md) · [Middleware](docs/middleware.md) · [Distributed](docs/distributed.md) · [API spec](docs/api.yaml)
 
+**Design:** [Design docs](docs/design/) — accepted proposals, with the alternatives that were rejected
+
 **About the project:** [Security](SECURITY.md) · [Performance](docs/PERFORMANCE.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 ---
