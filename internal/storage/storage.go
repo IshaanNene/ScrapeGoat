@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // Storage is the interface for all storage backends.

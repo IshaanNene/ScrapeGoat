@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/plugin"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // --- S3 Storage Plugin ---

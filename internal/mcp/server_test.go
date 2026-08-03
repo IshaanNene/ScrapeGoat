@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 func testLogger() *slog.Logger {
@@ -398,4 +398,3 @@ func TestMemoryCollector(t *testing.T) {
 
 // Ensure types import is used.
 var _ = (*types.Item)(nil)
-

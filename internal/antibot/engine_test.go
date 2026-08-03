@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 func testLogger() *slog.Logger {
@@ -213,4 +213,3 @@ func TestBlockReason_String(t *testing.T) {
 func mustCompile(pattern string) *regexp.Regexp {
 	return regexp.MustCompile(pattern)
 }
-

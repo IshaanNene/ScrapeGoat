@@ -34,8 +34,50 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
+
+// The core data types are aliased here so that everything this package's API hands
+// you has a name you can write down. They previously lived under internal/, which
+// meant a consumer could call methods on an *Item but could not declare a variable
+// of that type, store it in a struct field, or write a function that took one —
+// every non-trivial use hit a wall at the first refactor.
+//
+// These are aliases, not wrappers: scrapegoat.Item and types.Item are the same type,
+// so either spelling works and no conversion is needed.
+type (
+	// Item is a single scraped record.
+	Item = types.Item
+
+	// Request is a crawl request.
+	Request = types.Request
+
+	// RawResponse is the fetcher's response, as exposed on Element.Response.
+	// The Spider API takes the friendlier Response wrapper declared in spider.go;
+	// this is the underlying value it wraps.
+	RawResponse = types.Response
+
+	// FetchError describes a failed fetch, including whether it is worth retrying.
+	FetchError = types.FetchError
+
+	// ParseError describes a failure while extracting from a page.
+	ParseError = types.ParseError
+)
+
+// Sentinel errors callers can test with errors.Is.
+var (
+	ErrTimeout          = types.ErrTimeout
+	ErrMaxRetries       = types.ErrMaxRetries
+	ErrBlocked          = types.ErrBlocked
+	ErrMaxDepth         = types.ErrMaxDepth
+	ErrDuplicate        = types.ErrDuplicate
+	ErrInvalidURL       = types.ErrInvalidURL
+	ErrBodyTooLarge     = types.ErrBodyTooLarge
+	ErrCompressionRatio = types.ErrCompressionRatio
+)
+
+// NewRequest builds a Request from a raw URL.
+func NewRequest(rawURL string) (*Request, error) { return types.NewRequest(rawURL) }
 
 // Crawler is the high-level API for using ScrapeGoat as a library.
 type Crawler struct {
@@ -90,69 +132,82 @@ func (e *Element) Follow(rawURL string) {
 }
 
 // Option configures a Crawler.
-type Option func(*config.Config)
+//
+// Option is deliberately opaque. It used to be `func(*config.Config)`, which made
+// the entire internal configuration struct part of this package's public contract
+// while simultaneously leaving it unnameable by callers — all of the coupling of an
+// exported type with none of the usability. Keeping the concrete type private lets
+// the configuration evolve without breaking anyone.
+type Option interface {
+	apply(*config.Config)
+}
+
+// optionFunc adapts a plain function to the Option interface.
+type optionFunc func(*config.Config)
+
+func (f optionFunc) apply(c *config.Config) { f(c) }
 
 // WithConcurrency sets the number of concurrent workers.
 func WithConcurrency(n int) Option {
-	return func(c *config.Config) { c.Engine.Concurrency = n }
+	return optionFunc(func(c *config.Config) { c.Engine.Concurrency = n })
 }
 
 // WithMaxDepth sets the maximum crawl depth.
 func WithMaxDepth(depth int) Option {
-	return func(c *config.Config) { c.Engine.MaxDepth = depth }
+	return optionFunc(func(c *config.Config) { c.Engine.MaxDepth = depth })
 }
 
 // WithDelay sets the politeness delay between requests.
 func WithDelay(d time.Duration) Option {
-	return func(c *config.Config) { c.Engine.PolitenessDelay = d }
+	return optionFunc(func(c *config.Config) { c.Engine.PolitenessDelay = d })
 }
 
 // WithOutput sets the output format and path.
 func WithOutput(format, path string) Option {
-	return func(c *config.Config) {
+	return optionFunc(func(c *config.Config) {
 		c.Storage.Type = format
 		c.Storage.OutputPath = path
-	}
+	})
 }
 
 // WithUserAgent sets a custom User-Agent.
 func WithUserAgent(ua string) Option {
-	return func(c *config.Config) { c.Engine.UserAgents = []string{ua} }
+	return optionFunc(func(c *config.Config) { c.Engine.UserAgents = []string{ua} })
 }
 
 // WithAllowedDomains restricts crawling to the given domains.
 func WithAllowedDomains(domains ...string) Option {
-	return func(c *config.Config) { c.Engine.AllowedDomains = domains }
+	return optionFunc(func(c *config.Config) { c.Engine.AllowedDomains = domains })
 }
 
 // WithProxy enables proxy rotation with the given proxy URLs.
 func WithProxy(urls ...string) Option {
-	return func(c *config.Config) {
+	return optionFunc(func(c *config.Config) {
 		c.Proxy.Enabled = true
 		c.Proxy.URLs = urls
-	}
+	})
 }
 
 // WithRobotsRespect enables/disables robots.txt compliance.
 func WithRobotsRespect(respect bool) Option {
-	return func(c *config.Config) { c.Engine.RespectRobotsTxt = respect }
+	return optionFunc(func(c *config.Config) { c.Engine.RespectRobotsTxt = respect })
 }
 
 // WithMaxRequests sets the global request limit.
 func WithMaxRequests(n int) Option {
-	return func(c *config.Config) { c.Engine.MaxRequests = n }
+	return optionFunc(func(c *config.Config) { c.Engine.MaxRequests = n })
 }
 
 // WithVerbose enables debug-level logging.
 func WithVerbose() Option {
-	return func(c *config.Config) { c.Logging.Level = "debug" }
+	return optionFunc(func(c *config.Config) { c.Logging.Level = "debug" })
 }
 
 // NewCrawler creates a new Crawler with the given options.
 func NewCrawler(opts ...Option) *Crawler {
 	cfg := config.DefaultConfig()
 	for _, opt := range opts {
-		opt(cfg)
+		opt.apply(cfg)
 	}
 
 	level := slog.LevelInfo

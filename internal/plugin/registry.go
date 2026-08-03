@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // PluginType identifies the category of a plugin.

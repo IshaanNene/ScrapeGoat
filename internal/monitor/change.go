@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // ChangeType identifies what kind of change occurred.

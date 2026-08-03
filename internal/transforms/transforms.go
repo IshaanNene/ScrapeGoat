@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // SchemaField defines validation rules for a single field.
