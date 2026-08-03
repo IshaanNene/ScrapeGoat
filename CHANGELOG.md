@@ -13,6 +13,43 @@ wired into the running system, and several security properties a crawler needs w
 absent. Both are addressed, and the README now describes only what actually runs —
 everything else moved to [ROADMAP.md](ROADMAP.md).
 
+### Added (P1)
+
+- **Per-domain rate-limiter slots.** `Frontier.PopReady` dequeues only requests
+  whose domain is off cooldown, so a throttled domain no longer parks a worker.
+  The old throttle slept while holding the domain's mutex, *after* dequeue, which
+  made effective concurrency 1 on a single-domain crawl. Domain state is
+  LRU-bounded; it previously grew forever.
+- **Jittered exponential backoff and a per-domain circuit breaker.** Retries had
+  no delay at all, and the one delay that existed (`Retry-After`) ran inside the
+  worker. Backoff now happens on a timer and is counted in the termination
+  condition so retries cannot be dropped by the idle monitor.
+- **A real `RedisQueue`**, replacing the placeholder that delegated to an
+  in-memory queue. BLMOVE-based at-least-once delivery, `Ack`/`Nack` on the
+  `Queue` interface, and a reaper that recovers tasks abandoned by dead workers.
+  It errors instead of falling back when Redis is unreachable. Tested against a
+  real Redis in CI.
+- **`crawl --resume`**, wiring `CheckpointManager.Load`, which had no caller.
+  Restores the dedup set before seeding, so a re-run continues rather than
+  restarting.
+- **Selectable Bloom deduplication** (`engine.dedup_strategy: bloom`), now
+  measuring 1.20 bytes/URL against ~40 for the exact set. The previous
+  implementation kept a filter *and* a full exact set, so its advertised memory
+  saving was not real.
+- **`docs/PERFORMANCE.md`** with measured numbers, methodology, and an explicit
+  list of what is *not* measured.
+- **A malformed-HTML corpus with golden files** (`internal/parser/testdata/`).
+
+### Fixed (P1)
+
+- **`allowed_domains` matched by string equality**, so `example.com` rejected
+  `www.example.com` and every subdomain — a crawl that found nothing and reported
+  success. Now suffix matching on a label boundary, with public-suffix awareness
+  so a rule cannot span a registrable boundary.
+- **`<base href>` was ignored** during link resolution, so relative links on any
+  page using one resolved against the wrong host. Caught by the new corpus.
+- **`Retry-After: -1` produced a negative backoff.** Caught by a fuzz target.
+
 ### Security
 
 - **SSRF guard on every outbound fetch** (`internal/safety`). Scheme allowlist,
