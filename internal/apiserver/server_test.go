@@ -381,39 +381,6 @@ func TestIntegration_APIServerWithTestHTTPServer(t *testing.T) {
 	}
 }
 
-func TestIntegration_SEOAudit(t *testing.T) {
-	// Test page with SEO issues.
-	testHTTP := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, `<!DOCTYPE html><html><head></head><body><p>No title, no meta, no h1</p></body></html>`)
-	}))
-	defer testHTTP.Close()
-
-	srv := testServer(t)
-	body := fmt.Sprintf(`{"url": "%s"}`, testHTTP.URL)
-	req := httptest.NewRequest(http.MethodPost, "/v1/seo-audit", strings.NewReader(body))
-	req.Header.Set("X-API-Key", "test-key-123")
-	w := httptest.NewRecorder()
-
-	srv.handleSEOAudit(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200; body: %s", w.Code, w.Body.String())
-	}
-
-	var result map[string]any
-	json.Unmarshal(w.Body.Bytes(), &result)
-
-	// Should have a low score due to missing tags.
-	score, ok := result["score"].(float64)
-	if !ok {
-		t.Fatal("expected score field")
-	}
-	if score > 70 {
-		t.Errorf("score = %f, expected <70 for page with missing title/h1/meta", score)
-	}
-}
-
 // Ensure unused imports.
 var _ = context.Background
 var _ = time.Now

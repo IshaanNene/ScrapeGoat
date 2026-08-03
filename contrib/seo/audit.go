@@ -1,114 +1,16 @@
 package seo
 
 import (
-	"encoding/xml"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/safety"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
-
-// --- Sitemap Crawler ---
-
-// SitemapURL represents a URL entry from a sitemap.
-type SitemapURL struct {
-	Loc        string  `xml:"loc" json:"loc"`
-	LastMod    string  `xml:"lastmod,omitempty" json:"lastmod,omitempty"`
-	ChangeFreq string  `xml:"changefreq,omitempty" json:"changefreq,omitempty"`
-	Priority   float64 `xml:"priority,omitempty" json:"priority,omitempty"`
-}
-
-// Sitemap represents a parsed sitemap.
-type Sitemap struct {
-	URLs     []SitemapURL `xml:"url" json:"urls"`
-	Sitemaps []struct {
-		Loc string `xml:"loc"`
-	} `xml:"sitemap" json:"sitemaps"`
-}
-
-// SitemapCrawler fetches and parses sitemaps.
-type SitemapCrawler struct {
-	client *http.Client
-	logger *slog.Logger
-}
-
-// NewSitemapCrawler creates a new sitemap crawler.
-//
-// The client is guarded: sitemap URLs come from the same untrusted places as crawl
-// URLs (an MCP tool argument, a REST request body), so an unguarded client here
-// would be an SSRF bypass around the fetcher's guard.
-func NewSitemapCrawler(logger *slog.Logger) *SitemapCrawler {
-	return &SitemapCrawler{
-		client: safety.Default().HTTPClient(30*time.Second, 10),
-		logger: logger.With("component", "sitemap_crawler"),
-	}
-}
-
-// Crawl fetches and parses a sitemap, recursively following sitemap indexes.
-func (sc *SitemapCrawler) Crawl(sitemapURL string) ([]SitemapURL, error) {
-	sc.logger.Info("crawling sitemap", "url", sitemapURL)
-
-	resp, err := sc.client.Get(sitemapURL)
-	if err != nil {
-		return nil, fmt.Errorf("fetch sitemap: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read sitemap: %w", err)
-	}
-
-	var sitemap Sitemap
-	if err := xml.Unmarshal(body, &sitemap); err != nil {
-		return nil, fmt.Errorf("parse sitemap: %w", err)
-	}
-
-	var allURLs []SitemapURL
-	allURLs = append(allURLs, sitemap.URLs...)
-
-	// Recursively fetch sub-sitemaps
-	for _, sub := range sitemap.Sitemaps {
-		subURLs, err := sc.Crawl(sub.Loc)
-		if err != nil {
-			sc.logger.Warn("sub-sitemap error", "url", sub.Loc, "error", err)
-			continue
-		}
-		allURLs = append(allURLs, subURLs...)
-	}
-
-	sc.logger.Info("sitemap crawled", "url", sitemapURL, "urls", len(allURLs))
-	return allURLs, nil
-}
-
-// DiscoverSitemap finds the sitemap URL for a domain.
-func (sc *SitemapCrawler) DiscoverSitemap(domain string) string {
-	candidates := []string{
-		"https://" + domain + "/sitemap.xml",
-		"https://" + domain + "/sitemap_index.xml",
-		"https://" + domain + "/sitemap.xml.gz",
-	}
-
-	for _, u := range candidates {
-		resp, err := sc.client.Head(u)
-		if err == nil && resp.StatusCode == 200 {
-			resp.Body.Close()
-			return u
-		}
-		if resp != nil && resp.Body != nil {
-			resp.Body.Close()
-		}
-	}
-	return ""
-}
 
 // --- Meta Tag Auditor ---
 

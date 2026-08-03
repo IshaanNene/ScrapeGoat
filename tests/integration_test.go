@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/IshaanNene/ScrapeGoat/contrib/seo"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
-	"github.com/IshaanNene/ScrapeGoat/internal/seo"
+	"github.com/IshaanNene/ScrapeGoat/internal/sitemap"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
 	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
@@ -103,39 +104,13 @@ func TestLiveParse(t *testing.T) {
 	}
 }
 
-// TestLiveSEOAudit tests the SEO auditor against a real page.
-func TestLiveSEOAudit(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping live test")
-	}
-
-	cfg := testutil.LoopbackConfig()
-	f, _ := fetcher.NewHTTPFetcher(cfg, testLogger)
-	defer f.Close()
-
-	req, _ := types.NewRequest("https://quotes.toscrape.com")
-	resp, _ := f.Fetch(context.Background(), req)
-
-	auditor := seo.NewMetaAuditor(testLogger)
-	result, err := auditor.Audit(resp)
-	if err != nil {
-		t.Fatalf("audit: %v", err)
-	}
-
-	t.Logf("SEO Score: %d/100", result.Score)
-	for _, issue := range result.Issues {
-		t.Logf("  [%s] %s: %s", issue.Severity, issue.Category, issue.Message)
-	}
-	t.Logf("Tags: %v", result.Tags)
-}
-
 // TestLiveSitemap tests sitemap crawling.
 func TestLiveSitemap(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping live test")
 	}
 
-	sc := seo.NewSitemapCrawler(testLogger)
+	sc := sitemap.New(testLogger)
 	discovered := sc.DiscoverSitemap("quotes.toscrape.com")
 	t.Logf("Discovered sitemap: %s", discovered)
 

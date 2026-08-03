@@ -202,7 +202,7 @@ tool. Add this to your MCP config:
 
 Tools: `scrapegoat_crawl`, `scrapegoat_extract`, `scrapegoat_search`,
 `scrapegoat_screenshot`, `scrapegoat_batch`, `scrapegoat_job_status`,
-`scrapegoat_sitemap`, `scrapegoat_seo_audit`.
+`scrapegoat_sitemap`.
 
 Nothing leaves your machine, there is no API key, and there is no per-request cost.
 
@@ -309,21 +309,25 @@ SETTINGS, header order, TCP characteristics, and behaviour are all still tells.
 
 | | |
 |---|---|
-| **Crawling** | Priority frontier, per-domain rate limiting, circuit breaker, jittered backoff, `robots.txt`, checkpoint resume |
+| **Crawling** | Priority frontier, per-domain rate limiting, circuit breaker, jittered backoff, `robots.txt`, sitemap discovery, checkpoint resume |
 | **Parsing** | CSS, XPath, regex, JSON-LD, OpenGraph, tables, structural listing detection |
 | **Output** | JSON, JSONL, CSV |
-| **Interfaces** | CLI (20 commands), Go library, MCP server, REST + WebSocket API, Python and TypeScript SDKs |
+| **Interfaces** | CLI, Go library, MCP server, REST + WebSocket API, Python and TypeScript SDKs |
 | **Dedup** | Exact set, or Bloom at 1.2 bytes/URL when a crawl outgrows memory |
 | **Distributed** | Master/worker with a Redis queue — at-least-once delivery, recovery of tasks abandoned by dead workers |
 | **Browser** | Headless Chromium via go-rod for JS-rendered pages |
 | **Observability** | Prometheus metrics with labels and histograms |
 | **LLM extraction** | OpenAI, Anthropic, Ollama; schema-based, SQLite-cached |
 
-Designed but **not** wired into the crawl path — the autoscaled pool and in-process
-tracing — are in [ROADMAP.md](ROADMAP.md), not this table. If it is listed here, it
-runs.
+Deliberately **not** here: SEO auditing, change detection, crawl-graph export, a
+web dashboard, a REPL, and a benchmark harness. They work, and they live in
+[contrib/](contrib/) — out of the binary and out of this list. The reasoning is in
+[contrib/README.md](contrib/README.md); the short version is that every subsystem
+in core is one the crawl's determinism invariant has to hold across.
 
----
+The autoscaled pool and in-process tracing are implemented but not wired into the
+crawl path; they are in [ROADMAP.md](ROADMAP.md). If it is in the table above, it
+runs.
 
 ## Docs
 

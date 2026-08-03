@@ -63,13 +63,10 @@ go run ./spiders/
 |---------|-------------|
 | `scrapegoat crawl <url>` | Crawl a URL with link following |
 | `scrapegoat extract <url>` | Auto-extract structured data |
-| `scrapegoat search <url>` | Full-text indexing |
 | `scrapegoat new spider <name>` | Scaffold a new spider |
 | `scrapegoat new project <name>` | Scaffold project with config |
 | `scrapegoat master` | Start distributed coordinator |
 | `scrapegoat worker` | Start distributed worker |
-| `scrapegoat dashboard` | Launch web dashboard |
-| `scrapegoat benchmark <url>` | Run performance benchmarks |
 
 ## Using as a Library
 

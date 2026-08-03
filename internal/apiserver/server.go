@@ -152,7 +152,6 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("GET /v1/jobs/{id}/items", s.withAuth(s.handleGetJobItems))
 	mux.HandleFunc("GET /v1/jobs", s.withAuth(s.handleListJobs))
 	mux.HandleFunc("POST /v1/screenshot", s.withAuth(s.withRateLimit(s.handleScreenshot)))
-	mux.HandleFunc("POST /v1/seo-audit", s.withAuth(s.withRateLimit(s.handleSEOAudit)))
 	mux.HandleFunc("POST /v1/sitemap", s.withAuth(s.withRateLimit(s.handleSitemap)))
 
 	// WebSocket.

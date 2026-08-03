@@ -76,7 +76,6 @@ func TestServer_ToolsList(t *testing.T) {
 		"scrapegoat_batch",
 		"scrapegoat_job_status",
 		"scrapegoat_sitemap",
-		"scrapegoat_seo_audit",
 	}
 
 	if len(toolList.Tools) != len(expectedTools) {

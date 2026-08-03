@@ -15,7 +15,7 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
 	"github.com/IshaanNene/ScrapeGoat/internal/safety"
-	"github.com/IshaanNene/ScrapeGoat/internal/seo"
+	"github.com/IshaanNene/ScrapeGoat/internal/sitemap"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
@@ -202,17 +202,6 @@ func (r *ToolRegistry) registerBuiltins() {
 		}`),
 	}, r.handleSitemap)
 
-	r.register(ToolDefinition{
-		Name:        "scrapegoat_seo_audit",
-		Description: "Run an SEO audit on a URL, checking title tags, meta descriptions, headings, images, and more. Returns a score out of 100.",
-		InputSchema: json.RawMessage(`{
-			"type": "object",
-			"properties": {
-				"url": {"type": "string", "description": "The URL to audit"}
-			},
-			"required": ["url"]
-		}`),
-	}, r.handleSEOAudit)
 }
 
 // --- Tool Handlers ---
@@ -628,7 +617,7 @@ func (r *ToolRegistry) handleSitemap(ctx context.Context, rawArgs json.RawMessag
 		return nil, err
 	}
 
-	crawler := seo.NewSitemapCrawler(r.logger)
+	crawler := sitemap.New(r.logger)
 
 	sitemapURL := args.URL
 	if !strings.Contains(sitemapURL, "sitemap") {
@@ -653,51 +642,6 @@ func (r *ToolRegistry) handleSitemap(ctx context.Context, rawArgs json.RawMessag
 		"urls":        urls,
 	}
 	out, _ := json.MarshalIndent(result, "", "  ")
-	return &ToolCallResult{
-		Content: []ContentBlock{{Type: "text", Text: string(out)}},
-	}, nil
-}
-
-// SEOAuditArgs are the arguments for scrapegoat_seo_audit.
-type SEOAuditArgs struct {
-	URL string `json:"url"`
-}
-
-func (r *ToolRegistry) handleSEOAudit(ctx context.Context, rawArgs json.RawMessage) (*ToolCallResult, error) {
-	var args SEOAuditArgs
-	if err := json.Unmarshal(rawArgs, &args); err != nil {
-		return nil, fmt.Errorf("invalid arguments: %w", err)
-	}
-	if err := r.checkURL(args.URL); err != nil {
-		return nil, err
-	}
-
-	cfg := config.DefaultConfig()
-	httpFetcher, err := fetcher.NewHTTPFetcher(cfg, r.logger)
-	if err != nil {
-		return nil, fmt.Errorf("create fetcher: %w", err)
-	}
-
-	req, err := types.NewRequest(args.URL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid URL: %w", err)
-	}
-
-	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	resp, err := httpFetcher.Fetch(fetchCtx, req)
-	if err != nil {
-		return nil, fmt.Errorf("fetch: %w", err)
-	}
-
-	auditor := seo.NewMetaAuditor(r.logger)
-	auditResult, err := auditor.Audit(resp)
-	if err != nil {
-		return nil, fmt.Errorf("audit: %w", err)
-	}
-
-	out, _ := json.MarshalIndent(auditResult, "", "  ")
 	return &ToolCallResult{
 		Content: []ContentBlock{{Type: "text", Text: string(out)}},
 	}, nil

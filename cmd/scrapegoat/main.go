@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -20,12 +19,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/IshaanNene/ScrapeGoat/contrib/changedetect"
 	"github.com/IshaanNene/ScrapeGoat/internal/apiserver"
-	"github.com/IshaanNene/ScrapeGoat/internal/benchmark"
-	"github.com/IshaanNene/ScrapeGoat/internal/changedetect"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/crawlgraph"
-	"github.com/IshaanNene/ScrapeGoat/internal/dashboard"
 	"github.com/IshaanNene/ScrapeGoat/internal/distributed"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
@@ -58,39 +54,31 @@ func main() {
 		Short: "ScrapeGoat — All-in-One Web Scraper/Crawler",
 		Long: `ScrapeGoat is a web scraping and crawling toolkit for Go.
 
-Features:
-  • High-performance concurrent crawling with per-domain throttling
-  • CSS selector and regex extraction
-  • Search engine indexing mode (full-text, headings, meta, link graph)
-  • AI-powered crawling (summarize, NER, sentiment via LLM)
-  • JSON, JSONL, CSV export
-  • Proxy rotation and User-Agent randomization
-  • robots.txt compliance
+Crawl a site, extract structured data, or expose either to an AI agent over MCP.
+
+  • Concurrent crawling with per-domain rate limiting and a circuit breaker
+  • Structured extraction: CSS, XPath, regex, JSON-LD, and listing detection
+  • SSRF-guarded fetching — see SECURITY.md for the trust boundary
   • Checkpoint pause/resume (--resume)
-  • Prometheus metrics endpoint`,
+  • MCP server, REST API, Prometheus metrics
+
+Tools outside the core — SEO audit, change detection, crawl graph, dashboard,
+REPL, benchmark harness — live in contrib/ and are built separately.`,
 	}
 
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file path")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
 
 	rootCmd.AddCommand(crawlCmd())
-	rootCmd.AddCommand(searchCmd())
-	rootCmd.AddCommand(aiCrawlCmd())
 	rootCmd.AddCommand(newCmd())
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(configCmd())
 	rootCmd.AddCommand(masterCmd())
 	rootCmd.AddCommand(workerCmd())
 	rootCmd.AddCommand(extractCmd())
-	rootCmd.AddCommand(dashboardCmd())
-	rootCmd.AddCommand(benchmarkCmd())
 	rootCmd.AddCommand(scaleCmd())
 	rootCmd.AddCommand(mcpCmd())
 	rootCmd.AddCommand(serveCmd())
-	rootCmd.AddCommand(graphCmd())
-	rootCmd.AddCommand(replayCmd())
-	rootCmd.AddCommand(watchCmd())
-	rootCmd.AddCommand(diffCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -651,53 +639,6 @@ Examples:
 	return cmd
 }
 
-// dashboardCmd creates the "dashboard" subcommand.
-func dashboardCmd() *cobra.Command {
-	var (
-		dashAddr string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "dashboard",
-		Short: "Launch the web dashboard",
-		Long:  "Start the ScrapeGoat web dashboard for monitoring crawl jobs, viewing metrics, and managing workers.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := setupLogger()
-
-			// Parse port from address
-			dashPort := 8080
-			if len(dashAddr) > 1 && dashAddr[0] == ':' {
-				port, err := strconv.Atoi(dashAddr[1:])
-				if err != nil {
-					return fmt.Errorf("parse dashboard address %q: %w", dashAddr, err)
-				}
-				dashPort = port
-			}
-
-			// Create a stats provider that serves demo data
-			provider := &dashboardStatsProvider{}
-			dash := dashboard.NewDashboard(dashPort, provider, logger)
-
-			if err := dash.Start(); err != nil {
-				return fmt.Errorf("start dashboard: %w", err)
-			}
-
-			fmt.Printf("🐐 ScrapeGoat Dashboard running at http://localhost%s\n", dashAddr)
-			fmt.Println("\nPress Ctrl+C to stop.")
-
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-			<-sigCh
-
-			fmt.Println("\nDashboard stopped.")
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&dashAddr, "addr", ":8080", "dashboard listen address")
-	return cmd
-}
-
 // dashboardStatsProvider implements dashboard.StatsProvider for standalone mode.
 type dashboardStatsProvider struct{}
 
@@ -713,57 +654,6 @@ func (p *dashboardStatsProvider) GetStats() map[string]any {
 
 func (p *dashboardStatsProvider) GetState() string {
 	return "idle"
-}
-
-// benchmarkCmd creates the "benchmark" subcommand.
-func benchmarkCmd() *cobra.Command {
-	var (
-		bConcurrency int
-		bDuration    string
-		bRequests    int
-	)
-
-	cmd := &cobra.Command{
-		Use:   "benchmark [url]",
-		Short: "Run performance benchmarks",
-		Long:  "Benchmark ScrapeGoat's fetching performance against a target URL. Measures requests/sec, latency percentiles, and throughput.",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := setupLogger()
-
-			duration, err := time.ParseDuration(bDuration)
-			if err != nil {
-				return fmt.Errorf("invalid duration: %w", err)
-			}
-
-			cfg := &benchmark.BenchmarkConfig{
-				URL:         args[0],
-				Concurrency: bConcurrency,
-				Duration:    duration,
-				Requests:    bRequests,
-				Headers: map[string]string{
-					"User-Agent": "ScrapeGoat-Benchmark/1.0",
-				},
-			}
-
-			fmt.Println("🐐 ScrapeGoat Benchmark")
-			fmt.Printf("   Target:      %s\n", cfg.URL)
-			fmt.Printf("   Concurrency: %d\n", cfg.Concurrency)
-			fmt.Printf("   Duration:    %s\n", cfg.Duration)
-			fmt.Println()
-
-			b := benchmark.NewBenchmark(logger)
-			result := b.Run(cfg)
-			benchmark.PrintResult(result)
-
-			return nil
-		},
-	}
-
-	cmd.Flags().IntVar(&bConcurrency, "concurrency", 10, "number of concurrent workers")
-	cmd.Flags().StringVar(&bDuration, "duration", "10s", "benchmark duration")
-	cmd.Flags().IntVar(&bRequests, "requests", 0, "max requests (0 = unlimited)")
-	return cmd
 }
 
 // scaleCmd creates the "scale" subcommand.
@@ -1144,236 +1034,6 @@ Examples:
 	return cmd
 }
 
-// graphCmd creates the "graph" subcommand for crawl graph export.
-func graphCmd() *cobra.Command {
-	var (
-		graphDB     string
-		graphFormat string
-		graphOutput string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "graph",
-		Short: "Export crawl graph in multiple formats",
-		Long: `Export the crawl graph collected during a crawl session.
-
-Supported formats: json, dot (GraphViz), mermaid, csv.
-
-Examples:
-  scrapegoat graph --db=./crawl.db --format=dot > graph.dot
-  scrapegoat graph --db=./crawl.db --format=json -o graph.json
-  scrapegoat graph --format=mermaid`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := setupLogger()
-
-			if graphDB == "" {
-				graphDB = "./scrapegoat_graph.db"
-			}
-
-			g, err := crawlgraph.New(graphDB, logger)
-			if err != nil {
-				return fmt.Errorf("open graph: %w", err)
-			}
-			defer g.Close()
-
-			var output string
-			switch graphFormat {
-			case "json":
-				data, err := g.ExportJSON()
-				if err != nil {
-					return err
-				}
-				output = string(data)
-			case "dot":
-				output, err = g.ExportDOT()
-			case "mermaid":
-				output, err = g.ExportMermaid()
-			case "csv":
-				output, err = g.ExportCSV()
-			default:
-				return fmt.Errorf("unknown format: %s (supported: json, dot, mermaid, csv)", graphFormat)
-			}
-			if err != nil {
-				return err
-			}
-
-			if graphOutput != "" {
-				return os.WriteFile(graphOutput, []byte(output), 0o644)
-			}
-			fmt.Println(output)
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&graphDB, "db", "./scrapegoat_graph.db", "Crawl graph database path")
-	cmd.Flags().StringVar(&graphFormat, "format", "json", "Export format: json, dot, mermaid, csv")
-	cmd.Flags().StringVarP(&graphOutput, "output", "o", "", "Output file (default: stdout)")
-
-	return cmd
-}
-
-// replayCmd creates the "replay" subcommand for generating re-crawl URL lists.
-func replayCmd() *cobra.Command {
-	var (
-		replayDB       string
-		replayStrategy string
-		replayMaxDepth int
-	)
-
-	cmd := &cobra.Command{
-		Use:   "replay",
-		Short: "Generate a re-crawl URL list from a previous crawl graph",
-		Long: `Analyze a crawl graph and output URLs for re-crawling based on a strategy.
-
-Strategies:
-  errors    — Re-crawl pages that returned errors or non-2xx status
-  changed   — Re-crawl pages whose content hash changed
-  all       — Re-crawl everything
-  depth     — Re-crawl pages up to a max depth
-
-Examples:
-  scrapegoat replay --db=./crawl.db --strategy=errors
-  scrapegoat replay --strategy=depth --max-depth=2`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := setupLogger()
-
-			if replayDB == "" {
-				replayDB = "./scrapegoat_graph.db"
-			}
-
-			g, err := crawlgraph.New(replayDB, logger)
-			if err != nil {
-				return fmt.Errorf("open graph: %w", err)
-			}
-			defer g.Close()
-
-			cfg := crawlgraph.ReplayConfig{
-				Strategy: crawlgraph.ReplayStrategy(replayStrategy),
-				MaxDepth: replayMaxDepth,
-			}
-
-			urls, err := crawlgraph.GetReplayURLs(g, cfg, logger)
-			if err != nil {
-				return fmt.Errorf("replay: %w", err)
-			}
-
-			if len(urls) == 0 {
-				fmt.Println("No URLs to replay.")
-				return nil
-			}
-
-			fmt.Printf("# %d URLs to re-crawl (strategy: %s)\n", len(urls), replayStrategy)
-			for _, u := range urls {
-				fmt.Println(u)
-			}
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&replayDB, "db", "./scrapegoat_graph.db", "Crawl graph database path")
-	cmd.Flags().StringVar(&replayStrategy, "strategy", "errors", "Replay strategy: errors, changed, all, depth")
-	cmd.Flags().IntVar(&replayMaxDepth, "max-depth", 3, "Max depth for depth strategy")
-
-	return cmd
-}
-
-// watchCmd creates the "watch" subcommand for monitoring URL changes.
-func watchCmd() *cobra.Command {
-	var (
-		watchDB       string
-		watchInterval string
-		watchSelector string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "watch [urls...]",
-		Short: "Monitor web pages for changes",
-		Long: `Watch one or more URLs and detect content changes over time.
-
-The monitor stores snapshots in SQLite and can trigger notifications
-when changes are detected.
-
-Examples:
-  scrapegoat watch https://example.com --interval=5m
-  scrapegoat watch https://news.site/feed --selector=".headlines" --interval=1h
-  scrapegoat watch https://a.com https://b.com --db=./watch.db`,
-		Args: cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := setupLogger()
-
-			if watchDB == "" {
-				watchDB = "./scrapegoat_watch.db"
-			}
-
-			interval, err := time.ParseDuration(watchInterval)
-			if err != nil {
-				return fmt.Errorf("parse interval: %w", err)
-			}
-
-			monitor, err := changedetect.NewMonitor(watchDB, logger)
-			if err != nil {
-				return fmt.Errorf("create monitor: %w", err)
-			}
-			defer monitor.Close()
-
-			// Add log notifier.
-			monitor.AddNotifier(&changedetect.LogNotifier{Logger: logger})
-
-			// Register watches.
-			for _, url := range args {
-				cfg := changedetect.WatchConfig{
-					URL:      url,
-					Interval: interval,
-					DiffType: changedetect.DiffHash,
-					Selector: watchSelector,
-					Name:     url,
-				}
-				if err := monitor.AddWatch(cfg); err != nil {
-					return fmt.Errorf("add watch for %s: %w", url, err)
-				}
-				logger.Info("watching URL", "url", url, "interval", interval)
-			}
-
-			fmt.Printf("🔍 Monitoring %d URL(s) every %s\n", len(args), interval)
-			fmt.Println("Press Ctrl+C to stop.")
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
-			ticker := time.NewTicker(interval)
-			defer ticker.Stop()
-
-			// Run initial check immediately.
-			for _, url := range args {
-				checkURL(ctx, monitor, url, logger)
-			}
-
-			for {
-				select {
-				case <-ticker.C:
-					for _, url := range args {
-						checkURL(ctx, monitor, url, logger)
-					}
-				case <-sigCh:
-					fmt.Println("\nStopping watcher.")
-					return nil
-				case <-ctx.Done():
-					return nil
-				}
-			}
-		},
-	}
-
-	cmd.Flags().StringVar(&watchDB, "db", "./scrapegoat_watch.db", "Watch database path")
-	cmd.Flags().StringVar(&watchInterval, "interval", "30m", "Check interval (e.g. 5m, 1h, 30s)")
-	cmd.Flags().StringVar(&watchSelector, "selector", "", "CSS selector to scope change detection")
-
-	return cmd
-}
-
 func checkURL(ctx context.Context, monitor *changedetect.Monitor, url string, logger *slog.Logger) {
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(url)
@@ -1405,87 +1065,4 @@ func checkURL(ctx context.Context, monitor *changedetect.Monitor, url string, lo
 	} else {
 		logger.Debug("no change", "url", url)
 	}
-}
-
-// diffCmd creates the "diff" subcommand for viewing change history.
-func diffCmd() *cobra.Command {
-	var (
-		diffDB    string
-		diffLimit int
-	)
-
-	cmd := &cobra.Command{
-		Use:   "diff [url]",
-		Short: "Show change history for a monitored URL",
-		Long: `View the snapshot and change history for a URL that has been
-monitored with 'scrapegoat watch'.
-
-Examples:
-  scrapegoat diff https://example.com
-  scrapegoat diff https://example.com --limit=20`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := setupLogger()
-			url := args[0]
-
-			if diffDB == "" {
-				diffDB = "./scrapegoat_watch.db"
-			}
-
-			monitor, err := changedetect.NewMonitor(diffDB, logger)
-			if err != nil {
-				return fmt.Errorf("open monitor: %w", err)
-			}
-			defer monitor.Close()
-
-			changes, err := monitor.GetChanges(url, diffLimit)
-			if err != nil {
-				return fmt.Errorf("get changes: %w", err)
-			}
-
-			if len(changes) == 0 {
-				fmt.Printf("No changes recorded for %s\n", url)
-				return nil
-			}
-
-			fmt.Printf("📋 Change history for %s (%d events)\n\n", url, len(changes))
-			fmt.Printf("%-24s  %-10s  %-10s  %-8s\n", "Detected", "Old Len", "New Len", "Diff %")
-			fmt.Println(strings.Repeat("─", 60))
-
-			for _, c := range changes {
-				fmt.Printf("%-24s  %-10d  %-10d  %6.1f%%\n",
-					c.DetectedAt.Format("2006-01-02 15:04:05"),
-					c.OldLen, c.NewLen, c.DiffPercent)
-			}
-
-			// Show snapshot history too.
-			fmt.Println()
-			snapshots, err := monitor.GetHistory(url, diffLimit)
-			if err != nil {
-				return fmt.Errorf("get history: %w", err)
-			}
-
-			if len(snapshots) > 0 {
-				fmt.Printf("📸 Snapshot history (%d snapshots)\n\n", len(snapshots))
-				fmt.Printf("%-24s  %-8s  %-10s  %s\n", "Captured", "Status", "Size", "Hash (first 12)")
-				fmt.Println(strings.Repeat("─", 70))
-				for _, s := range snapshots {
-					hash := s.ContentHash
-					if len(hash) > 12 {
-						hash = hash[:12]
-					}
-					fmt.Printf("%-24s  %-8d  %-10d  %s\n",
-						s.CapturedAt.Format("2006-01-02 15:04:05"),
-						s.StatusCode, s.ContentLen, hash)
-				}
-			}
-
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&diffDB, "db", "./scrapegoat_watch.db", "Watch database path")
-	cmd.Flags().IntVar(&diffLimit, "limit", 50, "Max number of entries to show")
-
-	return cmd
 }

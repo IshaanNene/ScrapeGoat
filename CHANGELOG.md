@@ -13,6 +13,29 @@ wired into the running system, and several security properties a crawler needs w
 absent. Both are addressed, and the README now describes only what actually runs —
 everything else moved to [ROADMAP.md](ROADMAP.md).
 
+### Changed (Phase 0)
+
+- **The engine takes time and randomness from injected sources.** First step of
+  [docs/design/0001-deterministic-crawl.md](docs/design/0001-deterministic-crawl.md):
+  `internal/clock` supplies `Clock`, `Timer`, and `Ticker`, threaded through the
+  frontier, throttler, circuit breaker, robots manager, checkpoint manager, and
+  autoscaled pool. Backoff jitter comes from an injected `*rand.Rand`. Constructors
+  take `nil` to mean "the real one", so callers are unaffected. Enforced by
+  `scripts/check-determinism.sh` in CI, because breaking the boundary is silent —
+  nothing fails, the crawl just stops being reproducible.
+- **Nine subsystems moved to `contrib/`**: SEO auditing, crawl-graph export, change
+  detection, anti-bot patterns, browser automation helpers, the plugin registry,
+  the dashboard, the REPL, and the benchmark harness. They build and their tests
+  pass; they are not in the binary. Sitemap discovery stayed in core as
+  `internal/sitemap` — it is part of crawling. Reasoning in
+  [contrib/README.md](contrib/README.md).
+- **The CLI is 20 commands to 10.** Removed: `search`, `ai-crawl`, `dashboard`,
+  `benchmark`, `graph`, `replay`, `watch`, `diff`. `replay` in particular had to go
+  early: the name is needed for deterministic replay, and the old command generated
+  a re-crawl URL list from a graph. **Breaking.**
+- **The `scrapegoat_seo_audit` MCP tool and `POST /v1/seo-audit` are removed.**
+  **Breaking.**
+
 ### Added (P1)
 
 - **Per-domain rate-limiter slots.** `Frontier.PopReady` dequeues only requests

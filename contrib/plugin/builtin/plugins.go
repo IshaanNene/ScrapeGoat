@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/plugin"
+	"github.com/IshaanNene/ScrapeGoat/contrib/plugin"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
