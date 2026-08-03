@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,6 +13,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/spf13/cobra"
 
@@ -32,7 +33,7 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var (
@@ -53,7 +54,7 @@ func main() {
 	rootCmd := &cobra.Command{
 		Use:   "scrapegoat",
 		Short: "ScrapeGoat — All-in-One Web Scraper/Crawler",
-		Long: `ScrapeGoat is a next-generation, enterprise-grade web scraping and crawling toolkit.
+		Long: `ScrapeGoat is a web scraping and crawling toolkit for Go.
 
 Features:
   • High-performance concurrent crawling with per-domain throttling
@@ -63,7 +64,7 @@ Features:
   • JSON, JSONL, CSV export
   • Proxy rotation and User-Agent randomization
   • robots.txt compliance
-  • Checkpoint-based pause/resume
+  • Periodic checkpoint snapshots
   • Prometheus metrics endpoint`,
 	}
 
@@ -177,9 +178,12 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	}
 	eng.SetStorage(store)
 
-	// Setup metrics (if enabled)
+	// Setup metrics (if enabled). The recorder must be handed to the engine, not
+	// merely served: without SetMetrics the endpoint comes up and reports zeroes
+	// forever, which is worse than having no endpoint at all.
 	if cfg.Metrics.Enabled {
 		metrics := observability.NewMetrics(logger)
+		eng.SetMetrics(metrics)
 		if err := metrics.StartServer(cfg.Metrics.Port, cfg.Metrics.Path); err != nil {
 			logger.Warn("failed to start metrics server", "error", err)
 		}
@@ -1023,9 +1027,11 @@ Examples:
 // serveCmd creates the "serve" subcommand to start the API server.
 func serveCmd() *cobra.Command {
 	var (
-		servePort   int
-		serveAPIKey string
-		serveDB     string
+		servePort    int
+		serveAPIKey  string
+		serveDB      string
+		serveNoAuth  bool
+		serveOrigins []string
 	)
 
 	cmd := &cobra.Command{
@@ -1066,6 +1072,8 @@ Examples:
 			}
 
 			cfg.APIServer.CORS = true
+			cfg.APIServer.AllowNoAuth = serveNoAuth
+			cfg.APIServer.AllowedOrigins = serveOrigins
 
 			srv, err := apiserver.NewServer(cfg, logger)
 			if err != nil {
@@ -1076,6 +1084,8 @@ Examples:
 			fmt.Printf("   Health: http://localhost:%d/health\n", cfg.APIServer.Port)
 			if cfg.APIServer.APIKey != "" {
 				fmt.Printf("   API Key: %s...%s\n", cfg.APIServer.APIKey[:4], cfg.APIServer.APIKey[len(cfg.APIServer.APIKey)-4:])
+			} else {
+				fmt.Println("   ⚠️  Authentication DISABLED (--insecure-no-auth)")
 			}
 			fmt.Println("\nPress Ctrl+C to stop.")
 
@@ -1096,6 +1106,10 @@ Examples:
 	cmd.Flags().IntVar(&servePort, "port", 8080, "API server port")
 	cmd.Flags().StringVar(&serveAPIKey, "api-key", "", "API key for authentication (or set SCRAPEGOAT_API_KEY)")
 	cmd.Flags().StringVar(&serveDB, "db", "", "SQLite database path for job persistence")
+	cmd.Flags().BoolVar(&serveNoAuth, "insecure-no-auth", false,
+		"start without an API key — every endpoint is open to anything that can reach the port")
+	cmd.Flags().StringSliceVar(&serveOrigins, "allowed-origin", nil,
+		"origin permitted by CORS and WebSocket upgrades; repeatable. Empty means same-origin only")
 
 	return cmd
 }
@@ -1445,4 +1459,3 @@ Examples:
 
 	return cmd
 }
-
