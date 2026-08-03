@@ -3,7 +3,9 @@ package mcp
 import (
 	"bufio"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -118,8 +120,20 @@ func NewHTTPTransport(port int, apiKey string, logger *slog.Logger) *HTTPTranspo
 	}
 }
 
+// ErrNoAPIKey is returned when the HTTP transport is started without an API key.
+var ErrNoAPIKey = errors.New("mcp http transport requires an API key")
+
 // Run starts the HTTP server and blocks until ctx is cancelled.
+//
+// It refuses to start without an API key. The transport's own documentation already
+// said HTTP requires authentication, but an empty key silently authorised every
+// request — and these tools fetch arbitrary URLs on the caller's behalf.
 func (t *HTTPTransport) Run(ctx context.Context, handler MessageHandler) error {
+	if t.apiKey == "" {
+		return fmt.Errorf("%w: pass --api-key or set SCRAPEGOAT_MCP_API_KEY "+
+			"(the stdio transport needs no key)", ErrNoAPIKey)
+	}
+
 	t.handler = handler
 
 	mux := http.NewServeMux()
@@ -158,16 +172,21 @@ func (t *HTTPTransport) Run(ctx context.Context, handler MessageHandler) error {
 }
 
 // authenticate checks the API key on HTTP requests.
+//
+// An empty configured key denies rather than allows: Run refuses to start without
+// one, so reaching here with no key means something constructed a transport out of
+// band, and the safe reading of that is "not authorised".
 func (t *HTTPTransport) authenticate(r *http.Request) bool {
 	if t.apiKey == "" {
-		return true // No auth configured — should not happen for HTTP.
+		return false
 	}
 	key := r.Header.Get("X-API-Key")
 	if key == "" {
 		key = r.Header.Get("Authorization")
 		key = strings.TrimPrefix(key, "Bearer ")
 	}
-	return key == t.apiKey
+	// Constant-time, so response latency does not leak the key byte by byte.
+	return subtle.ConstantTimeCompare([]byte(key), []byte(t.apiKey)) == 1
 }
 
 func (t *HTTPTransport) handleMCP(w http.ResponseWriter, r *http.Request) {
@@ -220,7 +239,8 @@ func (t *HTTPTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// No Access-Control-Allow-Origin: this stream is for a local MCP client, not for
+	// a web page. Advertising it as cross-origin readable only widens the target.
 
 	// Create a unique session ID for this SSE client.
 	sessionID := fmt.Sprintf("sse-%d", time.Now().UnixNano())
