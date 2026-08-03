@@ -69,3 +69,98 @@ cannot export OTLP and cannot reach Jaeger, Tempo, or Honeycomb. It also does no
 - End-to-end crawl throughput against a controlled target, and a fair comparison
   harness against Scrapy and Colly. Scheduler and dedup numbers are already in
   [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
+---
+
+## Direction: the corpus-building wedge
+
+The generic-crawler space is crowded and commoditised. Colly has a decade of bug
+fixes; Scrapy has fifteen years and an ecosystem; Firecrawl and Exa have companies.
+Competing on "fetch and parse HTML" means losing on every axis that matters.
+
+The gap worth occupying is one layer up: **turning a set of domains into a clean,
+deduplicated, provenance-tracked corpus**, locally, with no per-request cost and no
+data leaving the network. Almost every AI-adjacent web-data task is that task —
+domain-specific pretraining and fine-tuning sets, RAG corpora, eval and benchmark
+construction, RL environment scraping — and the tooling for it is mostly Python,
+mostly research-grade, and mostly assumes you are starting from CommonCrawl.
+
+The items below are ordered by how much they close that gap. Everything above this
+section is maintenance of what exists; this is where the project would become
+something people reach for rather than something that competes with Colly.
+
+### 1. Content extraction that survives the real web
+
+The single largest gap. `AutoExtractor.extractArticles` matches CSS selectors —
+`article`, `.post`, `.entry-content` — which works on well-marked-up sites and
+fails on most of the web, returning navigation, cookie banners, and footers as
+article text.
+
+What is needed is algorithmic main-content detection: text-density and link-density
+scoring per DOM node, boilerplate removal, and a confidence signal so downstream
+consumers can filter. Python has trafilatura and resiliparse; Go has nothing
+comparable, which makes this both the highest-leverage internal fix and a
+genuinely reusable package in its own right.
+
+Everything downstream depends on this. Deduplication, quality filtering, and
+embedding are all garbage-in-garbage-out on bad extraction.
+
+### 2. Near-duplicate detection
+
+Current dedup is exact-URL only. A corpus needs *content* dedup: the same article
+syndicated across twenty sites, the same page under a dozen tracking-parameter
+variants, boilerplate-only pages. MinHash with LSH banding for near-duplicates,
+SimHash for cheap fuzzy comparison.
+
+This is the difference between "a pile of pages" and "a dataset". FineWeb's own
+pipeline spends most of its complexity here.
+
+### 3. Corpus output with provenance
+
+JSON, JSONL, and CSV are fine for scraped records and wrong for a corpus. Needed:
+
+- **Parquet**, so the output is directly loadable by `datasets`, DuckDB, and Polars.
+- **A stable record schema**: URL, canonical URL, fetch timestamp, HTTP status,
+  content hash, extracted text, language, and extraction confidence.
+- **Provenance for every record**: what robots.txt said at fetch time, which AI
+  directives were present, any licence signal found, and the crawler identity used.
+
+Provenance is not bookkeeping. It is what makes a dataset defensible when someone
+asks where the data came from, and that question is being asked far more often
+than it was two years ago.
+
+### 4. Compliance as a first-class feature
+
+`robots.txt` compliance exists. What does not:
+
+- AI-specific directives (`GPTBot`, `CCBot`, `Google-Extended`, and successors),
+  which are now how sites express intent about AI use specifically.
+- Page-level signals: `noai` / `noimageai` meta tags, TDM reservation headers.
+- A machine-readable per-crawl compliance report: what was respected, what was
+  skipped, and why.
+
+Most tools treat this as a checkbox. Treating it as a feature — with an auditable
+report — is a real differentiator for anyone who has to justify their corpus.
+
+### 5. Incremental recrawl
+
+Per-URL change-frequency estimation driving recrawl priority, so a corpus is
+maintained rather than rebuilt. This is what turns a one-shot tool into
+infrastructure, and there is citable prior work (Cho & Garcia-Molina) to implement
+against rather than inventing a heuristic.
+
+### 6. WARC read and write
+
+WARC is the interchange format of the web-archiving and dataset world. Writing it
+makes ScrapeGoat's output usable by existing pipelines; reading it makes
+ScrapeGoat usable *on* CommonCrawl, which is where essentially all large-scale
+web-derived datasets actually start. This is the interoperability item — it stops
+the project being an island.
+
+### 7. MCP tools shaped for corpora
+
+The current tools are crawl-shaped: crawl, extract, screenshot, sitemap. An agent
+building or querying a corpus wants different verbs — search *within* what has
+been crawled, fetch a page as clean markdown, ask what a source's licence and
+robots status were. Streaming results rather than one large blob, and a
+capability-scoped tool surface so an agent can be given read-only access.
