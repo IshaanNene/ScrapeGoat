@@ -363,6 +363,9 @@ func TestMultipleResultsChanSubscribers(t *testing.T) {
 // wrapped error.
 func TestRetryUsesErrorsAs(t *testing.T) {
 	cfg := testutil.LoopbackConfig()
+	// Zero backoff so the requeue is synchronous; the delayed path has its own
+	// test in backoff_test.go.
+	cfg.Engine.RetryDelay = 0
 	eng := New(cfg, concurrencyLogger)
 	s := eng.scheduler
 

@@ -61,9 +61,18 @@ type EngineConfig struct {
 	// memory monotonically on a broad crawl. Zero uses the default.
 	MaxThrottleSlots int `mapstructure:"max_throttle_slots" yaml:"max_throttle_slots"`
 
-	RespectRobotsTxt   bool          `mapstructure:"respect_robots_txt"   yaml:"respect_robots_txt"`
-	MaxRetries         int           `mapstructure:"max_retries"          yaml:"max_retries"`
-	RetryDelay         time.Duration `mapstructure:"retry_delay"          yaml:"retry_delay"`
+	RespectRobotsTxt bool          `mapstructure:"respect_robots_txt"   yaml:"respect_robots_txt"`
+	MaxRetries       int           `mapstructure:"max_retries"          yaml:"max_retries"`
+	RetryDelay       time.Duration `mapstructure:"retry_delay"          yaml:"retry_delay"`
+
+	// CircuitBreakerThreshold is how many consecutive failures open a domain's
+	// circuit. Zero disables the breaker.
+	CircuitBreakerThreshold int `mapstructure:"circuit_breaker_threshold" yaml:"circuit_breaker_threshold"`
+
+	// CircuitBreakerCooldown is how long an open circuit waits before allowing
+	// a single probe through.
+	CircuitBreakerCooldown time.Duration `mapstructure:"circuit_breaker_cooldown" yaml:"circuit_breaker_cooldown"`
+
 	CheckpointInterval time.Duration `mapstructure:"checkpoint_interval"  yaml:"checkpoint_interval"`
 	UserAgents         []string      `mapstructure:"user_agents"          yaml:"user_agents"`
 	AllowedDomains     []string      `mapstructure:"allowed_domains"      yaml:"allowed_domains"`
@@ -153,15 +162,17 @@ type MetricsConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Engine: EngineConfig{
-			Concurrency:        10,
-			MaxDepth:           5,
-			RequestTimeout:     30 * time.Second,
-			PolitenessDelay:    1 * time.Second,
-			MaxThrottleSlots:   10_000,
-			RespectRobotsTxt:   true,
-			MaxRetries:         3,
-			RetryDelay:         2 * time.Second,
-			CheckpointInterval: 60 * time.Second,
+			Concurrency:             10,
+			MaxDepth:                5,
+			RequestTimeout:          30 * time.Second,
+			PolitenessDelay:         1 * time.Second,
+			MaxThrottleSlots:        10_000,
+			RespectRobotsTxt:        true,
+			MaxRetries:              3,
+			RetryDelay:              2 * time.Second,
+			CircuitBreakerThreshold: 5,
+			CircuitBreakerCooldown:  30 * time.Second,
+			CheckpointInterval:      60 * time.Second,
 			UserAgents: []string{
 				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 				"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

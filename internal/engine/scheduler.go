@@ -25,8 +25,15 @@ type Scheduler struct {
 	resumeCh chan struct{}
 
 	throttler   *Throttler
+	breaker     *CircuitBreaker
 	idleWorkers atomic.Int32
-	done        chan struct{}
+
+	// pendingRetries counts requests waiting out a backoff off-queue. They are
+	// invisible to both the frontier length and the idle-worker count, so
+	// without this the idle monitor would declare the crawl finished and close
+	// the frontier while retries were still due — silently dropping them.
+	pendingRetries atomic.Int32
+	done           chan struct{}
 }
 
 // NewScheduler creates a new Scheduler.
@@ -37,6 +44,11 @@ func NewScheduler(e *Engine) *Scheduler {
 		resumeCh: make(chan struct{}),
 		throttler: NewThrottler(
 			e.cfg.Engine.PolitenessDelay,
+			e.cfg.Engine.MaxThrottleSlots,
+		),
+		breaker: NewCircuitBreaker(
+			e.cfg.Engine.CircuitBreakerThreshold,
+			e.cfg.Engine.CircuitBreakerCooldown,
 			e.cfg.Engine.MaxThrottleSlots,
 		),
 		done: make(chan struct{}),
@@ -117,7 +129,9 @@ func (s *Scheduler) idleMonitor(ctx context.Context, concurrency int) {
 			idle := int(s.idleWorkers.Load())
 			queueLen := s.engine.frontier.Len()
 
-			if idle >= concurrency && queueLen == 0 {
+			pending := int(s.pendingRetries.Load())
+
+			if idle >= concurrency && queueLen == 0 && pending == 0 {
 				idleStreak++
 				// Require 3 consecutive idle checks (~600ms) to confirm completion
 				if idleStreak >= 3 {
@@ -212,16 +226,31 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 	fetchCtx, fetchCancel := context.WithTimeout(ctx, timeout)
 	defer fetchCancel()
 
-	s.engine.stats.RequestsSent.Add(1)
 	domain := req.Domain()
+
+	// A domain that has failed consistently is skipped rather than retried into
+	// the ground. Without this, a site that goes down absorbs the entire request
+	// budget while the crawler reports the waste as ordinary errors.
+	if !s.breaker.Allow(domain) {
+		s.engine.stats.RequestsFailed.Add(1)
+		s.engine.metrics.RecordRequest(domain, "circuit_open")
+		logger.Warn("circuit open, skipping request", "domain", domain)
+		return
+	}
+
+	s.engine.stats.RequestsSent.Add(1)
 
 	resp, err := fetcher.Fetch(fetchCtx, req)
 	if err != nil {
 		s.engine.metrics.RecordRequest(domain, "error")
+		if state := s.breaker.RecordFailure(domain); state == breakerOpen {
+			logger.Warn("circuit opened for domain", "domain", domain)
+		}
 		s.handleFetchError(logger, req, err)
 		return
 	}
 
+	s.breaker.RecordSuccess(domain)
 	s.engine.stats.ResponsesOK.Add(1)
 	s.engine.stats.BytesDownloaded.Add(resp.ContentLength)
 	s.engine.metrics.RecordRequest(domain, "ok")
@@ -316,19 +345,56 @@ func (s *Scheduler) handleFetchError(logger *slog.Logger, req *types.Request, er
 			"max_retries", req.MaxRetries,
 			"error", err,
 		)
-		// For 429: respect Retry-After before re-queuing
-		if fetchErr.RetryAfter > 0 {
-			logger.Info("rate limited — backing off",
+		// Back off before the request becomes eligible again. A server's
+		// Retry-After wins when present; otherwise exponential with full jitter.
+		delay := backoffFor(s.engine.cfg.Engine.RetryDelay, req.RetryCount)
+		if fetchErr.RetryAfter > delay {
+			delay = fetchErr.RetryAfter
+			logger.Info("rate limited — honouring Retry-After",
 				"retry_after", fetchErr.RetryAfter,
 				"url", req.URLString(),
 			)
-			time.Sleep(fetchErr.RetryAfter)
 		}
+
 		s.engine.metrics.RecordRequest(req.Domain(), "retry")
-		s.engine.frontier.Push(req)
+
+		// Re-queued on a timer rather than by sleeping here: sleeping inside the
+		// worker is what the politeness throttle used to do, and it holds a
+		// worker slot hostage for up to two minutes doing nothing.
+		if delay > 0 {
+			s.requeueAfter(delay, req)
+		} else {
+			s.engine.frontier.Push(req)
+		}
 		return
 	}
 
 	s.engine.stats.ResponsesError.Add(1)
 	logger.Error("fetch failed permanently", "error", err, "retries", req.RetryCount)
+}
+
+// requeueAfter pushes req back onto the frontier once delay has elapsed, without
+// occupying a worker while it waits.
+//
+// The goroutine is tracked by the scheduler's WaitGroup so shutdown does not race
+// it, and it gives up on context cancellation rather than re-queuing work into a
+// crawl that is already ending.
+func (s *Scheduler) requeueAfter(delay time.Duration, req *types.Request) {
+	s.wg.Add(1)
+	s.pendingRetries.Add(1)
+
+	go func() {
+		defer s.wg.Done()
+		defer s.pendingRetries.Add(-1)
+
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+
+		select {
+		case <-timer.C:
+			s.engine.frontier.Push(req)
+		case <-s.engine.ctx.Done():
+		case <-s.done:
+		}
+	}()
 }
