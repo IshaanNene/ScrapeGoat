@@ -30,20 +30,20 @@ const (
 
 // Monitor tracks changes on a set of URLs.
 type Monitor struct {
-	db       *sql.DB
-	logger   *slog.Logger
-	mu       sync.RWMutex
+	db        *sql.DB
+	logger    *slog.Logger
+	mu        sync.RWMutex
 	notifiers []Notifier
 }
 
 // WatchConfig defines a single URL to watch.
 type WatchConfig struct {
-	URL        string        `json:"url" yaml:"url"`
-	Interval   time.Duration `json:"interval" yaml:"interval"`
-	DiffType   DiffType      `json:"diff_type" yaml:"diff_type"`
-	Selector   string        `json:"selector,omitempty" yaml:"selector,omitempty"` // For selector diff.
-	Name       string        `json:"name,omitempty" yaml:"name,omitempty"`
-	Headers    map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
+	URL      string            `json:"url" yaml:"url"`
+	Interval time.Duration     `json:"interval" yaml:"interval"`
+	DiffType DiffType          `json:"diff_type" yaml:"diff_type"`
+	Selector string            `json:"selector,omitempty" yaml:"selector,omitempty"` // For selector diff.
+	Name     string            `json:"name,omitempty" yaml:"name,omitempty"`
+	Headers  map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
 }
 
 // Snapshot holds a point-in-time capture of a URL's content.
@@ -322,7 +322,7 @@ func (n *WebhookNotifier) Name() string { return "webhook" }
 
 func (n *WebhookNotifier) Notify(ctx context.Context, event ChangeEvent) error {
 	data, _ := json.Marshal(event)
-	// Would use http.Post here — omitted for simplicity. 
+	// Would use http.Post here — omitted for simplicity.
 	_ = data
 	_ = strings.NewReader(string(data))
 	return nil

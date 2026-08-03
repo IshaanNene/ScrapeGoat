@@ -37,9 +37,12 @@ lint: ## Run linters
 		"$(GOLANGCI_LINT_BIN)" run ./...; \
 	fi
 
-clean: ## Clean build artifacts
-	rm -rf $(BUILD_DIR)
-	go clean -cache
+clean: ## Clean this project's build artifacts
+	rm -rf $(BUILD_DIR) coverage.out
+	# Deliberately NOT `go clean -cache`: that wipes the user's entire global Go
+	# build cache, not this project's artifacts, and costs them a full rebuild of
+	# everything else they work on. `go clean -testcache` is scoped to test results.
+	go clean -testcache
 
 docker-build: ## Build Docker image
 	docker build -t scrapegoat:$(VERSION) .

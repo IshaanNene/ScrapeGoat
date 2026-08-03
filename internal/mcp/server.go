@@ -104,11 +104,11 @@ type ContentBlock struct {
 
 // AsyncJob tracks an in-progress background job.
 type AsyncJob struct {
-	ID        string         `json:"id"`
-	Status    string         `json:"status"` // pending, running, completed, failed
-	CreatedAt time.Time      `json:"created_at"`
-	Results   []any          `json:"results,omitempty"`
-	Error     string         `json:"error,omitempty"`
+	ID        string    `json:"id"`
+	Status    string    `json:"status"` // pending, running, completed, failed
+	CreatedAt time.Time `json:"created_at"`
+	Results   []any     `json:"results,omitempty"`
+	Error     string    `json:"error,omitempty"`
 	mu        sync.Mutex
 	items     []map[string]any
 }

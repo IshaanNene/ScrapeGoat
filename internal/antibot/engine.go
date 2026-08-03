@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // BlockReason classifies why a response was blocked.
@@ -230,10 +230,10 @@ func (d *BlockDetector) registerDefaults() {
 
 // DomainStats tracks block rates per domain.
 type DomainStats struct {
-	Domain     string
-	Total      int
-	Blocked    int
-	LastBlock  time.Time
+	Domain      string
+	Total       int
+	Blocked     int
+	LastBlock   time.Time
 	PausedUntil time.Time
 }
 
@@ -330,7 +330,7 @@ type Action struct {
 type ActionType int
 
 const (
-	ActionContinue    ActionType = iota
+	ActionContinue ActionType = iota
 	ActionSlowDown
 	ActionBackoff
 	ActionRotateProxy

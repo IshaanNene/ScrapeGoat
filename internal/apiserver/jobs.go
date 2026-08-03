@@ -297,9 +297,9 @@ type scannable interface {
 
 func (jm *JobManager) scanJob(row *sql.Row) (*Job, error) {
 	var (
-		job                                       Job
-		errStr, configJSON, statsJSON              sql.NullString
-		createdStr, startedStr, endedStr           sql.NullString
+		job                              Job
+		errStr, configJSON, statsJSON    sql.NullString
+		createdStr, startedStr, endedStr sql.NullString
 	)
 
 	err := row.Scan(&job.ID, &job.Type, &job.URL, &job.Status, &job.Priority,
@@ -334,9 +334,9 @@ func (jm *JobManager) scanJob(row *sql.Row) (*Job, error) {
 
 func (jm *JobManager) scanJobRow(rows *sql.Rows) (*Job, error) {
 	var (
-		job                                       Job
-		errStr, configJSON, statsJSON              sql.NullString
-		createdStr, startedStr, endedStr           sql.NullString
+		job                              Job
+		errStr, configJSON, statsJSON    sql.NullString
+		createdStr, startedStr, endedStr sql.NullString
 	)
 
 	err := rows.Scan(&job.ID, &job.Type, &job.URL, &job.Status, &job.Priority,

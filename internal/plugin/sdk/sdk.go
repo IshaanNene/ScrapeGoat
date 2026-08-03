@@ -5,7 +5,7 @@ package sdk
 import (
 	"log/slog"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // BasePlugin provides a default implementation for the Plugin interface
@@ -71,7 +71,7 @@ type ItemTransform func(item *types.Item)
 
 // FilterMiddleware creates a pipeline middleware from a filter function.
 type FilterMiddleware struct {
-	FilterFn ItemFilter
+	FilterFn   ItemFilter
 	PluginName string
 }
 

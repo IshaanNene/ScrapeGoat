@@ -25,10 +25,10 @@ const (
 
 // ReplayConfig configures a replay run.
 type ReplayConfig struct {
-	Strategy     ReplayStrategy
-	ReferenceDB  string // Path to reference crawl graph DB.
-	MaxDepth     int    // For depth strategy.
-	URLPattern   string // For pattern strategy.
+	Strategy    ReplayStrategy
+	ReferenceDB string // Path to reference crawl graph DB.
+	MaxDepth    int    // For depth strategy.
+	URLPattern  string // For pattern strategy.
 }
 
 // GetReplayURLs returns the list of URLs to re-crawl based on the strategy.

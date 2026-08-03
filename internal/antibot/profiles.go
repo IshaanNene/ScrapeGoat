@@ -7,37 +7,37 @@ import (
 
 // BrowserStealthProfile contains a complete browser fingerprint for stealth crawling.
 type BrowserStealthProfile struct {
-	Name       string            `json:"name"`
-	UserAgent  string            `json:"user_agent"`
-	Platform   string            `json:"platform"`
-	Vendor     string            `json:"vendor"`
-	Language   string            `json:"language"`
-	Languages  []string          `json:"languages"`
-	Screen     ScreenProfile     `json:"screen"`
-	Navigator  NavigatorProfile  `json:"navigator"`
-	WebGL      WebGLProfile      `json:"webgl"`
-	Headers    map[string]string `json:"headers"`
+	Name      string            `json:"name"`
+	UserAgent string            `json:"user_agent"`
+	Platform  string            `json:"platform"`
+	Vendor    string            `json:"vendor"`
+	Language  string            `json:"language"`
+	Languages []string          `json:"languages"`
+	Screen    ScreenProfile     `json:"screen"`
+	Navigator NavigatorProfile  `json:"navigator"`
+	WebGL     WebGLProfile      `json:"webgl"`
+	Headers   map[string]string `json:"headers"`
 }
 
 // ScreenProfile emulates a screen configuration.
 type ScreenProfile struct {
-	Width      int `json:"width"`
-	Height     int `json:"height"`
-	AvailWidth int `json:"avail_width"`
-	AvailHeight int `json:"avail_height"`
-	ColorDepth int `json:"color_depth"`
-	PixelRatio float64 `json:"pixel_ratio"`
+	Width       int     `json:"width"`
+	Height      int     `json:"height"`
+	AvailWidth  int     `json:"avail_width"`
+	AvailHeight int     `json:"avail_height"`
+	ColorDepth  int     `json:"color_depth"`
+	PixelRatio  float64 `json:"pixel_ratio"`
 }
 
 // NavigatorProfile emulates navigator properties.
 type NavigatorProfile struct {
-	MaxTouchPoints int    `json:"max_touch_points"`
-	HardwareConcurrency int `json:"hardware_concurrency"`
-	DeviceMemory   int    `json:"device_memory"`
-	DoNotTrack     string `json:"do_not_track"`
-	CookieEnabled  bool   `json:"cookie_enabled"`
-	PDFViewerEnabled bool `json:"pdf_viewer_enabled"`
-	Webdriver      bool   `json:"webdriver"` // Must be false to avoid detection.
+	MaxTouchPoints      int    `json:"max_touch_points"`
+	HardwareConcurrency int    `json:"hardware_concurrency"`
+	DeviceMemory        int    `json:"device_memory"`
+	DoNotTrack          string `json:"do_not_track"`
+	CookieEnabled       bool   `json:"cookie_enabled"`
+	PDFViewerEnabled    bool   `json:"pdf_viewer_enabled"`
+	Webdriver           bool   `json:"webdriver"` // Must be false to avoid detection.
 }
 
 // WebGLProfile emulates WebGL renderer info.
@@ -71,20 +71,20 @@ func chromeWindows() BrowserStealthProfile {
 		Vendor:    "Google Inc.",
 		Language:  "en-US",
 		Languages: []string{"en-US", "en"},
-		Screen: ScreenProfile{Width: 1920, Height: 1080, AvailWidth: 1920, AvailHeight: 1040, ColorDepth: 24, PixelRatio: 1.0},
+		Screen:    ScreenProfile{Width: 1920, Height: 1080, AvailWidth: 1920, AvailHeight: 1040, ColorDepth: 24, PixelRatio: 1.0},
 		Navigator: NavigatorProfile{MaxTouchPoints: 0, HardwareConcurrency: 8, DeviceMemory: 8, DoNotTrack: "unspecified", CookieEnabled: true, PDFViewerEnabled: true, Webdriver: false},
-		WebGL: WebGLProfile{Vendor: "Google Inc. (NVIDIA)", Renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
+		WebGL:     WebGLProfile{Vendor: "Google Inc. (NVIDIA)", Renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
 		Headers: map[string]string{
-			"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-			"Accept-Language": "en-US,en;q=0.9",
-			"Accept-Encoding": "gzip, deflate, br",
-			"Sec-Ch-Ua":       `"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"`,
-			"Sec-Ch-Ua-Mobile": "?0",
-			"Sec-Ch-Ua-Platform": `"Windows"`,
-			"Sec-Fetch-Dest":  "document",
-			"Sec-Fetch-Mode":  "navigate",
-			"Sec-Fetch-Site":  "none",
-			"Sec-Fetch-User":  "?1",
+			"Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+			"Accept-Language":           "en-US,en;q=0.9",
+			"Accept-Encoding":           "gzip, deflate, br",
+			"Sec-Ch-Ua":                 `"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"`,
+			"Sec-Ch-Ua-Mobile":          "?0",
+			"Sec-Ch-Ua-Platform":        `"Windows"`,
+			"Sec-Fetch-Dest":            "document",
+			"Sec-Fetch-Mode":            "navigate",
+			"Sec-Fetch-Site":            "none",
+			"Sec-Fetch-User":            "?1",
 			"Upgrade-Insecure-Requests": "1",
 		},
 	}
@@ -98,14 +98,14 @@ func chromeMac() BrowserStealthProfile {
 		Vendor:    "Google Inc.",
 		Language:  "en-US",
 		Languages: []string{"en-US", "en"},
-		Screen: ScreenProfile{Width: 2560, Height: 1600, AvailWidth: 2560, AvailHeight: 1575, ColorDepth: 30, PixelRatio: 2.0},
+		Screen:    ScreenProfile{Width: 2560, Height: 1600, AvailWidth: 2560, AvailHeight: 1575, ColorDepth: 30, PixelRatio: 2.0},
 		Navigator: NavigatorProfile{MaxTouchPoints: 0, HardwareConcurrency: 10, DeviceMemory: 8, DoNotTrack: "unspecified", CookieEnabled: true, PDFViewerEnabled: true, Webdriver: false},
-		WebGL: WebGLProfile{Vendor: "Google Inc. (Apple)", Renderer: "ANGLE (Apple, Apple M1 Pro, OpenGL 4.1)"},
+		WebGL:     WebGLProfile{Vendor: "Google Inc. (Apple)", Renderer: "ANGLE (Apple, Apple M1 Pro, OpenGL 4.1)"},
 		Headers: map[string]string{
-			"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-			"Accept-Language": "en-US,en;q=0.9",
-			"Sec-Ch-Ua":       `"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"`,
-			"Sec-Ch-Ua-Mobile": "?0",
+			"Accept":             "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+			"Accept-Language":    "en-US,en;q=0.9",
+			"Sec-Ch-Ua":          `"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"`,
+			"Sec-Ch-Ua-Mobile":   "?0",
 			"Sec-Ch-Ua-Platform": `"macOS"`,
 		},
 	}
@@ -119,9 +119,9 @@ func firefoxLinux() BrowserStealthProfile {
 		Vendor:    "",
 		Language:  "en-US",
 		Languages: []string{"en-US", "en"},
-		Screen: ScreenProfile{Width: 1920, Height: 1080, AvailWidth: 1920, AvailHeight: 1053, ColorDepth: 24, PixelRatio: 1.0},
+		Screen:    ScreenProfile{Width: 1920, Height: 1080, AvailWidth: 1920, AvailHeight: 1053, ColorDepth: 24, PixelRatio: 1.0},
 		Navigator: NavigatorProfile{MaxTouchPoints: 0, HardwareConcurrency: 12, DeviceMemory: 0, DoNotTrack: "unspecified", CookieEnabled: true, PDFViewerEnabled: true, Webdriver: false},
-		WebGL: WebGLProfile{Vendor: "Mesa", Renderer: "Mesa Intel(R) UHD Graphics 630 (CFL GT2)"},
+		WebGL:     WebGLProfile{Vendor: "Mesa", Renderer: "Mesa Intel(R) UHD Graphics 630 (CFL GT2)"},
 		Headers: map[string]string{
 			"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 			"Accept-Language": "en-US,en;q=0.5",
@@ -138,9 +138,9 @@ func safariMac() BrowserStealthProfile {
 		Vendor:    "Apple Computer, Inc.",
 		Language:  "en-US",
 		Languages: []string{"en-US"},
-		Screen: ScreenProfile{Width: 2560, Height: 1440, AvailWidth: 2560, AvailHeight: 1415, ColorDepth: 30, PixelRatio: 2.0},
+		Screen:    ScreenProfile{Width: 2560, Height: 1440, AvailWidth: 2560, AvailHeight: 1415, ColorDepth: 30, PixelRatio: 2.0},
 		Navigator: NavigatorProfile{MaxTouchPoints: 0, HardwareConcurrency: 8, DeviceMemory: 0, DoNotTrack: "unspecified", CookieEnabled: true, PDFViewerEnabled: true, Webdriver: false},
-		WebGL: WebGLProfile{Vendor: "Apple Inc.", Renderer: "Apple GPU"},
+		WebGL:     WebGLProfile{Vendor: "Apple Inc.", Renderer: "Apple GPU"},
 		Headers: map[string]string{
 			"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 			"Accept-Language": "en-US,en;q=0.9",
@@ -156,14 +156,14 @@ func edgeWindows() BrowserStealthProfile {
 		Vendor:    "Google Inc.",
 		Language:  "en-US",
 		Languages: []string{"en-US", "en"},
-		Screen: ScreenProfile{Width: 1920, Height: 1080, AvailWidth: 1920, AvailHeight: 1040, ColorDepth: 24, PixelRatio: 1.25},
+		Screen:    ScreenProfile{Width: 1920, Height: 1080, AvailWidth: 1920, AvailHeight: 1040, ColorDepth: 24, PixelRatio: 1.25},
 		Navigator: NavigatorProfile{MaxTouchPoints: 0, HardwareConcurrency: 8, DeviceMemory: 8, DoNotTrack: "unspecified", CookieEnabled: true, PDFViewerEnabled: true, Webdriver: false},
-		WebGL: WebGLProfile{Vendor: "Google Inc. (Intel)", Renderer: "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
+		WebGL:     WebGLProfile{Vendor: "Google Inc. (Intel)", Renderer: "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
 		Headers: map[string]string{
-			"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-			"Accept-Language": "en-US,en;q=0.9",
-			"Sec-Ch-Ua":       fmt.Sprintf(`"Microsoft Edge";v="125", "Chromium";v="125", "Not.A/Brand";v="24"`),
-			"Sec-Ch-Ua-Mobile": "?0",
+			"Accept":             "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+			"Accept-Language":    "en-US,en;q=0.9",
+			"Sec-Ch-Ua":          fmt.Sprintf(`"Microsoft Edge";v="125", "Chromium";v="125", "Not.A/Brand";v="24"`),
+			"Sec-Ch-Ua-Mobile":   "?0",
 			"Sec-Ch-Ua-Platform": `"Windows"`,
 		},
 	}
