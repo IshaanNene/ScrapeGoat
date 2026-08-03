@@ -89,8 +89,15 @@ func (ae *AutoExtractor) Extract(resp *types.Response) (*ExtractedData, error) {
 	// 4. Extract tables
 	ae.extractTables(doc, result)
 
-	// 5. Extract product data (price, name, image patterns)
+	// 5. Extract product data (price, name, image patterns).
+	// The selector pass handles well-marked-up sites; the structural pass catches
+	// the rest, which is most of them. Only run the fallback if the first found
+	// nothing, so a site that marks its products up properly is not second-guessed.
+	before := len(result.Data)
 	ae.extractProducts(doc, result)
+	if len(result.Data) == before {
+		ae.extractProductsStructural(doc, result)
+	}
 
 	// 6. Extract article/content data
 	ae.extractArticles(doc, result)
@@ -319,6 +326,18 @@ func (ae *AutoExtractor) extractProducts(doc *goquery.Document, result *Extracte
 }
 
 // extractArticles attempts to extract article/content data.
+// extractProductsStructural is the fallback when the selector list finds nothing.
+// See detectRepeatedItems for why guessing class names is not enough on its own.
+func (ae *AutoExtractor) extractProductsStructural(doc *goquery.Document, result *ExtractedData) {
+	items := detectRepeatedItems(doc)
+	for _, item := range items {
+		result.Data = append(result.Data, item)
+	}
+	if len(items) > 0 {
+		ae.logger.Debug("extracted listing by structure", "items", len(items))
+	}
+}
+
 func (ae *AutoExtractor) extractArticles(doc *goquery.Document, result *ExtractedData) {
 	articleSelectors := []string{
 		"article",

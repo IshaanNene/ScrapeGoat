@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -407,8 +408,6 @@ func generateSpider(name string) error {
 	template := fmt.Sprintf(`package main
 
 import (
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"fmt"
 	"log"
 
@@ -609,7 +608,10 @@ Examples:
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			fmt.Printf("🔍 Extracting structured data from %s...\n\n", args[0])
+			// Progress and summary go to stderr so that stdout is nothing but the
+			// JSON document. The first thing anyone does with a JSON-emitting CLI
+			// is pipe it to jq, and mixing decoration into stdout breaks that.
+			fmt.Fprintf(os.Stderr, "🔍 Extracting structured data from %s...\n", args[0])
 
 			resp, err := httpFetcher.Fetch(ctx, req)
 			if err != nil {
@@ -634,12 +636,12 @@ Examples:
 				if err := extractor.ExtractToFile(resp, extractOutput); err != nil {
 					return fmt.Errorf("write output: %w", err)
 				}
-				fmt.Printf("\n📁 Saved to %s\n", extractOutput)
+				fmt.Fprintf(os.Stderr, "📁 Saved to %s\n", extractOutput)
 			}
 
-			fmt.Printf("\n📊 Extracted: %d data items, %d links, %d images, %d tables\n",
+			fmt.Fprintf(os.Stderr, "📊 Extracted: %d data items, %d links, %d images, %d tables\n",
 				len(data.Data), len(data.Links), len(data.Images), len(data.Tables))
-			fmt.Printf("📄 Page type: %s\n", data.Type)
+			fmt.Fprintf(os.Stderr, "📄 Page type: %s\n", data.Type)
 
 			return nil
 		},
@@ -881,18 +883,28 @@ logging:
 	}
 
 	// Create go.mod
+	// Only the module line is written. Versions are left to `go mod tidy`, which
+	// runs below: pinning them here means the scaffold ships a version that is
+	// stale the day after the next release, and a go.sum that does not exist yet.
 	goMod := fmt.Sprintf(`module %s
 
-go 1.22
-
-require (
-	github.com/IshaanNene/ScrapeGoat v0.1.0
-	github.com/PuerkitoBio/goquery v1.8.1
-)
+go 1.25
 `, name)
 
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644); err != nil {
 		return fmt.Errorf("write go.mod: %w", err)
+	}
+
+	// Resolve dependencies now, so the project builds the moment it is created.
+	// Without this the next step in the printed instructions — `go run ./spiders/`
+	// — fails on missing go.sum entries, which is a poor first five minutes.
+	tidied := true
+	tidy := exec.Command("go", "mod", "tidy")
+	tidy.Dir = dir
+	tidy.Stderr = os.Stderr
+	if err := tidy.Run(); err != nil {
+		tidied = false
+		fmt.Fprintf(os.Stderr, "\n⚠️  could not run `go mod tidy` in %s: %v\n", dir, err)
 	}
 
 	fmt.Printf("✅ Created ScrapeGoat project: %s/\n\n", dir)
@@ -903,8 +915,14 @@ require (
 	fmt.Printf("       └── main.go         # Your spider\n")
 	fmt.Printf("\nNext steps:\n")
 	fmt.Printf("  1. cd %s\n", dir)
-	fmt.Printf("  2. Edit spiders/main.go with your target URLs and selectors\n")
-	fmt.Printf("  3. Run: go run ./spiders/\n")
+	if !tidied {
+		fmt.Printf("  2. go mod tidy\n")
+		fmt.Printf("  3. Edit spiders/main.go with your target URLs and selectors\n")
+		fmt.Printf("  4. go run ./spiders/\n")
+	} else {
+		fmt.Printf("  2. go run ./spiders/          # works as-is against example.com\n")
+		fmt.Printf("  3. Edit spiders/main.go with your own URLs and selectors\n")
+	}
 
 	return nil
 }
@@ -918,8 +936,6 @@ func generateSpiderInDir(dir, name string) error {
 	template := fmt.Sprintf(`package main
 
 import (
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"fmt"
 	"log"
 
