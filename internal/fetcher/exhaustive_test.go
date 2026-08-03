@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var exhaustiveLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -259,7 +260,7 @@ func TestHTTPFetcherBasic(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.RequestTimeout = 5 * time.Second
 
 	fetcher, err := NewHTTPFetcher(cfg, exhaustiveLogger)
@@ -293,7 +294,7 @@ func TestHTTPFetcherTimeout(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.RequestTimeout = 500 * time.Millisecond
 
 	fetcher, err := NewHTTPFetcher(cfg, exhaustiveLogger)
@@ -325,7 +326,7 @@ func TestHTTPFetcher429Handling(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.RequestTimeout = 5 * time.Second
 
 	fetcher, err := NewHTTPFetcher(cfg, exhaustiveLogger)

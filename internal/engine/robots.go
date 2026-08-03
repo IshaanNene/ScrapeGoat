@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/IshaanNene/ScrapeGoat/internal/safety"
 )
 
 // RobotsManager handles robots.txt fetching, parsing, and enforcement.
@@ -28,13 +30,18 @@ type robotsData struct {
 }
 
 // NewRobotsManager creates a new RobotsManager.
-func NewRobotsManager(enabled bool) *RobotsManager {
+//
+// guard may be nil, in which case the default policy applies. The robots.txt URL is
+// derived from the crawl target's own host, so it is exactly as untrusted as the
+// page it governs and needs the same guarded client.
+func NewRobotsManager(enabled bool, guard *safety.URLGuard) *RobotsManager {
+	if guard == nil {
+		guard = safety.Default()
+	}
 	return &RobotsManager{
 		enabled: enabled,
 		cache:   make(map[string]*robotsData),
-		client: &http.Client{
-			Timeout: 10 * time.Second,
-		},
+		client:  guard.HTTPClient(10*time.Second, 5),
 	}
 }
 

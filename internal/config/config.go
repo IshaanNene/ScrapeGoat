@@ -25,6 +25,28 @@ type Config struct {
 	Distributed DistributedConfig     `mapstructure:"distributed" yaml:"distributed"`
 	Middleware  MiddlewareGroupConfig `mapstructure:"middleware" yaml:"middleware"`
 	Project     ProjectConfig         `mapstructure:"project"     yaml:"project"`
+	Safety      SafetyConfig          `mapstructure:"safety"      yaml:"safety"`
+}
+
+// SafetyConfig controls the outbound network trust boundary — which URLs the
+// crawler is willing to fetch. The defaults deny everything that is not a public
+// http/https endpoint, because URLs reach the fetcher from callers the operator
+// does not control (MCP clients, the REST API, links in crawled pages).
+//
+// See internal/safety and SECURITY.md for the threat model.
+type SafetyConfig struct {
+	// AllowedSchemes is the set of permitted URL schemes. Empty means http+https.
+	AllowedSchemes []string `mapstructure:"allowed_schemes" yaml:"allowed_schemes"`
+
+	// AllowPrivateAddresses permits fetching loopback, RFC1918, link-local, and
+	// other non-public addresses. Turning this on makes the process an SSRF proxy
+	// for anything that can hand it a URL — only enable it for a deliberate crawl
+	// of an internal network.
+	AllowPrivateAddresses bool `mapstructure:"allow_private_addresses" yaml:"allow_private_addresses"`
+
+	// AllowedPrivateHosts exempts specific hostnames from the address checks
+	// without opening up the whole private range.
+	AllowedPrivateHosts []string `mapstructure:"allowed_private_hosts" yaml:"allowed_private_hosts"`
 }
 
 // EngineConfig controls the core crawler engine.
@@ -152,6 +174,10 @@ func DefaultConfig() *Config {
 			HealthCheck:  true,
 			RotateOnFail: true,
 		},
+		Safety: SafetyConfig{
+			AllowedSchemes:        []string{"http", "https"},
+			AllowPrivateAddresses: false,
+		},
 		Parser: ParserConfig{
 			AutoDetect: true,
 		},
@@ -222,24 +248,40 @@ type ProjectConfig struct {
 
 // LLMConfig configures the LLM extraction engine.
 type LLMConfig struct {
-	Enabled    bool          `mapstructure:"enabled"      yaml:"enabled"`
-	Provider   string        `mapstructure:"provider"     yaml:"provider"` // openai, anthropic, ollama
-	Model      string        `mapstructure:"model"        yaml:"model"`
-	APIKey     string        `mapstructure:"api_key"      yaml:"api_key"`
-	Endpoint   string        `mapstructure:"endpoint"     yaml:"endpoint"`
-	CachePath  string        `mapstructure:"cache_path"   yaml:"cache_path"`
-	CacheTTL   time.Duration `mapstructure:"cache_ttl"    yaml:"cache_ttl"`
-	MaxTokens  int           `mapstructure:"max_tokens"   yaml:"max_tokens"`
+	Enabled   bool          `mapstructure:"enabled"      yaml:"enabled"`
+	Provider  string        `mapstructure:"provider"     yaml:"provider"` // openai, anthropic, ollama
+	Model     string        `mapstructure:"model"        yaml:"model"`
+	APIKey    string        `mapstructure:"api_key"      yaml:"api_key"`
+	Endpoint  string        `mapstructure:"endpoint"     yaml:"endpoint"`
+	CachePath string        `mapstructure:"cache_path"   yaml:"cache_path"`
+	CacheTTL  time.Duration `mapstructure:"cache_ttl"    yaml:"cache_ttl"`
+	MaxTokens int           `mapstructure:"max_tokens"   yaml:"max_tokens"`
 }
 
 // APIServerConfig configures the REST/WebSocket API server.
 type APIServerConfig struct {
-	Enabled  bool   `mapstructure:"enabled"   yaml:"enabled"`
-	Port     int    `mapstructure:"port"      yaml:"port"`
-	APIKey   string `mapstructure:"api_key"   yaml:"api_key"`
-	DBPath   string `mapstructure:"db_path"   yaml:"db_path"`
-	CORS     bool   `mapstructure:"cors"      yaml:"cors"`
-	RateRPS  int    `mapstructure:"rate_rps"  yaml:"rate_rps"` // requests per second per key
+	Enabled bool   `mapstructure:"enabled"   yaml:"enabled"`
+	Port    int    `mapstructure:"port"      yaml:"port"`
+	APIKey  string `mapstructure:"api_key"   yaml:"api_key"`
+	DBPath  string `mapstructure:"db_path"   yaml:"db_path"`
+	CORS    bool   `mapstructure:"cors"      yaml:"cors"`
+	RateRPS int    `mapstructure:"rate_rps"  yaml:"rate_rps"` // requests per second per key
+
+	// AllowNoAuth permits starting without an API key. The server otherwise
+	// refuses to start unauthenticated, because an empty key used to mean "let
+	// everyone in" — and an unauthenticated crawl endpoint on localhost is
+	// reachable from any web page the operator happens to visit.
+	AllowNoAuth bool `mapstructure:"allow_no_auth" yaml:"allow_no_auth"`
+
+	// AllowedOrigins lists the origins permitted by CORS and accepted on the
+	// WebSocket upgrade. Empty means same-origin only: no Access-Control-Allow-Origin
+	// header is emitted and cross-origin WebSocket upgrades are refused.
+	//
+	// "*" is honoured but makes every response readable by any site the operator
+	// visits; combined with a crawl endpoint that is an SSRF primitive, that is a
+	// drive-by credential-theft chain. Set it only for a deliberately public,
+	// authenticated deployment.
+	AllowedOrigins []string `mapstructure:"allowed_origins" yaml:"allowed_origins"`
 }
 
 // MCPConfig configures the MCP server.

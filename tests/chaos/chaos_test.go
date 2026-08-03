@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var testLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -37,7 +37,7 @@ func TestChaos_RandomKill(t *testing.T) {
 	ts := chaosServer()
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 10
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 1000
@@ -93,7 +93,7 @@ func TestChaos_OOMPressure(t *testing.T) {
 	ts := chaosServer()
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 5
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 100
@@ -150,7 +150,7 @@ func TestChaos_ConcurrentConfigChange(t *testing.T) {
 	ts := chaosServer()
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 5
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 200
@@ -193,7 +193,7 @@ func TestChaos_RapidStopStart(t *testing.T) {
 	goroutinesBefore := runtime.NumGoroutine()
 
 	for cycle := 0; cycle < 5; cycle++ {
-		cfg := config.DefaultConfig()
+		cfg := testutil.LoopbackConfig()
 		cfg.Engine.Concurrency = 3
 		cfg.Engine.MaxDepth = 0
 		cfg.Engine.MaxRequests = 20
@@ -234,7 +234,7 @@ func TestChaos_FilledDisk(t *testing.T) {
 	ts := chaosServer()
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 3
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 50

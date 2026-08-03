@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var exhaustiveLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -36,7 +36,7 @@ func TestSchedulerStartStop(t *testing.T) {
 	ts := testServer()
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 5
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 10
@@ -80,7 +80,7 @@ func TestSchedulerPauseResume(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 2
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 100
@@ -349,7 +349,7 @@ func TestCheckpointMidCrawlRestore(t *testing.T) {
 func TestEngineAddSeed(t *testing.T) {
 	t.Parallel()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.MaxDepth = 2
 	cfg.Engine.AllowedDomains = []string{"example.com"}
 	cfg.Engine.RespectRobotsTxt = false
@@ -387,7 +387,7 @@ func TestEngineStopGoroutineCleanup(t *testing.T) {
 
 	goroutinesBefore := runtime.NumGoroutine()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 5
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 20
@@ -434,7 +434,7 @@ func TestEngineContextCancellation(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 5
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 100

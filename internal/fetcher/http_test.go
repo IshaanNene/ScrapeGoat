@@ -12,11 +12,12 @@ import (
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 func testConfig() *config.Config {
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.UserAgents = []string{"Bot/1.0", "Bot/2.0", "Bot/3.0"}
 	cfg.Fetcher.MaxBodySize = 1024 * 1024
 	return cfg

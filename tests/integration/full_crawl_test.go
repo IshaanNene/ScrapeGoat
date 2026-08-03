@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var testLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -56,7 +56,7 @@ func TestFullSpiderRun(t *testing.T) {
 	ts := interlinkedServer(pageCount)
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 10
 	cfg.Engine.MaxDepth = 3
 	cfg.Engine.MaxRequests = 200
@@ -179,7 +179,7 @@ func TestCheckpointRoundTrip(t *testing.T) {
 	checkpointDir := t.TempDir()
 
 	// Run 1: crawl first half
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 5
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 50
@@ -211,7 +211,7 @@ func TestCheckpointRoundTrip(t *testing.T) {
 	t.Logf("Run 1: visited %d pages", run1Count)
 
 	// Run 2: fresh engine for remaining pages
-	cfg2 := config.DefaultConfig()
+	cfg2 := testutil.LoopbackConfig()
 	cfg2.Engine.Concurrency = 5
 	cfg2.Engine.MaxDepth = 0
 	cfg2.Engine.MaxRequests = pageCount - run1Count + 10
@@ -277,7 +277,7 @@ func TestMemoryStability(t *testing.T) {
 	runtime.ReadMemStats(&memStart)
 	goroutinesStart := runtime.NumGoroutine()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 10
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = totalPages

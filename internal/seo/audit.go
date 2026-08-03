@@ -12,7 +12,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/safety"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // --- Sitemap Crawler ---
@@ -40,9 +41,13 @@ type SitemapCrawler struct {
 }
 
 // NewSitemapCrawler creates a new sitemap crawler.
+//
+// The client is guarded: sitemap URLs come from the same untrusted places as crawl
+// URLs (an MCP tool argument, a REST request body), so an unguarded client here
+// would be an SSRF bypass around the fetcher's guard.
 func NewSitemapCrawler(logger *slog.Logger) *SitemapCrawler {
 	return &SitemapCrawler{
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: safety.Default().HTTPClient(30*time.Second, 10),
 		logger: logger.With("component", "sitemap_crawler"),
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
 )
 
 func testLogger() *slog.Logger {
@@ -23,7 +24,7 @@ func testLogger() *slog.Logger {
 func testServer(t *testing.T) *Server {
 	t.Helper()
 	dir := t.TempDir()
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.APIServer = config.APIServerConfig{
 		Enabled: true,
 		Port:    0,

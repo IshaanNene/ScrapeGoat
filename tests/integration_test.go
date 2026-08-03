@@ -14,7 +14,8 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
 	"github.com/IshaanNene/ScrapeGoat/internal/seo"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var testLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -25,7 +26,7 @@ func TestLiveFetch(t *testing.T) {
 		t.Skip("skipping live test")
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	f, err := fetcher.NewHTTPFetcher(cfg, testLogger)
 	if err != nil {
 		t.Fatalf("create fetcher: %v", err)
@@ -60,7 +61,7 @@ func TestLiveParse(t *testing.T) {
 		t.Skip("skipping live test")
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	f, _ := fetcher.NewHTTPFetcher(cfg, testLogger)
 	defer f.Close()
 
@@ -108,7 +109,7 @@ func TestLiveSEOAudit(t *testing.T) {
 		t.Skip("skipping live test")
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	f, _ := fetcher.NewHTTPFetcher(cfg, testLogger)
 	defer f.Close()
 
@@ -153,7 +154,7 @@ func TestLiveCrawl(t *testing.T) {
 		t.Skip("skipping live test")
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.MaxDepth = 1
 	cfg.Engine.Concurrency = 2
 	cfg.Engine.PolitenessDelay = 500 * time.Millisecond
@@ -217,7 +218,7 @@ func TestBacklinkExtraction(t *testing.T) {
 		t.Skip("skipping live test")
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	f, _ := fetcher.NewHTTPFetcher(cfg, testLogger)
 	defer f.Close()
 

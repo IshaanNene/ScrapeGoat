@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var coverLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -94,7 +94,7 @@ func TestFrontierDrainAndRestoreAll(t *testing.T) {
 
 // --- Engine setters: SetPipeline, SetStorage, Stats, GetState, ResultsChan ---
 func TestEngineSettersAndGetters(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.RespectRobotsTxt = false
 	eng := New(cfg, coverLogger)
 
@@ -144,7 +144,7 @@ func TestStateString(t *testing.T) {
 
 // --- Engine Pause/Resume (on idle engine) ---
 func TestEnginePauseResumeBasic(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.RespectRobotsTxt = false
 	eng := New(cfg, coverLogger)
 	eng.Pause()
@@ -154,7 +154,7 @@ func TestEnginePauseResumeBasic(t *testing.T) {
 
 // --- Engine isDomainAllowed ---
 func TestIsDomainAllowed(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.AllowedDomains = []string{"example.com", "test.com"}
 	cfg.Engine.RespectRobotsTxt = false
 	eng := New(cfg, coverLogger)
@@ -185,7 +185,7 @@ func TestEngineProcessItemsAndStore(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 2
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 5

@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var benchLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -36,7 +36,7 @@ func benchmarkRequestsAtConcurrency(b *testing.B, concurrency int) {
 	}))
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = concurrency
 	cfg.Engine.MaxDepth = 0 // seed-only
 	cfg.Engine.MaxRequests = b.N
@@ -215,7 +215,7 @@ func BenchmarkFullCrawlSimulation(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		cfg := config.DefaultConfig()
+		cfg := testutil.LoopbackConfig()
 		cfg.Engine.Concurrency = 5
 		cfg.Engine.MaxDepth = 0
 		cfg.Engine.MaxRequests = 50

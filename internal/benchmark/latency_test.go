@@ -16,11 +16,11 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // ---------------------------------------------------------------------------
@@ -312,7 +312,7 @@ func BenchmarkStage_RequestResponseRoundtrip(b *testing.B) {
 	ts := realisticServer()
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.PolitenessDelay = 0
 	cfg.Engine.RequestTimeout = 5 * time.Second
 
@@ -345,7 +345,7 @@ func TestColdVsWarmLatency(t *testing.T) {
 	ts := realisticServer()
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.PolitenessDelay = 0
 	cfg.Engine.RequestTimeout = 5 * time.Second
 
@@ -407,7 +407,7 @@ func TestMemoryPerRequest(t *testing.T) {
 	ts := realisticServer()
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 10
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 1000
