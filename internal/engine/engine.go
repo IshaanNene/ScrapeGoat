@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -116,7 +117,7 @@ type Engine struct {
 	cfg        *config.Config
 	logger     *slog.Logger
 	frontier   *Frontier
-	dedup      *Deduplicator
+	dedup      Deduper
 	robots     *RobotsManager
 	checkpoint *CheckpointManager
 	scheduler  *Scheduler
@@ -160,7 +161,7 @@ func New(cfg *config.Config, logger *slog.Logger) *Engine {
 		cfg:      cfg,
 		logger:   logger,
 		frontier: NewFrontier(),
-		dedup:    NewDeduplicator(1_000_000),
+		dedup:    newDeduper(cfg, logger),
 		robots: NewRobotsManager(cfg.Engine.RespectRobotsTxt, safety.New(safety.Config{
 			AllowedSchemes:        cfg.Safety.AllowedSchemes,
 			AllowPrivateAddresses: cfg.Safety.AllowPrivateAddresses,
@@ -563,3 +564,28 @@ func (e *Engine) ResumeFromCheckpoint() error {
 // ClearCheckpoint removes the checkpoint file. Called after a crawl finishes
 // normally, so the next run does not resume work that is already done.
 func (e *Engine) ClearCheckpoint() error { return e.checkpoint.Clean() }
+
+// newDeduper builds the deduplication strategy named in the configuration.
+//
+// The default is exact. Bloom is opt-in because it is lossy: a false positive
+// means a URL is treated as already-seen and never crawled, which is a silent
+// data-completeness cost, not a performance knob. Engine.New previously hardcoded
+// NewDeduplicator(1_000_000) — so the Bloom implementation, its tests, and its
+// documented memory saving were all unreachable.
+func newDeduper(cfg *config.Config, logger *slog.Logger) Deduper {
+	expected := cfg.Engine.ExpectedURLs
+	if expected <= 0 {
+		expected = 1_000_000
+	}
+
+	switch strings.ToLower(cfg.Engine.DedupStrategy) {
+	case "bloom":
+		logger.Warn("using bloom deduplication — memory-bounded but lossy",
+			"expected_urls", expected,
+			"target_fp_rate", cfg.Engine.DedupFPRate,
+			"note", "a false positive silently skips a URL that was never crawled")
+		return NewBloomDeduplicator(expected, cfg.Engine.DedupFPRate)
+	default:
+		return NewDeduplicator(expected)
+	}
+}

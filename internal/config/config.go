@@ -56,6 +56,23 @@ type EngineConfig struct {
 	RequestTimeout  time.Duration `mapstructure:"request_timeout"      yaml:"request_timeout"`
 	PolitenessDelay time.Duration `mapstructure:"politeness_delay"     yaml:"politeness_delay"`
 
+	// DedupStrategy selects how visited URLs are tracked: "exact" (default) keeps
+	// every hash in a map, "bloom" keeps only a Bloom filter.
+	//
+	// Bloom is memory-bounded but lossy — a false positive means a URL is treated
+	// as already-seen and silently never crawled. Choose it only when the crawl is
+	// large enough that an exact set will not fit.
+	DedupStrategy string `mapstructure:"dedup_strategy" yaml:"dedup_strategy"`
+
+	// ExpectedURLs sizes the deduplicator. For the bloom strategy this determines
+	// the filter's memory and its actual false-positive rate; undersizing it makes
+	// the filter far lossier than DedupFPRate suggests.
+	ExpectedURLs int `mapstructure:"expected_urls" yaml:"expected_urls"`
+
+	// DedupFPRate is the target false-positive rate for the bloom strategy.
+	// Zero uses 1%.
+	DedupFPRate float64 `mapstructure:"dedup_fp_rate" yaml:"dedup_fp_rate"`
+
 	// MaxThrottleSlots bounds how many per-domain rate limiters are retained.
 	// The map used to grow one entry per domain with no eviction, which leaked
 	// memory monotonically on a broad crawl. Zero uses the default.

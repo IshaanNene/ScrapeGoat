@@ -72,7 +72,7 @@ graph TD
     CFG --> ENG["Engine"]
     ENG --> SCH["Scheduler"]
     ENG --> FRT["Frontier<br>(Priority Queue)"]
-    ENG --> DDP["Deduplicator<br>(Exact set)"]
+    ENG --> DDP["Deduplicator<br>(Exact set or Bloom)"]
     ENG --> RBT["Robots Manager"]
     ENG --> CHK["Checkpoint Manager"]
     ENG --> MET["Prometheus Metrics"]
@@ -140,7 +140,7 @@ func main() {
 
 | Category | Features |
 |----------|----------|
-| **Core Engine** | Priority queue frontier, per-domain throttling, fixed-size worker pool, exact-set dedup |
+| **Core Engine** | Priority queue frontier, per-domain throttling, fixed-size worker pool, exact or Bloom dedup, per-domain rate limiting, circuit breaker |
 | **MCP Server** | JSON-RPC 2.0, stdio + HTTP/SSE transports, 8 tools for Claude/Cursor/Cline |
 | **LLM Extraction** | OpenAI, Anthropic, Ollama backends; schema-based extraction; SQLite caching |
 | **API Server** | REST + WebSocket, job management, real-time streaming, API key auth, CORS |
@@ -159,8 +159,8 @@ func main() {
 | **DevEx** | CLI scaffolding, REPL, YAML config, checkpoint pause/resume (`--resume`), `robots.txt` compliance |
 
 > Subsystems that are implemented and tested but **not yet wired into the crawl path** — the autoscaled
-> pool, Bloom filter dedup, and in-process tracing — are tracked in [ROADMAP.md](ROADMAP.md) rather than
-> listed above. If it is in the table, it runs.
+> pool and in-process tracing — are tracked in [ROADMAP.md](ROADMAP.md) rather than listed above.
+> If it is in the table, it runs.
 
 ---
 

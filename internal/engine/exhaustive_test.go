@@ -195,7 +195,7 @@ func TestFrontierPriorityOrdering(t *testing.T) {
 func TestBloomDeduplicator_ZeroFalseNegatives(t *testing.T) {
 	t.Parallel()
 
-	bd := NewBloomDeduplicator(1_000_000)
+	bd := NewBloomDeduplicator(1_000_000, 0.01)
 	urls := make([]string, 10000)
 	for i := range urls {
 		urls[i] = fmt.Sprintf("https://example.com/page/%d?q=%d", i, i*7)
@@ -203,7 +203,7 @@ func TestBloomDeduplicator_ZeroFalseNegatives(t *testing.T) {
 
 	// Mark all as seen
 	for _, u := range urls {
-		bd.MarkSeen(u)
+		bd.MarkIfUnseen(u)
 	}
 
 	// Check: zero false negatives

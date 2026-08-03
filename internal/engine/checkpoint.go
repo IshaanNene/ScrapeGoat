@@ -50,7 +50,7 @@ func NewCheckpointManager(interval time.Duration) *CheckpointManager {
 }
 
 // Save serializes the current crawl state to disk.
-func (cm *CheckpointManager) Save(frontier *Frontier, dedup *Deduplicator, stats *Stats) error {
+func (cm *CheckpointManager) Save(frontier *Frontier, dedup Deduper, stats *Stats) error {
 	if err := os.MkdirAll(cm.checkpointDir, 0o755); err != nil {
 		return fmt.Errorf("create checkpoint dir: %w", err)
 	}
@@ -107,7 +107,7 @@ func (cm *CheckpointManager) Save(frontier *Frontier, dedup *Deduplicator, stats
 }
 
 // Load reads a checkpoint from disk and restores crawl state.
-func (cm *CheckpointManager) Load(frontier *Frontier, dedup *Deduplicator, stats *Stats) error {
+func (cm *CheckpointManager) Load(frontier *Frontier, dedup Deduper, stats *Stats) error {
 	path := filepath.Join(cm.checkpointDir, "checkpoint.json")
 
 	f, err := os.Open(path)

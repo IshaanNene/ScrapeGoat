@@ -24,17 +24,6 @@ individual workers to exit via a per-worker quit channel on scale-down — then 
 `Evaluate()` on a ticker. This must land *after* the frontier is event-driven, because a poll-loop
 worker cannot be cheaply parked.
 
-### Bloom filter dedup — `internal/engine/bloom.go`
-
-`BloomFilter` (Kirsch–Mitzenmacher double hashing) and the hybrid `BloomDeduplicator` are both
-implemented and tested. `Engine.New()` constructs a plain `Deduplicator` backed by
-`map[string]struct{}`, so the memory saving the doc comment advertises is not realised.
-
-**To integrate:** make `Deduplicator` an interface, and select the implementation by expected crawl
-size — exact set below ~1M URLs, tiered Bloom → on-disk filter above it. The tiered design needs a
-false-positive escape hatch before it can be the default, since a Bloom hit must not silently drop a
-URL that was never actually seen.
-
 ### Distributed tracing — `internal/observability/tracing.go`
 
 A hand-rolled `Tracer`/`Span`/`SpanExporter`. `go.mod` contains no OpenTelemetry dependency, so this
