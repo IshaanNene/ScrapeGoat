@@ -152,29 +152,6 @@ func TestEnginePauseResumeBasic(t *testing.T) {
 	t.Log("PASS: Pause+Resume on idle engine did not panic")
 }
 
-// --- Engine isDomainAllowed ---
-func TestIsDomainAllowed(t *testing.T) {
-	cfg := testutil.LoopbackConfig()
-	cfg.Engine.AllowedDomains = []string{"example.com", "test.com"}
-	cfg.Engine.RespectRobotsTxt = false
-	eng := New(cfg, coverLogger)
-
-	tests := []struct {
-		domain string
-		want   bool
-	}{
-		{"example.com", true},
-		{"test.com", true},
-		{"evil.com", false},
-	}
-	for _, tt := range tests {
-		got := eng.isDomainAllowed(tt.domain)
-		if got != tt.want {
-			t.Errorf("isDomainAllowed(%q) = %v, want %v", tt.domain, got, tt.want)
-		}
-	}
-}
-
 // --- Full pipeline + storage exercising processItems + storeResults ---
 func TestEngineProcessItemsAndStore(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

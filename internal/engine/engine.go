@@ -436,27 +436,6 @@ func (e *Engine) closeSubscribers() {
 	}
 }
 
-// isDomainAllowed checks domain allow/disallow lists.
-func (e *Engine) isDomainAllowed(domain string) bool {
-	// If allowed domains are set, domain must be in the list
-	if len(e.cfg.Engine.AllowedDomains) > 0 {
-		for _, d := range e.cfg.Engine.AllowedDomains {
-			if d == domain {
-				return true
-			}
-		}
-		return false
-	}
-
-	// Check disallowed domains
-	for _, d := range e.cfg.Engine.DisallowedDomains {
-		if d == domain {
-			return false
-		}
-	}
-	return true
-}
-
 // processItems runs the pipeline on scraped items.
 func (e *Engine) processItems() {
 	defer e.wg.Done()
