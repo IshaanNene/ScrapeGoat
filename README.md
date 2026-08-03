@@ -310,7 +310,7 @@ SETTINGS, header order, TCP characteristics, and behaviour are all still tells.
 | | |
 |---|---|
 | **Crawling** | Priority frontier, per-domain rate limiting, circuit breaker, jittered backoff, `robots.txt`, sitemap discovery, checkpoint resume |
-| **Parsing** | CSS, XPath, regex, JSON-LD, OpenGraph, tables, structural listing detection |
+| **Parsing** | CSS, XPath, regex, JSON-LD, OpenGraph, tables, structural listing detection, density-based main-content extraction |
 | **Output** | JSON, JSONL, CSV |
 | **Interfaces** | CLI, Go library, MCP server, REST + WebSocket API, Python and TypeScript SDKs |
 | **Dedup** | Exact set, or Bloom at 1.2 bytes/URL when a crawl outgrows memory |

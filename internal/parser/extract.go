@@ -10,6 +10,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
+	"github.com/IshaanNene/ScrapeGoat/internal/extract"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
@@ -99,8 +100,13 @@ func (ae *AutoExtractor) Extract(resp *types.Response) (*ExtractedData, error) {
 		ae.extractProductsStructural(doc, result)
 	}
 
-	// 6. Extract article/content data
-	ae.extractArticles(doc, result)
+	// 6. Extract article/content data. Density scoring first; the selector pass
+	// is the fallback for pages where it declines to answer.
+	before = len(result.Data)
+	ae.extractArticleContent(doc, result)
+	if len(result.Data) == before {
+		ae.extractArticlesBySelector(doc, result)
+	}
 
 	// 7. Extract links and images
 	ae.extractLinks(doc, result)
@@ -338,7 +344,34 @@ func (ae *AutoExtractor) extractProductsStructural(doc *goquery.Document, result
 	}
 }
 
-func (ae *AutoExtractor) extractArticles(doc *goquery.Document, result *ExtractedData) {
+// extractArticleContent uses density scoring to find the main content.
+//
+// Replaces the selector list below for the article case. On the extraction
+// benchmark the selector approach scored F1 0.438 — below the 0.537 of returning
+// the whole page body — because it is perfect on pages using <article> or
+// .entry-content and returns nothing at all on anything else. See
+// docs/EXTRACTION.md.
+func (ae *AutoExtractor) extractArticleContent(doc *goquery.Document, result *ExtractedData) {
+	res := extract.New().FromDocument(goquery.CloneDocument(doc))
+	if res.Text == "" {
+		return
+	}
+
+	article := map[string]any{
+		"_type": "article",
+		"text":  res.Text,
+	}
+	if res.Title != "" {
+		article["title"] = res.Title
+	}
+	// Carried through so a downstream filter can drop low-confidence extractions
+	// rather than treating every result as equally trustworthy.
+	article["_confidence"] = res.Confidence
+
+	result.Data = append(result.Data, article)
+}
+
+func (ae *AutoExtractor) extractArticlesBySelector(doc *goquery.Document, result *ExtractedData) {
 	articleSelectors := []string{
 		"article",
 		"[itemtype*='Article']",
