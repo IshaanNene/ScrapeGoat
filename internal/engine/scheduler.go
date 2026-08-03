@@ -24,16 +24,9 @@ type Scheduler struct {
 	pauseMu  sync.RWMutex
 	resumeCh chan struct{}
 
-	throttle    map[string]*domainThrottle
-	throttleMu  sync.RWMutex
+	throttler   *Throttler
 	idleWorkers atomic.Int32
 	done        chan struct{}
-}
-
-// domainThrottle implements per-domain rate limiting.
-type domainThrottle struct {
-	lastFetch time.Time
-	mu        sync.Mutex
 }
 
 // NewScheduler creates a new Scheduler.
@@ -42,8 +35,11 @@ func NewScheduler(e *Engine) *Scheduler {
 		engine:   e,
 		logger:   e.logger.With("component", "scheduler"),
 		resumeCh: make(chan struct{}),
-		throttle: make(map[string]*domainThrottle),
-		done:     make(chan struct{}),
+		throttler: NewThrottler(
+			e.cfg.Engine.PolitenessDelay,
+			e.cfg.Engine.MaxThrottleSlots,
+		),
+		done: make(chan struct{}),
 	}
 }
 
@@ -154,19 +150,18 @@ func (s *Scheduler) worker(ctx context.Context, id int) {
 			}
 		}
 
-		// Mark as idle while parked on the frontier. Pop blocks until a Push wakes
-		// it, the frontier closes, or ctx is cancelled — no polling.
+		// Mark as idle while parked on the frontier. PopReady blocks until a
+		// request whose domain is off cooldown is available, the frontier closes,
+		// or ctx is cancelled — no polling, and no waiting out one domain's
+		// politeness delay while other domains have work ready.
 		s.idleWorkers.Add(1)
-		req := s.engine.frontier.Pop(ctx)
+		req := s.engine.frontier.PopReady(ctx, s.throttler)
 		s.idleWorkers.Add(-1)
 
 		if req == nil {
 			// Frontier closed or context cancelled: no more work is coming.
 			return
 		}
-
-		// Apply per-domain throttle
-		s.applyThrottle(req.Domain())
 
 		// Track active worker count
 		active := s.engine.stats.ActiveWorkers.Add(1)
@@ -336,29 +331,4 @@ func (s *Scheduler) handleFetchError(logger *slog.Logger, req *types.Request, er
 
 	s.engine.stats.ResponsesError.Add(1)
 	logger.Error("fetch failed permanently", "error", err, "retries", req.RetryCount)
-}
-
-// applyThrottle enforces per-domain politeness delays.
-func (s *Scheduler) applyThrottle(domain string) {
-	delay := s.engine.cfg.Engine.PolitenessDelay
-	if delay <= 0 {
-		return
-	}
-
-	s.throttleMu.Lock()
-	t, ok := s.throttle[domain]
-	if !ok {
-		t = &domainThrottle{}
-		s.throttle[domain] = t
-	}
-	s.throttleMu.Unlock()
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	elapsed := time.Since(t.lastFetch)
-	if elapsed < delay {
-		time.Sleep(delay - elapsed)
-	}
-	t.lastFetch = time.Now()
 }

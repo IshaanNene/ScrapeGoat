@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"context"
 	"sync"
+	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
@@ -96,6 +97,120 @@ func (f *Frontier) Pop(ctx context.Context) *types.Request {
 			return f.TryPop()
 		case <-f.notify:
 		}
+	}
+}
+
+// DomainGate decides whether a request to a given domain may be dispatched now.
+// Throttler implements it; a nil gate means everything is always ready.
+type DomainGate interface {
+	// Ready reports whether the domain could be dispatched now, without
+	// consuming anything. Used while scanning candidates, so that inspecting a
+	// request the worker then declines does not spend its budget.
+	Ready(domain string) bool
+
+	// Claim consumes the domain's allowance and reports whether it succeeded.
+	// Called only for the request actually being taken.
+	Claim(domain string) bool
+
+	// Delay reports how long until the domain is ready.
+	Delay(domain string) time.Duration
+}
+
+// PopReady removes and returns the highest-priority request whose domain is ready
+// to be fetched, blocking until one exists, the frontier closes, or ctx is done.
+//
+// This is what stops a throttled domain from parking a worker. The old scheduler
+// dequeued first and *then* slept out the politeness delay while holding the
+// domain's lock — so one slow domain occupied every worker slot in turn and every
+// other domain starved. Here a worker skips past a throttled domain to whatever
+// else is runnable, and only waits when nothing at all is.
+func (f *Frontier) PopReady(ctx context.Context, gate DomainGate) *types.Request {
+	if gate == nil {
+		return f.Pop(ctx)
+	}
+
+	for {
+		f.mu.Lock()
+
+		// Highest-priority runnable candidate. The heap is ordered by priority,
+		// not by domain, so this is a scan rather than a peek — but it stops at
+		// the first ready entry, which for an unthrottled crawl is index 0.
+		best := -1
+		var soonest time.Duration
+		haveSoonest := false
+
+		for i, item := range f.pq {
+			domain := item.request.Domain()
+			if gate.Ready(domain) {
+				if best == -1 || f.pq[i].priority < f.pq[best].priority {
+					best = i
+				}
+				continue
+			}
+			if d := gate.Delay(domain); !haveSoonest || d < soonest {
+				soonest, haveSoonest = d, true
+			}
+		}
+
+		if best != -1 {
+			item := heap.Remove(&f.pq, best).(*pqItem)
+			remaining := f.pq.Len()
+			f.mu.Unlock()
+
+			// Claim can still fail if another worker took the same domain's
+			// token between the scan and here; put the request back and retry.
+			if !gate.Claim(item.request.Domain()) {
+				f.Push(item.request)
+				continue
+			}
+			if remaining > 0 {
+				f.wake()
+			}
+			return item.request
+		}
+
+		closed := f.closed
+		f.mu.Unlock()
+
+		if closed {
+			// Shutting down. Hand back whatever remains without waiting out
+			// politeness delays — the frontier is closed precisely because
+			// dispatch is ending, and the wait could be hours. Mirrors Pop,
+			// which also drains one item per caller on close so a final Push
+			// racing with Close is not lost.
+			return f.TryPop()
+		}
+
+		// Wait for whichever comes first: new work, the frontier closing, or the
+		// earliest throttled domain becoming ready. The timer only exists when
+		// something is actually throttled, so an idle crawl still costs nothing.
+		// Stopped explicitly rather than deferred: this is a loop, and a deferred
+		// Stop would pile up one timer per iteration until the function returns.
+		var timer *time.Timer
+		var timerC <-chan time.Time
+		if haveSoonest {
+			timer = time.NewTimer(soonest)
+			timerC = timer.C
+		}
+
+		select {
+		case <-ctx.Done():
+			stopTimer(timer)
+			return nil
+		case <-f.closedCh:
+			stopTimer(timer)
+			// Loop round; the closed check at the top of the next iteration
+			// drains and returns.
+		case <-f.notify:
+			stopTimer(timer)
+		case <-timerC:
+		}
+	}
+}
+
+func stopTimer(t *time.Timer) {
+	if t != nil {
+		t.Stop()
 	}
 }
 

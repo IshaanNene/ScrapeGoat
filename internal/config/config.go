@@ -51,10 +51,16 @@ type SafetyConfig struct {
 
 // EngineConfig controls the core crawler engine.
 type EngineConfig struct {
-	Concurrency        int           `mapstructure:"concurrency"          yaml:"concurrency"`
-	MaxDepth           int           `mapstructure:"max_depth"            yaml:"max_depth"`
-	RequestTimeout     time.Duration `mapstructure:"request_timeout"      yaml:"request_timeout"`
-	PolitenessDelay    time.Duration `mapstructure:"politeness_delay"     yaml:"politeness_delay"`
+	Concurrency     int           `mapstructure:"concurrency"          yaml:"concurrency"`
+	MaxDepth        int           `mapstructure:"max_depth"            yaml:"max_depth"`
+	RequestTimeout  time.Duration `mapstructure:"request_timeout"      yaml:"request_timeout"`
+	PolitenessDelay time.Duration `mapstructure:"politeness_delay"     yaml:"politeness_delay"`
+
+	// MaxThrottleSlots bounds how many per-domain rate limiters are retained.
+	// The map used to grow one entry per domain with no eviction, which leaked
+	// memory monotonically on a broad crawl. Zero uses the default.
+	MaxThrottleSlots int `mapstructure:"max_throttle_slots" yaml:"max_throttle_slots"`
+
 	RespectRobotsTxt   bool          `mapstructure:"respect_robots_txt"   yaml:"respect_robots_txt"`
 	MaxRetries         int           `mapstructure:"max_retries"          yaml:"max_retries"`
 	RetryDelay         time.Duration `mapstructure:"retry_delay"          yaml:"retry_delay"`
@@ -151,6 +157,7 @@ func DefaultConfig() *Config {
 			MaxDepth:           5,
 			RequestTimeout:     30 * time.Second,
 			PolitenessDelay:    1 * time.Second,
+			MaxThrottleSlots:   10_000,
 			RespectRobotsTxt:   true,
 			MaxRetries:         3,
 			RetryDelay:         2 * time.Second,
