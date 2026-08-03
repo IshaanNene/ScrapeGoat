@@ -1,854 +1,407 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ScrapeGoat — Next-Gen Web Scraping Toolkit</title>
-  <meta name="description" content="ScrapeGoat is an enterprise-grade web scraping and crawling toolkit for Go. Crawl websites, extract data, index for search, and analyze with AI.">
-  <meta name="keywords" content="web scraper, web crawler, Go, scraping toolkit, data extraction, ScrapeGoat">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕷️</text></svg>">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScrapeGoat — a web crawler for Go, and an MCP server</title>
+<meta name="description" content="Point it at a URL and get structured data. SSRF-guarded by default, benchmarked content extraction, and an MCP server so agents can do the fetching. One binary, no services required.">
+<meta name="color-scheme" content="dark light">
+
+<meta property="og:title" content="ScrapeGoat">
+<meta property="og:description" content="A web crawler for Go, and an MCP server, in one binary. SSRF-guarded by default, with measured numbers instead of adjectives.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ishaannene.github.io/ScrapeGoat/">
+
+<link rel="canonical" href="https://ishaannene.github.io/ScrapeGoat/">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐐</text></svg>">
 </head>
 <body>
 
-  <!-- ═══ NAVIGATION ═══ -->
-  <nav class="navbar" id="navbar">
-    <div class="container">
-      <a href="#" class="navbar__logo">🕷️ <span>ScrapeGoat</span></a>
-      <ul class="navbar__links">
-        <li><a href="#what-is">About</a></li>
-        <li><a href="#features">Features</a></li>
-        <li><a href="#getting-started">Setup</a></li>
-        <li><a href="#commands">Commands</a></li>
-        <li><a href="#sdk">SDK</a></li>
-        <li><a href="#architecture">How It Works</a></li>
-        <li><a href="#faq">FAQ</a></li>
-      </ul>
-      <div class="navbar__actions">
-        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">🌙</button>
-        <a href="https://github.com/IshaanNene/ScrapeGoat" target="_blank" class="github-btn">⭐ GitHub</a>
-        <button class="hamburger" id="hamburger" aria-label="Menu">
-          <span></span><span></span><span></span>
-        </button>
-      </div>
-    </div>
-  </nav>
+<a class="skip" href="#main">Skip to content</a>
 
-  <!-- Mobile nav -->
-  <div class="mobile-nav" id="mobile-nav">
-    <a href="#what-is">About</a>
-    <a href="#features">Features</a>
-    <a href="#getting-started">Setup</a>
-    <a href="#commands">Commands</a>
-    <a href="#sdk">SDK</a>
-    <a href="#architecture">How It Works</a>
-    <a href="#faq">FAQ</a>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="#top"><span class="brand__mark" aria-hidden="true">🐐</span> ScrapeGoat</a>
+
+    <nav class="topbar__nav" aria-label="Sections">
+      <a href="#start">Start</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#security">Security</a>
+      <a href="#agents">Agents</a>
+      <a href="#design">Design</a>
+    </nav>
+
+    <div class="topbar__actions">
+      <button class="iconbtn" id="theme" aria-label="Switch theme" title="Switch theme">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="i-sun" d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="i-moon" d="M20 14.5A8 8 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      </button>
+      <a class="ghbtn" href="https://github.com/IshaanNene/ScrapeGoat">GitHub</a>
+      <button class="iconbtn menubtn" id="menu" aria-label="Menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
   </div>
+  <div class="drawer" id="drawer" hidden>
+    <a href="#start">Start</a><a href="#evidence">Evidence</a><a href="#security">Security</a>
+    <a href="#agents">Agents</a><a href="#design">Design</a>
+  </div>
+</header>
 
-  <!-- ═══ HERO ═══ -->
-  <section class="hero" id="hero">
-    <div class="hero__shapes">
-      <div class="hero__shape hero__shape--1"></div>
-      <div class="hero__shape hero__shape--2"></div>
-      <div class="hero__shape hero__shape--3"></div>
-      <div class="hero__shape hero__shape--4"></div>
+<main id="main">
+
+<!-- Hero -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <p class="eyebrow">v0.1.0 · Apache&nbsp;2.0 · Go 1.25</p>
+
+    <h1>A web crawler for Go,<br>and an MCP server.</h1>
+
+    <p class="lede">
+      Point it at a URL and get structured data. Import it and write a spider in
+      thirty lines. Plug it into Claude or Cursor and let an agent do the fetching.
+      One binary, no services required.
+    </p>
+
+    <div class="term" role="group" aria-label="Example">
+      <div class="term__bar"><span></span><span></span><span></span>
+        <button class="copy" data-copy="scrapegoat extract https://books.toscrape.com | jq -r '.data[].name'">Copy</button>
+      </div>
+<pre class="term__body"><code><span class="c-dim">$</span> <span class="c-cmd">scrapegoat</span> extract https://books.toscrape.com <span class="c-op">|</span> jq -r <span class="c-str">'.data[].name'</span>
+<span class="c-out">A Light in the Attic
+Tipping the Velvet
+Soumission</span></code></pre>
     </div>
 
-    <div class="container">
-      <div class="hero__badge">Open Source · Written in Go</div>
-      <h1>Scrape the web<br><span class="highlight">like a pro.</span></h1>
-      <p class="hero__subtitle">
-        ScrapeGoat is a powerful toolkit that lets you crawl websites, pull out the data you need,
-        and even use AI to understand it — all from your terminal.
-      </p>
+    <p class="note">
+      No selectors, no config. Listings are found by structure — repeated sibling
+      elements that mostly contain a price and a link — so it works on markup
+      nobody anticipated.
+    </p>
 
-      <div class="hero__cta">
-        <a href="#getting-started" class="btn btn--primary">🚀 Get Started</a>
-        <a href="https://github.com/IshaanNene/ScrapeGoat" target="_blank" class="btn btn--secondary">📦 View on GitHub</a>
+    <div class="cta">
+      <a class="btn btn--primary" href="#start">Get started</a>
+      <a class="btn" href="https://github.com/IshaanNene/ScrapeGoat">Source</a>
+    </div>
+  </div>
+</section>
+
+<!-- Evidence -->
+<section class="band" id="evidence">
+  <div class="wrap">
+    <h2>Numbers, not adjectives</h2>
+    <p class="sub">
+      Everything here is produced by a command in the repository. Where something
+      is unmeasured, it says so rather than going quiet.
+    </p>
+
+    <div class="grid grid--3">
+      <article class="stat">
+        <p class="stat__k">~3 µs</p>
+        <p class="stat__l">Frontier wake latency</p>
+        <p class="stat__d">
+          A worker parked on an empty queue, woken by a push. The previous poll
+          loop took ~49&nbsp;ms for the same thing.
+        </p>
+        <a class="stat__src" href="https://github.com/IshaanNene/ScrapeGoat/blob/main/docs/PERFORMANCE.md">Method →</a>
+      </article>
+
+      <article class="stat">
+        <p class="stat__k">1.20 <span>B/URL</span></p>
+        <p class="stat__l">Bloom deduplication</p>
+        <p class="stat__d">
+          Against ~40&nbsp;B/URL for an exact set, with a measured 0.97% false-positive
+          rate. Lossy, so it is opt-in.
+        </p>
+        <a class="stat__src" href="https://github.com/IshaanNene/ScrapeGoat/blob/main/docs/PERFORMANCE.md">Method →</a>
+      </article>
+
+      <article class="stat">
+        <p class="stat__k">0.998 <span>F1</span></p>
+        <p class="stat__l">Content extraction</p>
+        <p class="stat__d">
+          On a synthetic corpus that was iterated on during development — read the
+          caveats before trusting it.
+        </p>
+        <a class="stat__src" href="https://github.com/IshaanNene/ScrapeGoat/blob/main/docs/EXTRACTION.md">Caveats →</a>
+      </article>
+    </div>
+
+    <div class="split">
+      <div>
+        <h3>The extraction result that mattered</h3>
+        <p>
+          The extractor ScrapeGoat shipped in v0.1.0 matched a fixed list of CSS
+          selectors. Benchmarked against three alternatives, it scored
+          <strong>below returning the entire page body</strong>.
+        </p>
+
+        <div class="tbl-scroll">
+        <table class="tbl">
+          <caption class="sr">Extraction F1 by approach</caption>
+          <thead><tr><th scope="col">Approach</th><th scope="col">Precision</th><th scope="col">Recall</th><th scope="col">F1</th></tr></thead>
+          <tbody>
+            <tr><td>Whole page body</td><td>0.394</td><td>0.938</td><td>0.537</td></tr>
+            <tr><td>All <code>&lt;p&gt;</code> tags</td><td>0.497</td><td>0.896</td><td>0.621</td></tr>
+            <tr class="row--bad"><td>Selector list <span class="tag">v0.1.0</span></td><td>0.438</td><td>0.438</td><td>0.438</td></tr>
+            <tr class="row--good"><td>Density scoring <span class="tag tag--ok">now</span></td><td>0.996</td><td>1.000</td><td>0.998</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <p class="note">
+          Not gradual degradation — a cliff. The selector list was perfect on pages
+          using <code>&lt;article&gt;</code> and returned <em>nothing</em> on
+          anything else, with no way to tell the caller which had happened.
+        </p>
       </div>
 
-      <div class="hero__terminal">
-        <div class="hero__terminal-header">
-          <div class="hero__terminal-dot hero__terminal-dot--red"></div>
-          <div class="hero__terminal-dot hero__terminal-dot--yellow"></div>
-          <div class="hero__terminal-dot hero__terminal-dot--green"></div>
-        </div>
-        <div class="hero__terminal-body">
-          <span class="prompt">$</span> <span class="cmd">scrapegoat crawl https://quotes.toscrape.com --depth 2</span><br>
-          <span class="output">INFO starting crawl seeds=[https://quotes.toscrape.com] depth=2</span><br>
-          <span class="output">INFO fetching url=https://quotes.toscrape.com status=200</span><br>
-          <span class="output">INFO discovered links=50 items=10</span><br>
-          <br>
-          <span class="success">✅ Crawl complete in 3.2s</span><br>
-          <span class="output">&nbsp;&nbsp; Requests:  52 sent, 0 failed</span><br>
-          <span class="output">&nbsp;&nbsp; Items:     47 scraped, 0 dropped</span><br>
-          <span class="output">&nbsp;&nbsp; Output:    ./output</span>
-        </div>
+      <div>
+        <h3>TLS fingerprints, from captured bytes</h3>
+        <p>
+          <code>fetcher.fingerprint</code> makes the ClientHello a real browser's via
+          uTLS. Verified by reading the handshake off a socket and computing JA3 —
+          not by asserting a config value.
+        </p>
+<pre class="code"><code><span class="c-dim">go crypto/tls  </span> 20b279993ae2e137e62b9647c6d768fb
+<span class="c-ok">chrome         </span> bfc383408c83298569ce8fefad613581
+<span class="c-ok">firefox        </span> a4a7efb11da858ab9c34dc7fbb241bcb
+<span class="c-ok">safari         </span> 5a527c775ff4ae29b4f0c77b113f9625
+<span class="c-ok">edge           </span> bcfedf9f1709891a892b5bb1571df55c</code></pre>
+        <p class="note">
+          This closes the loudest signal — “this is a Go program” — and nothing
+          more. HTTP/2 SETTINGS, header order, and behaviour are all still tells.
+        </p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ═══ WHAT IS ═══ -->
-  <section id="what-is">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-header__tag" style="background: var(--sky);">Plain English</div>
-        <h2>Wait, what does this thing actually do?</h2>
-        <p>Let's break it down without the tech jargon.</p>
+<!-- Start -->
+<section class="band band--alt" id="start">
+  <div class="wrap">
+    <h2>Pick your entry point</h2>
+
+    <div class="tabs" data-tabs>
+      <div class="tabs__list" role="tablist" aria-label="Usage">
+        <button role="tab" aria-selected="true"  aria-controls="t-cli" id="tb-cli">CLI</button>
+        <button role="tab" aria-selected="false" aria-controls="t-lib" id="tb-lib" tabindex="-1">Go library</button>
+        <button role="tab" aria-selected="false" aria-controls="t-mcp" id="tb-mcp" tabindex="-1">MCP</button>
+        <button role="tab" aria-selected="false" aria-controls="t-api" id="tb-api" tabindex="-1">REST</button>
       </div>
 
-      <div class="what-is__grid fade-in">
-        <div class="what-is__text">
-          <h3>Think of it like a super-smart browser.</h3>
-          <p>
-            You know how you visit a website, click links, and read pages? ScrapeGoat does that automatically —
-            but <strong>really fast</strong> and <strong>at scale</strong>. It can visit thousands of pages,
-            grab the information you care about, and save it neatly in files you can actually use.
-          </p>
-          <p>
-            Whether you're a developer building a data pipeline, a researcher collecting articles,
-            or someone who just wants to download product prices — ScrapeGoat has you covered.
-          </p>
-        </div>
+      <div role="tabpanel" id="t-cli" aria-labelledby="tb-cli" class="tabs__panel" tabindex="0">
+<pre class="code"><code><span class="c-dim"># install</span>
+go install github.com/IshaanNene/ScrapeGoat/cmd/scrapegoat@latest
 
-        <div class="what-is__cards">
-          <div class="what-is__card">
-            <div class="what-is__card-icon">🔗</div>
-            <h4>Crawl</h4>
-            <p>Follow links across pages, just like browsing — but automatic.</p>
-          </div>
-          <div class="what-is__card">
-            <div class="what-is__card-icon">📋</div>
-            <h4>Extract</h4>
-            <p>Pick out titles, prices, text — whatever data matters to you.</p>
-          </div>
-          <div class="what-is__card">
-            <div class="what-is__card-icon">🔍</div>
-            <h4>Search</h4>
-            <p>Build a searchable index of any website's content.</p>
-          </div>
-          <div class="what-is__card">
-            <div class="what-is__card-icon">🤖</div>
-            <h4>AI Power</h4>
-            <p>Summarize pages and find names, places, and sentiments.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+<span class="c-dim"># one page, structured</span>
+scrapegoat extract https://books.toscrape.com
 
-  <!-- ═══ FEATURES ═══ -->
-  <section id="features">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-header__tag" style="background: var(--yellow);">What's Inside</div>
-        <h2>Packed with powerful features</h2>
-        <p>Everything you need for serious web scraping, out of the box.</p>
+<span class="c-dim"># crawl a site; Ctrl-C and pick up where you stopped</span>
+scrapegoat crawl https://books.toscrape.com \
+  --depth 2 --concurrency 10 \
+  --allowed-domains books.toscrape.com \
+  --output ./out --format jsonl
+
+scrapegoat crawl https://books.toscrape.com --resume</code></pre>
+        <p class="note">Progress goes to stderr and JSON to stdout, so piping to <code>jq</code> works.</p>
       </div>
 
-      <div class="features-grid fade-in">
-        <div class="feature-card">
-          <div class="feature-card__icon">⚡</div>
-          <h3>Blazing Fast Crawling</h3>
-          <p>Run up to hundreds of workers at once. ScrapeGoat handles concurrency, throttling, and retries so your crawls finish fast without crashing target sites.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">🎯</div>
-          <h3>Smart Data Extraction</h3>
-          <p>Use CSS selectors, XPath, or regex patterns to grab exactly the data you need. Supports JSON-LD, OpenGraph, and Twitter Cards out of the box.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">🔍</div>
-          <h3>Search Engine Mode</h3>
-          <p>Index any website with full-text content, headings hierarchy, metadata, and link graphs. Build your own mini search engine.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">🧠</div>
-          <h3>AI-Powered Analysis</h3>
-          <p>Automatically summarize pages, extract named entities (people, places, organizations), and detect sentiment — using Ollama or OpenAI.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">💾</div>
-          <h3>Multiple Output Formats</h3>
-          <p>Export your data as JSON, JSONL (streaming), or CSV. Files are written atomically so nothing gets corrupted mid-crawl.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">🔄</div>
-          <h3>Proxy Rotation</h3>
-          <p>Route requests through rotating proxies with round-robin or random selection. Auto-rotates on failure and includes health checking.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">⏸️</div>
-          <h3>Pause & Resume</h3>
-          <p>Checkpoint your crawl progress automatically. If your process stops, pick up right where you left off — no duplicate work.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">📊</div>
-          <h3>Prometheus Metrics</h3>
-          <p>Built-in /metrics and /health endpoints. Monitor requests, errors, bytes downloaded, and active workers in real-time.</p>
-        </div>
-      </div>
-    </div>
-  </section>
+      <div role="tabpanel" id="t-lib" aria-labelledby="tb-lib" class="tabs__panel" tabindex="0" hidden>
+<pre class="code"><code><span class="c-kw">type</span> BookSpider <span class="c-kw">struct</span>{}
 
-  <!-- ═══ GETTING STARTED ═══ -->
-  <section id="getting-started">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-header__tag" style="background: var(--coral);">Let's Go</div>
-        <h2>Up and running in 3 minutes</h2>
-        <p>You need Go 1.24+ and a terminal. That's it.</p>
-      </div>
+<span class="c-kw">func</span> (s *BookSpider) Name() <span class="c-typ">string</span>        { <span class="c-kw">return</span> <span class="c-str">"books"</span> }
+<span class="c-kw">func</span> (s *BookSpider) StartURLs() []<span class="c-typ">string</span> { <span class="c-kw">return</span> []<span class="c-typ">string</span>{<span class="c-str">"https://books.toscrape.com"</span>} }
 
-      <div class="steps fade-in">
-        <div class="step">
-          <div class="step__number">1</div>
-          <div class="step__content">
-            <h3>Clone & Build</h3>
-            <p>Grab the code from GitHub and compile the binary.</p>
-            <div class="code-block">
-              <div class="code-block__header">
-                <span class="code-block__lang">bash</span>
-                <button class="code-block__copy">Copy</button>
-              </div>
-              <pre><code>git clone https://github.com/IshaanNene/ScrapeGoat
-cd ScrapeGoat
-make build</code></pre>
-            </div>
-          </div>
-        </div>
+<span class="c-kw">func</span> (s *BookSpider) Parse(resp *scrapegoat.Response) (*scrapegoat.SpiderResult, <span class="c-typ">error</span>) {
+    result := &amp;scrapegoat.SpiderResult{}
 
-        <div class="step">
-          <div class="step__number">2</div>
-          <div class="step__content">
-            <h3>Run Your First Crawl</h3>
-            <p>Point ScrapeGoat at any website and watch it go.</p>
-            <div class="code-block">
-              <div class="code-block__header">
-                <span class="code-block__lang">bash</span>
-                <button class="code-block__copy">Copy</button>
-              </div>
-              <pre><code>./bin/scrapegoat crawl https://quotes.toscrape.com --depth 2</code></pre>
-            </div>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step__number">3</div>
-          <div class="step__content">
-            <h3>Check Your Results</h3>
-            <p>Your scraped data is waiting in the output folder, neatly formatted as JSON.</p>
-            <div class="code-block">
-              <div class="code-block__header">
-                <span class="code-block__lang">bash</span>
-                <button class="code-block__copy">Copy</button>
-              </div>
-              <pre><code>cat output/crawl_*.json | head -50</code></pre>
-            </div>
-          </div>
-        </div>
-
-        <div class="step">
-          <div class="step__number">4</div>
-          <div class="step__content">
-            <h3>Try Search or AI Mode</h3>
-            <p>Go beyond basic crawling — index for search or analyze with AI.</p>
-            <div class="code-block">
-              <div class="code-block__header">
-                <span class="code-block__lang">bash</span>
-                <button class="code-block__copy">Copy</button>
-              </div>
-              <pre><code><span class="cmt"># Build a searchable index of a website</span>
-./bin/scrapegoat search https://go.dev --depth 2
-
-<span class="cmt"># Or use AI to summarize + analyze content</span>
-./bin/scrapegoat ai-crawl https://news.ycombinator.com</code></pre>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ COMMANDS ═══ -->
-  <section id="commands">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-header__tag" style="background: var(--lavender);">Reference</div>
-        <h2>CLI Commands</h2>
-        <p>Everything you can do from your terminal, explained simply.</p>
-      </div>
-
-      <div class="fade-in">
-        <div class="commands-tabs">
-          <button class="commands-tab active" data-tab="crawl">🔗 crawl</button>
-          <button class="commands-tab" data-tab="search">🔍 search</button>
-          <button class="commands-tab" data-tab="ai-crawl">🧠 ai-crawl</button>
-          <button class="commands-tab" data-tab="other">⚙️ other</button>
-        </div>
-
-        <!-- CRAWL -->
-        <div class="command-panel active" id="panel-crawl">
-          <h3>scrapegoat crawl</h3>
-          <p>
-            <strong>What it does:</strong> Visits a website, follows links, and downloads pages. If you've set up 
-            parse rules (in a YAML config), it also extracts specific data from each page.
-          </p>
-
-          <div class="code-block">
-            <div class="code-block__header">
-              <span class="code-block__lang">bash</span>
-              <button class="code-block__copy">Copy</button>
-            </div>
-            <pre><code><span class="cmt"># Simple crawl</span>
-./bin/scrapegoat crawl https://quotes.toscrape.com --depth 2
-
-<span class="cmt"># Stay within one domain, limit pages</span>
-./bin/scrapegoat crawl https://en.wikipedia.org/wiki/Web_scraping \
-  --depth 1 --max-requests 30 --allowed-domains en.wikipedia.org
-
-<span class="cmt"># High performance mode</span>
-./bin/scrapegoat crawl https://example.com \
-  --concurrency 20 --delay 200ms --format jsonl</code></pre>
-          </div>
-
-          <table class="flags-table">
-            <thead>
-              <tr><th>Flag</th><th>Short</th><th>Default</th><th>What it does</th></tr>
-            </thead>
-            <tbody>
-              <tr><td><code>--depth</code></td><td><code>-d</code></td><td>3</td><td>How many links deep to follow</td></tr>
-              <tr><td><code>--concurrency</code></td><td><code>-n</code></td><td>10</td><td>Number of pages to fetch in parallel</td></tr>
-              <tr><td><code>--delay</code></td><td></td><td>1s</td><td>Wait time between requests to the same site</td></tr>
-              <tr><td><code>--format</code></td><td><code>-f</code></td><td>json</td><td>Output format: json, jsonl, or csv</td></tr>
-              <tr><td><code>--output</code></td><td><code>-o</code></td><td>./output</td><td>Where to save the results</td></tr>
-              <tr><td><code>--max-requests</code></td><td><code>-m</code></td><td>0</td><td>Stop after this many requests (0 = no limit)</td></tr>
-              <tr><td><code>--max-retries</code></td><td></td><td>3</td><td>How many times to retry a failed page</td></tr>
-              <tr><td><code>--allowed-domains</code></td><td></td><td>all</td><td>Only crawl these domains (comma-separated)</td></tr>
-              <tr><td><code>--user-agent</code></td><td></td><td>built-in</td><td>Custom browser identity string</td></tr>
-              <tr><td><code>--verbose</code></td><td><code>-v</code></td><td>off</td><td>Show detailed logs for every request</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- SEARCH -->
-        <div class="command-panel" id="panel-search">
-          <h3>scrapegoat search</h3>
-          <p>
-            <strong>What it does:</strong> Crawls a website and creates a search-ready index. For each page, 
-            it extracts the title, headings, body text, meta tags, outbound links, images, and more.
-            The output is a JSONL file — one document per line — perfect for feeding into a search engine.
-          </p>
-
-          <div class="code-block">
-            <div class="code-block__header">
-              <span class="code-block__lang">bash</span>
-              <button class="code-block__copy">Copy</button>
-            </div>
-            <pre><code><span class="cmt"># Index a Go documentation site</span>
-./bin/scrapegoat search https://go.dev --depth 2 --max-pages 100
-
-<span class="cmt"># Index Wikipedia articles</span>
-./bin/scrapegoat search https://en.wikipedia.org/wiki/Artificial_intelligence \
-  --depth 2 --max-pages 50 --output ./wiki_index</code></pre>
-          </div>
-
-          <table class="flags-table">
-            <thead>
-              <tr><th>Flag</th><th>Short</th><th>Default</th><th>What it does</th></tr>
-            </thead>
-            <tbody>
-              <tr><td><code>--depth</code></td><td><code>-d</code></td><td>3</td><td>How deep to follow links</td></tr>
-              <tr><td><code>--concurrency</code></td><td><code>-n</code></td><td>10</td><td>Parallel workers</td></tr>
-              <tr><td><code>--delay</code></td><td></td><td>200ms</td><td>Politeness delay per domain</td></tr>
-              <tr><td><code>--max-pages</code></td><td></td><td>500</td><td>Maximum pages to index</td></tr>
-              <tr><td><code>--allowed-domains</code></td><td></td><td>all</td><td>Stay within these domains</td></tr>
-              <tr><td><code>--output</code></td><td><code>-o</code></td><td>./output/search_index</td><td>Output directory</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- AI-CRAWL -->
-        <div class="command-panel" id="panel-ai-crawl">
-          <h3>scrapegoat ai-crawl</h3>
-          <p>
-            <strong>What it does:</strong> Crawls a website and then sends each page's content to an AI model 
-            for analysis. You get back: a summary (~200 words), named entities (people, organizations, locations), 
-            and sentiment analysis (positive/negative/neutral).
-          </p>
-
-          <div class="code-block">
-            <div class="code-block__header">
-              <span class="code-block__lang">bash</span>
-              <button class="code-block__copy">Copy</button>
-            </div>
-            <pre><code><span class="cmt"># With Ollama (local, free, no API key needed)</span>
-ollama serve &
-ollama pull llama3.2
-./bin/scrapegoat ai-crawl https://news.ycombinator.com
-
-<span class="cmt"># With OpenAI</span>
-OPENAI_API_KEY=sk-... ./bin/scrapegoat ai-crawl https://techcrunch.com \
-  --llm openai --model gpt-4o-mini
-
-<span class="cmt"># Any OpenAI-compatible API</span>
-./bin/scrapegoat ai-crawl https://example.com \
-  --llm custom --llm-endpoint http://localhost:8080 --model mistral</code></pre>
-          </div>
-
-          <table class="flags-table">
-            <thead>
-              <tr><th>Flag</th><th>Default</th><th>What it does</th></tr>
-            </thead>
-            <tbody>
-              <tr><td><code>--depth</code></td><td>2</td><td>Link depth to follow</td></tr>
-              <tr><td><code>--concurrency</code></td><td>5</td><td>Parallel workers (lower for AI to avoid overload)</td></tr>
-              <tr><td><code>--delay</code></td><td>500ms</td><td>Wait time between requests</td></tr>
-              <tr><td><code>--max-pages</code></td><td>50</td><td>Maximum pages to analyze</td></tr>
-              <tr><td><code>--llm</code></td><td>ollama</td><td>AI provider: ollama, openai, or custom</td></tr>
-              <tr><td><code>--model</code></td><td>—</td><td>Which AI model to use (e.g., llama3.2, gpt-4o-mini)</td></tr>
-              <tr><td><code>--llm-endpoint</code></td><td>—</td><td>Custom API endpoint URL</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- OTHER -->
-        <div class="command-panel" id="panel-other">
-          <h3>Utility Commands</h3>
-          <p>Quick helpers that don't require a URL.</p>
-
-          <div class="code-block">
-            <div class="code-block__header">
-              <span class="code-block__lang">bash</span>
-              <button class="code-block__copy">Copy</button>
-            </div>
-            <pre><code><span class="cmt"># Show the version</span>
-./bin/scrapegoat version
-
-<span class="cmt"># Show current configuration</span>
-./bin/scrapegoat config
-
-<span class="cmt"># Use a custom config file</span>
-./bin/scrapegoat crawl https://example.com --config configs/default.yaml</code></pre>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ SDK ═══ -->
-  <section id="sdk">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-header__tag" style="background: var(--mint);">For Developers</div>
-        <h2>Use it as a Go Library</h2>
-        <p>Embed ScrapeGoat directly into your Go application — no CLI needed.</p>
-      </div>
-
-      <div class="sdk-grid fade-in">
-        <div>
-          <div class="code-block">
-            <div class="code-block__header">
-              <span class="code-block__lang">Go</span>
-              <button class="code-block__copy">Copy</button>
-            </div>
-            <pre><code><span class="kw">package</span> main
-
-<span class="kw">import</span> (
-    <span class="str">"fmt"</span>
-    <span class="str">"time"</span>
-    scrapegoat <span class="str">"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat"</span>
-)
-
-<span class="kw">func</span> <span class="fn">main</span>() {
-    crawler := scrapegoat.<span class="fn">NewCrawler</span>(
-        scrapegoat.<span class="fn">WithConcurrency</span>(<span class="num">5</span>),
-        scrapegoat.<span class="fn">WithMaxDepth</span>(<span class="num">2</span>),
-        scrapegoat.<span class="fn">WithDelay</span>(<span class="num">500</span> * time.Millisecond),
-        scrapegoat.<span class="fn">WithOutput</span>(<span class="str">"json"</span>, <span class="str">"./output"</span>),
-    )
-
-    <span class="cmt">// Extract quotes from each page</span>
-    crawler.<span class="fn">OnHTML</span>(<span class="str">".quote"</span>, <span class="kw">func</span>(e *scrapegoat.Element) {
-        e.Item.<span class="fn">Set</span>(<span class="str">"quote"</span>, e.Selection.<span class="fn">Find</span>(<span class="str">".text"</span>).<span class="fn">Text</span>())
-        e.Item.<span class="fn">Set</span>(<span class="str">"author"</span>, e.Selection.<span class="fn">Find</span>(<span class="str">".author"</span>).<span class="fn">Text</span>())
+    resp.Doc.Find(<span class="c-str">".product_pod"</span>).Each(<span class="c-kw">func</span>(_ <span class="c-typ">int</span>, sel *goquery.Selection) {
+        item := scrapegoat.NewItem(resp.URL)
+        item.Set(<span class="c-str">"title"</span>, sel.Find(<span class="c-str">"h3 a"</span>).AttrOr(<span class="c-str">"title"</span>, <span class="c-str">""</span>))
+        item.Set(<span class="c-str">"price"</span>, sel.Find(<span class="c-str">".price_color"</span>).Text())
+        result.Items = <span class="c-fn">append</span>(result.Items, item)
     })
 
-    crawler.<span class="fn">Start</span>(<span class="str">"https://quotes.toscrape.com"</span>)
-    crawler.<span class="fn">Wait</span>()
-    fmt.<span class="fn">Println</span>(<span class="str">"Done!"</span>, crawler.<span class="fn">Stats</span>())
+    <span class="c-kw">return</span> result, <span class="c-kw">nil</span>
 }</code></pre>
-          </div>
-        </div>
+        <p class="note">
+          <code>Item</code>, <code>Request</code>, and <code>Response</code> are ordinary
+          exported types, so you can write functions over them and store them in your
+          own structs.
+        </p>
+      </div>
 
-        <div class="sdk-options">
-          <div class="sdk-option">
-            <code>WithConcurrency(n)</code>
-            <p>How many pages to fetch in parallel</p>
-          </div>
-          <div class="sdk-option">
-            <code>WithMaxDepth(d)</code>
-            <p>Maximum link depth to crawl</p>
-          </div>
-          <div class="sdk-option">
-            <code>WithDelay(d)</code>
-            <p>Wait time between requests to be polite</p>
-          </div>
-          <div class="sdk-option">
-            <code>WithOutput(fmt, path)</code>
-            <p>Output format (json/jsonl/csv) and directory</p>
-          </div>
-          <div class="sdk-option">
-            <code>WithAllowedDomains(...)</code>
-            <p>Only crawl pages on these domains</p>
-          </div>
-          <div class="sdk-option">
-            <code>WithProxy(...)</code>
-            <p>Route through these proxy servers</p>
-          </div>
-          <div class="sdk-option">
-            <code>WithRobotsRespect(true)</code>
-            <p>Follow robots.txt rules (on by default)</p>
-          </div>
-          <div class="sdk-option">
-            <code>WithMaxRequests(n)</code>
-            <p>Stop after N total requests</p>
-          </div>
-        </div>
+      <div role="tabpanel" id="t-mcp" aria-labelledby="tb-mcp" class="tabs__panel" tabindex="0" hidden>
+<pre class="code"><code>{
+  <span class="c-str">"mcpServers"</span>: {
+    <span class="c-str">"scrapegoat"</span>: {
+      <span class="c-str">"command"</span>: <span class="c-str">"scrapegoat"</span>,
+      <span class="c-str">"args"</span>: [<span class="c-str">"mcp"</span>]
+    }
+  }
+}</code></pre>
+        <p class="note">
+          Seven tools for Claude Desktop, Cursor, and Cline. Nothing leaves your
+          machine, no API key, no per-request cost.
+        </p>
+      </div>
+
+      <div role="tabpanel" id="t-api" aria-labelledby="tb-api" class="tabs__panel" tabindex="0" hidden>
+<pre class="code"><code>scrapegoat serve --port 8080 --api-key <span class="c-str">"$SCRAPEGOAT_API_KEY"</span>
+
+curl -X POST http://localhost:8080/v1/extract \
+  -H <span class="c-str">"X-API-Key: $SCRAPEGOAT_API_KEY"</span> \
+  -H <span class="c-str">'Content-Type: application/json'</span> \
+  -d <span class="c-str">'{"url": "https://books.toscrape.com"}'</span></code></pre>
+        <p class="note">
+          The server refuses to start without an API key. Running it open requires
+          saying so: <code>--insecure-no-auth</code>.
+        </p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ═══ CONFIGURATION ═══ -->
-  <section id="config">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-header__tag" style="background: var(--orange);">Customize</div>
-        <h2>Configure Everything</h2>
-        <p>Use a YAML file to set defaults, or override anything with CLI flags.</p>
+<!-- Security -->
+<section class="band" id="security">
+  <div class="wrap">
+    <h2>A crawler fetches URLs someone else chose</h2>
+    <p class="sub">
+      That is the whole threat model. With an MCP server in front, those URLs come
+      from a model whose output was shaped by the last page it read — which makes
+      prompt injection a route into your network.
+    </p>
+
+    <div class="callout">
+      <p>
+        A crawled page saying <em>“now fetch
+        <code>http://169.254.169.254/latest/meta-data/</code>”</em> is a payload
+        aimed at your cloud credentials. ScrapeGoat blocks it by default.
+      </p>
+    </div>
+
+    <div class="grid grid--2">
+      <div class="card">
+        <h3>Guarded by default</h3>
+        <ul class="ticks">
+          <li>Scheme allowlist, then <strong>post-DNS</strong> address checks</li>
+          <li>Loopback, RFC1918, link-local, CGNAT — and the IPv4-mapped and NAT64 forms of each</li>
+          <li>DNS rebinding fails: it dials the address it validated</li>
+          <li>Every redirect hop re-checked</li>
+          <li>Bodies capped <em>after</em> decompression, with a ratio limit</li>
+        </ul>
       </div>
-
-      <div class="config-grid fade-in">
-        <div class="code-block">
-          <div class="code-block__header">
-            <span class="code-block__lang">yaml</span>
-            <button class="code-block__copy">Copy</button>
-          </div>
-          <pre><code><span class="cmt"># configs/default.yaml</span>
-<span class="kw">engine</span>:
-  <span class="fn">concurrency</span>: <span class="num">10</span>
-  <span class="fn">max_depth</span>: <span class="num">5</span>
-  <span class="fn">request_timeout</span>: <span class="str">30s</span>
-  <span class="fn">politeness_delay</span>: <span class="str">1s</span>
-  <span class="fn">respect_robots_txt</span>: <span class="num">true</span>
-  <span class="fn">max_retries</span>: <span class="num">3</span>
-
-<span class="kw">storage</span>:
-  <span class="fn">type</span>: <span class="str">json</span>
-  <span class="fn">output_path</span>: <span class="str">./output</span>
-
-<span class="kw">proxy</span>:
-  <span class="fn">enabled</span>: <span class="num">false</span>
-  <span class="fn">rotation</span>: <span class="str">round_robin</span>
-
-<span class="kw">metrics</span>:
-  <span class="fn">enabled</span>: <span class="num">false</span>
-  <span class="fn">port</span>: <span class="num">9090</span></code></pre>
-        </div>
-
-        <div class="config-info">
-          <div class="config-item">
-            <h4>⚙️ Engine</h4>
-            <p>Workers, depth, timeouts, retries, user-agents, domain filters</p>
-          </div>
-          <div class="config-item">
-            <h4>🌐 Fetcher</h4>
-            <p>HTTP or headless browser mode, redirects, body size limits</p>
-          </div>
-          <div class="config-item">
-            <h4>💾 Storage</h4>
-            <p>Output format (JSON/JSONL/CSV), path, batch size</p>
-          </div>
-          <div class="config-item">
-            <h4>🔄 Proxy</h4>
-            <p>Enable rotation, add proxy URLs, health checks</p>
-          </div>
-          <div class="config-item">
-            <h4>📊 Metrics</h4>
-            <p>Prometheus endpoint for real-time monitoring</p>
-          </div>
-        </div>
+      <div class="card">
+        <h3>Fails closed</h3>
+        <ul class="ticks">
+          <li>API and MCP HTTP servers refuse to start without a key</li>
+          <li>CORS is deny-by-default; WebSocket upgrades check <code>Origin</code></li>
+          <li>Keys compared in constant time</li>
+          <li>Crawling your own network is an explicit opt-in</li>
+        </ul>
       </div>
     </div>
-  </section>
 
-  <!-- ═══ ARCHITECTURE ═══ -->
-  <section id="architecture">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-header__tag" style="background: var(--pink);">Under the Hood</div>
-        <h2>How ScrapeGoat Works</h2>
-        <p>A modular pipeline where each piece does one job well.</p>
+    <p class="note">
+      What is <em>not</em> covered — proxied requests and the headless browser —
+      is written down too.
+      <a href="https://github.com/IshaanNene/ScrapeGoat/blob/main/SECURITY.md">Trust boundary →</a>
+    </p>
+  </div>
+</section>
+
+<!-- Agents -->
+<section class="band band--alt" id="agents">
+  <div class="wrap">
+    <h2>Built for agents, run by you</h2>
+    <div class="grid grid--3">
+      <div class="card">
+        <h3>Self-hosted</h3>
+        <p>No API key, no per-request cost, no data leaving your network. The trade against a hosted tool is that you run it.</p>
       </div>
-
-      <div class="arch-diagram fade-in">
-        <!-- Layer 1: Input -->
-        <div class="arch-layer-wrapper">
-          <div class="arch-label" style="background: var(--sky);">Input Layer</div>
-        </div>
-        <div class="arch-layer">
-          <div class="arch-box" style="background: var(--sky);">CLI Commands</div>
-          <div class="arch-box" style="background: var(--sky);">Go SDK</div>
-          <div class="arch-box" style="background: var(--sky);">YAML Config</div>
-        </div>
-
-        <div class="arch-connector">⬇</div>
-
-        <!-- Layer 2: Engine -->
-        <div class="arch-layer-wrapper">
-          <div class="arch-label" style="background: var(--yellow);">Core Engine</div>
-        </div>
-        <div class="arch-layer">
-          <div class="arch-box" style="background: var(--yellow);">Scheduler</div>
-          <div class="arch-box" style="background: var(--yellow);">Frontier</div>
-          <div class="arch-box" style="background: var(--yellow);">Dedup</div>
-          <div class="arch-box" style="background: var(--yellow);">Robots</div>
-          <div class="arch-box" style="background: var(--yellow);">Checkpoint</div>
-        </div>
-
-        <div class="arch-connector">⬇</div>
-
-        <!-- Layer 3: Fetch -->
-        <div class="arch-layer-wrapper">
-          <div class="arch-label" style="background: var(--coral);">Fetch Layer</div>
-        </div>
-        <div class="arch-layer">
-          <div class="arch-box" style="background: var(--coral);">HTTP Fetcher</div>
-          <div class="arch-box" style="background: var(--coral);">Browser Fetcher</div>
-          <div class="arch-box" style="background: var(--coral);">Proxy Rotation</div>
-          <div class="arch-box" style="background: var(--coral);">Stealth Mode</div>
-        </div>
-
-        <div class="arch-connector">⬇</div>
-
-        <!-- Layer 4: Parse -->
-        <div class="arch-layer-wrapper">
-          <div class="arch-label" style="background: var(--lime);">Parse & Process</div>
-        </div>
-        <div class="arch-layer">
-          <div class="arch-box" style="background: var(--lime);">CSS Parser</div>
-          <div class="arch-box" style="background: var(--lime);">XPath Parser</div>
-          <div class="arch-box" style="background: var(--lime);">Regex Parser</div>
-          <div class="arch-box" style="background: var(--lime);">Pipeline</div>
-          <div class="arch-box" style="background: var(--lime);">AI (LLM)</div>
-        </div>
-
-        <div class="arch-connector">⬇</div>
-
-        <!-- Layer 5: Output -->
-        <div class="arch-layer-wrapper">
-          <div class="arch-label" style="background: var(--lavender);">Output Layer</div>
-        </div>
-        <div class="arch-layer">
-          <div class="arch-box" style="background: var(--lavender);">JSON</div>
-          <div class="arch-box" style="background: var(--lavender);">JSONL</div>
-          <div class="arch-box" style="background: var(--lavender);">CSV</div>
-          <div class="arch-box" style="background: var(--lavender);">Prometheus</div>
-        </div>
+      <div class="card">
+        <h3>Seven MCP tools</h3>
+        <p><code>crawl</code>, <code>extract</code>, <code>search</code>, <code>screenshot</code>, <code>batch</code>, <code>job_status</code>, <code>sitemap</code>.</p>
+      </div>
+      <div class="card">
+        <h3>Guarded tool arguments</h3>
+        <p>Every URL an agent supplies is checked before a connection opens, and again at the dialer where rebinding cannot race it.</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ═══ EXAMPLES ═══ -->
-  <section id="examples">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-header__tag" style="background: var(--lime);">Ready to Run</div>
-        <h2>Example Scrapers</h2>
-        <p>Pre-built examples you can run instantly — no configuration needed.</p>
-      </div>
+<!-- Design -->
+<section class="band" id="design">
+  <div class="wrap">
+    <h2>Where this is going</h2>
+    <p class="sub">
+      The direction is one layer above crawling: turning a set of domains into a
+      clean, deduplicated, provenance-tracked corpus — locally.
+    </p>
 
-      <div class="features-grid fade-in">
-        <div class="feature-card">
-          <div class="feature-card__icon">📰</div>
-          <h3>Hacker News</h3>
-          <p>Scrape top stories with rank, title, URL, points, author, and comments count.</p>
-          <div class="code-block" style="margin-top:12px">
-            <div class="code-block__header">
-              <span class="code-block__lang">bash</span>
-              <button class="code-block__copy">Copy</button>
-            </div>
-            <pre><code>go run ./examples/hackernews/</code></pre>
-          </div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">🛒</div>
-          <h3>E-Commerce</h3>
-          <p>Extract product titles, prices, ratings, and stock status from books.toscrape.com.</p>
-          <div class="code-block" style="margin-top:12px">
-            <div class="code-block__header">
-              <span class="code-block__lang">bash</span>
-              <button class="code-block__copy">Copy</button>
-            </div>
-            <pre><code>go run ./examples/ecommerce/</code></pre>
-          </div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">🐙</div>
-          <h3>GitHub Trending</h3>
-          <p>Get trending repos with name, description, language, stars, and forks.</p>
-          <div class="code-block" style="margin-top:12px">
-            <div class="code-block__header">
-              <span class="code-block__lang">bash</span>
-              <button class="code-block__copy">Copy</button>
-            </div>
-            <pre><code>go run ./examples/github/</code></pre>
-          </div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">📚</div>
-          <h3>Wikipedia</h3>
-          <p>Deep crawl Wikipedia articles — titles, summaries, categories, references.</p>
-          <div class="code-block" style="margin-top:12px">
-            <div class="code-block__header">
-              <span class="code-block__lang">bash</span>
-              <button class="code-block__copy">Copy</button>
-            </div>
-            <pre><code>go run ./examples/wikipedia/</code></pre>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+    <ol class="phases">
+      <li class="ph ph--done">
+        <span class="ph__s">Done</span>
+        <h3>Determinism seams</h3>
+        <p>The engine takes time and randomness from injected sources. Enforced in CI, because breaking it is silent — nothing fails, the crawl just stops being reproducible.</p>
+      </li>
+      <li class="ph ph--done">
+        <span class="ph__s">Done</span>
+        <h3>Scope reduction</h3>
+        <p>Nine subsystems moved to <code>contrib/</code>; the CLI went from 20 commands to 10. Every subsystem kept is one the determinism invariant must hold across.</p>
+      </li>
+      <li class="ph ph--done">
+        <span class="ph__s">Done</span>
+        <h3>Extraction &amp; benchmark</h3>
+        <p>Density-based main-content detection, measured against three alternatives on a corpus built to defeat specific heuristics.</p>
+      </li>
+      <li class="ph ph--now">
+        <span class="ph__s">Now</span>
+        <h3>This site</h3>
+        <p>Rebuilt to show evidence rather than adjectives, and kept dependency-free so it cannot rot behind a build step.</p>
+      </li>
+      <li class="ph">
+        <span class="ph__s">Next</span>
+        <h3>Fetch log &amp; replay</h3>
+        <p>Content-addressed storage and WARC interchange, so a crawl replays and a dataset can be verified by a third party.</p>
+      </li>
+      <li class="ph">
+        <span class="ph__s">Then</span>
+        <h3>Simulation testing</h3>
+        <p>Seeded interleavings and injected faults. The concurrency bugs fixed for v0.1.0 all survived a 260-test suite with <code>-race</code>; the gap is not test count.</p>
+      </li>
+      <li class="ph">
+        <span class="ph__s">Then</span>
+        <h3>Provenance &amp; scale</h3>
+        <p>Signed manifests, a disk-backed frontier, and near-duplicate detection.</p>
+      </li>
+    </ol>
 
-  <!-- ═══ FAQ ═══ -->
-  <section id="faq">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-header__tag" style="background: var(--yellow);">Questions?</div>
-        <h2>Frequently Asked Questions</h2>
-      </div>
+    <p class="note">
+      Design documents record the alternatives that were rejected and why — the part
+      that does not survive into the code.
+      <a href="https://github.com/IshaanNene/ScrapeGoat/tree/main/docs/design">Design docs →</a>
+    </p>
+  </div>
+</section>
 
-      <div class="faq-list fade-in">
-        <div class="faq-item">
-          <button class="faq-question">
-            Do I need to know Go to use ScrapeGoat?
-            <span class="faq-question__icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <div class="faq-answer__inner">
-              Nope! The CLI tool works from any terminal. Just run commands like 
-              <code>scrapegoat crawl &lt;url&gt;</code> — no Go code required. The Go SDK is only 
-              needed if you want to embed scraping into your own Go applications.
-            </div>
-          </div>
-        </div>
+</main>
 
-        <div class="faq-item">
-          <button class="faq-question">
-            Is web scraping legal?
-            <span class="faq-question__icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <div class="faq-answer__inner">
-              Web scraping is generally legal for publicly available data, but you should always 
-              check a website's Terms of Service and robots.txt file. ScrapeGoat respects robots.txt 
-              by default to be a good citizen of the web.
-            </div>
-          </div>
-        </div>
+<footer class="foot">
+  <div class="wrap foot__inner">
+    <p>Apache 2.0 · <a href="https://github.com/IshaanNene/ScrapeGoat">github.com/IshaanNene/ScrapeGoat</a></p>
+    <nav aria-label="Documentation">
+      <a href="https://github.com/IshaanNene/ScrapeGoat/blob/main/README.md">Docs</a>
+      <a href="https://github.com/IshaanNene/ScrapeGoat/blob/main/SECURITY.md">Security</a>
+      <a href="https://github.com/IshaanNene/ScrapeGoat/blob/main/docs/PERFORMANCE.md">Performance</a>
+      <a href="https://github.com/IshaanNene/ScrapeGoat/blob/main/docs/EXTRACTION.md">Extraction</a>
+      <a href="https://github.com/IshaanNene/ScrapeGoat/blob/main/ROADMAP.md">Roadmap</a>
+    </nav>
+  </div>
+</footer>
 
-        <div class="faq-item">
-          <button class="faq-question">
-            Do I need an API key for AI features?
-            <span class="faq-question__icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <div class="faq-answer__inner">
-              Not if you use Ollama! Ollama runs AI models locally on your machine — completely free, 
-              no API keys, no cloud. If you want to use OpenAI models, then yes, you'll need an API key.
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question">
-            What happens if my crawl gets interrupted?
-            <span class="faq-question__icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <div class="faq-answer__inner">
-              ScrapeGoat saves checkpoints of its progress automatically (every 60 seconds by default). 
-              If your crawl stops, you can resume from the last checkpoint — no need to start over. 
-              It also handles Ctrl+C gracefully, saving state before shutting down.
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question">
-            How do I avoid getting blocked by websites?
-            <span class="faq-question__icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <div class="faq-answer__inner">
-              ScrapeGoat has several built-in safeguards: per-domain politeness delays (default 1 second 
-              between requests), User-Agent rotation, proxy support, and robots.txt compliance. 
-              You can also configure custom delay values and use the <code>--allowed-domains</code> flag 
-              to limit your crawl scope.
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question">
-            Can I use ScrapeGoat with JavaScript-heavy websites?
-            <span class="faq-question__icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <div class="faq-answer__inner">
-              Yes! ScrapeGoat includes a headless browser fetcher powered by go-rod. This can render 
-              JavaScript, handle dynamic content, and even includes stealth mode to avoid detection. 
-              Configure it by setting <code>fetcher.type: browser</code> in your YAML config.
-            </div>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question">
-            What output formats are supported?
-            <span class="faq-question__icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <div class="faq-answer__inner">
-              Three formats: <strong>JSON</strong> (pretty-printed, great for readability), 
-              <strong>JSONL</strong> (one record per line, ideal for streaming and large datasets), 
-              and <strong>CSV</strong> (spreadsheet-friendly). Use the <code>--format</code> flag 
-              to choose.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ FOOTER ═══ -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer__logo">🕷️ ScrapeGoat</div>
-      <div class="footer__links">
-        <a href="https://github.com/IshaanNene/ScrapeGoat" target="_blank">GitHub</a>
-        <a href="https://github.com/IshaanNene/ScrapeGoat/blob/main/LICENSE" target="_blank">Apache 2.0 License</a>
-        <a href="https://github.com/IshaanNene/ScrapeGoat/issues" target="_blank">Report Issues</a>
-        <a href="#getting-started">Get Started</a>
-      </div>
-      <p class="footer__copy">Built with 🐐 energy · &copy; 2026 Ishaan Nene</p>
-    </div>
-  </footer>
-
-  <!-- Back to top -->
-  <button class="back-to-top" id="back-to-top" aria-label="Back to top">↑</button>
-
-  <script src="script.js"></script>
+<script src="script.js" defer></script>
 </body>
 </html>

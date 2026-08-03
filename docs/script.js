@@ -1,191 +1,132 @@
-/* ═══════════════════════════════════════════
-   ScrapeGoat Docs — Interactivity
-   ═══════════════════════════════════════════ */
+/* ScrapeGoat site behaviour.
+ *
+ * Four small things: theme, mobile drawer, copy buttons, tabs. No framework and
+ * no dependencies — the page is readable and navigable with this file missing
+ * entirely, which is the property that matters for documentation.
+ */
 
-document.addEventListener('DOMContentLoaded', () => {
-  initThemeToggle();
-  initMobileNav();
-  initCopyButtons();
-  initFAQ();
-  initScrollAnimations();
-  initActiveNavigation();
-  initBackToTop();
-  initCommandTabs();
-});
+(() => {
+  'use strict';
 
-/* ── Theme Toggle ── */
-function initThemeToggle() {
-  const btn = document.getElementById('theme-toggle');
-  const saved = localStorage.getItem('scrapegoat-theme');
-  if (saved === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    btn.textContent = '☀️';
+  /* ── Theme ─────────────────────────────────────────────────────
+   * Explicit choice wins over the OS preference and persists. The initial value
+   * is set on <html> in the markup so there is no flash of the wrong theme
+   * before this script runs. */
+
+  const root = document.documentElement;
+  const STORE = 'sg-theme';
+
+  const stored = (() => {
+    try { return localStorage.getItem(STORE); } catch { return null; }
+  })();
+
+  if (stored === 'light' || stored === 'dark') {
+    root.dataset.theme = stored;
+  } else if (window.matchMedia?.('(prefers-color-scheme: light)').matches) {
+    root.dataset.theme = 'light';
   }
 
-  btn.addEventListener('click', () => {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (isDark) {
-      document.documentElement.removeAttribute('data-theme');
-      btn.textContent = '🌙';
-      localStorage.setItem('scrapegoat-theme', 'light');
-    } else {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      btn.textContent = '☀️';
-      localStorage.setItem('scrapegoat-theme', 'dark');
-    }
-  });
-}
-
-/* ── Mobile Navigation ── */
-function initMobileNav() {
-  const hamburger = document.getElementById('hamburger');
-  const mobileNav = document.getElementById('mobile-nav');
-
-  hamburger.addEventListener('click', () => {
-    mobileNav.classList.toggle('open');
-    const spans = hamburger.querySelectorAll('span');
-    if (mobileNav.classList.contains('open')) {
-      spans[0].style.transform = 'rotate(45deg) translate(5px, 5px)';
-      spans[1].style.opacity = '0';
-      spans[2].style.transform = 'rotate(-45deg) translate(6px, -6px)';
-    } else {
-      spans[0].style.transform = '';
-      spans[1].style.opacity = '1';
-      spans[2].style.transform = '';
-    }
+  document.getElementById('theme')?.addEventListener('click', () => {
+    const next = root.dataset.theme === 'light' ? 'dark' : 'light';
+    root.dataset.theme = next;
+    try { localStorage.setItem(STORE, next); } catch { /* private mode */ }
   });
 
-  // Close on link click
-  mobileNav.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', () => {
-      mobileNav.classList.remove('open');
-      const spans = hamburger.querySelectorAll('span');
-      spans[0].style.transform = '';
-      spans[1].style.opacity = '1';
-      spans[2].style.transform = '';
+  // Follow the OS only while the visitor has not chosen for themselves.
+  window.matchMedia?.('(prefers-color-scheme: light)').addEventListener?.('change', e => {
+    let chosen = null;
+    try { chosen = localStorage.getItem(STORE); } catch { /* ignore */ }
+    if (!chosen) root.dataset.theme = e.matches ? 'light' : 'dark';
+  });
+
+  /* ── Mobile drawer ─────────────────────────────────────────── */
+
+  const menu = document.getElementById('menu');
+  const drawer = document.getElementById('drawer');
+
+  const setDrawer = open => {
+    if (!drawer || !menu) return;
+    drawer.hidden = !open;
+    menu.setAttribute('aria-expanded', String(open));
+  };
+
+  menu?.addEventListener('click', () => setDrawer(drawer.hidden));
+  drawer?.addEventListener('click', e => {
+    if (e.target.tagName === 'A') setDrawer(false);
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') setDrawer(false);
+  });
+
+  /* ── Copy buttons ──────────────────────────────────────────── */
+
+  document.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = btn.dataset.copy;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // Clipboard API needs a secure context and permission; fall back rather
+        // than leaving the button looking broken.
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch { /* give up quietly */ }
+        ta.remove();
+      }
+
+      const original = btn.textContent;
+      btn.textContent = 'Copied';
+      btn.dataset.done = '';
+      setTimeout(() => {
+        btn.textContent = original;
+        delete btn.dataset.done;
+      }, 1400);
     });
   });
-}
 
-/* ── Copy to Clipboard ── */
-function initCopyButtons() {
-  document.querySelectorAll('.code-block__copy').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const codeBlock = btn.closest('.code-block');
-      const code = codeBlock.querySelector('code').textContent;
+  /* ── Tabs ──────────────────────────────────────────────────────
+   * Follows the ARIA authoring practice: arrow keys move between tabs, Home and
+   * End jump to the ends, and only the active tab is in the tab order. Panels
+   * are plain markup, so with JS disabled the first one still shows. */
 
-      navigator.clipboard.writeText(code).then(() => {
-        btn.textContent = '✓ Copied!';
-        btn.classList.add('code-block__copy--copied');
-        setTimeout(() => {
-          btn.textContent = 'Copy';
-          btn.classList.remove('code-block__copy--copied');
-        }, 2000);
-      }).catch(() => {
-        // Fallback
-        const textarea = document.createElement('textarea');
-        textarea.value = code;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        btn.textContent = '✓ Copied!';
-        btn.classList.add('code-block__copy--copied');
-        setTimeout(() => {
-          btn.textContent = 'Copy';
-          btn.classList.remove('code-block__copy--copied');
-        }, 2000);
+  document.querySelectorAll('[data-tabs]').forEach(group => {
+    const tabs = [...group.querySelectorAll('[role="tab"]')];
+    if (!tabs.length) return;
+
+    const select = idx => {
+      tabs.forEach((tab, i) => {
+        const on = i === idx;
+        tab.setAttribute('aria-selected', String(on));
+        tab.tabIndex = on ? 0 : -1;
+
+        const panel = document.getElementById(tab.getAttribute('aria-controls'));
+        if (panel) panel.hidden = !on;
       });
-    });
-  });
-}
+    };
 
-/* ── FAQ Accordion ── */
-function initFAQ() {
-  document.querySelectorAll('.faq-question').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const item = btn.closest('.faq-item');
-      const answer = item.querySelector('.faq-answer');
-      const isOpen = item.classList.contains('open');
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => select(i));
 
-      // Close all others
-      document.querySelectorAll('.faq-item.open').forEach(openItem => {
-        if (openItem !== item) {
-          openItem.classList.remove('open');
-          openItem.querySelector('.faq-answer').style.maxHeight = '0';
+      tab.addEventListener('keydown', e => {
+        const last = tabs.length - 1;
+        let next = null;
+
+        switch (e.key) {
+          case 'ArrowRight': next = i === last ? 0 : i + 1; break;
+          case 'ArrowLeft':  next = i === 0 ? last : i - 1; break;
+          case 'Home':       next = 0; break;
+          case 'End':        next = last; break;
+          default: return;
         }
+
+        e.preventDefault();
+        select(next);
+        tabs[next].focus();
       });
-
-      if (isOpen) {
-        item.classList.remove('open');
-        answer.style.maxHeight = '0';
-      } else {
-        item.classList.add('open');
-        answer.style.maxHeight = answer.scrollHeight + 'px';
-      }
     });
   });
-}
-
-/* ── Scroll Animations ── */
-function initScrollAnimations() {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-      }
-    });
-  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-
-  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
-}
-
-/* ── Active Navigation Highlighting ── */
-function initActiveNavigation() {
-  const sections = document.querySelectorAll('section[id]');
-  const navLinks = document.querySelectorAll('.navbar__links a');
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const id = entry.target.id;
-        navLinks.forEach(link => {
-          link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
-        });
-      }
-    });
-  }, { rootMargin: '-30% 0px -60% 0px' });
-
-  sections.forEach(section => observer.observe(section));
-}
-
-/* ── Back to Top ── */
-function initBackToTop() {
-  const btn = document.getElementById('back-to-top');
-
-  window.addEventListener('scroll', () => {
-    btn.classList.toggle('visible', window.scrollY > 500);
-  });
-
-  btn.addEventListener('click', () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-}
-
-/* ── Command Tabs ── */
-function initCommandTabs() {
-  const tabs = document.querySelectorAll('.commands-tab');
-  const panels = document.querySelectorAll('.command-panel');
-
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      const target = tab.dataset.tab;
-
-      tabs.forEach(t => t.classList.remove('active'));
-      panels.forEach(p => p.classList.remove('active'));
-
-      tab.classList.add('active');
-      document.getElementById(`panel-${target}`).classList.add('active');
-    });
-  });
-}
+})();

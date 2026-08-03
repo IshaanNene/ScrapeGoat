@@ -157,7 +157,24 @@ ScrapeGoat usable *on* CommonCrawl, which is where essentially all large-scale
 web-derived datasets actually start. This is the interoperability item — it stops
 the project being an island.
 
-### 7. MCP tools shaped for corpora
+### 7. The site
+
+`docs/` is the GitHub Pages site, and it is part of the project rather than a
+brochure bolted onto it. Rebuilt to show the evidence — measured numbers, the
+JA3 hashes from captured bytes, the extraction comparison including where the
+shipped version lost — instead of adjectives.
+
+Two constraints it keeps: **no build step and no third-party requests**. The
+previous stylesheet opened with an `@import` to Google Fonts, which is a
+third-party request on every page load for a project whose own README is about
+not sending data where it need not go. System fonts render instantly and leak
+nothing, and a site with no toolchain cannot rot behind a toolchain nobody
+reinstalls.
+
+Outstanding: the phase list is maintained by hand and will drift from ROADMAP.md.
+Generating it from this file at release time would fix that.
+
+### 8. MCP tools shaped for corpora
 
 The current tools are crawl-shaped: crawl, extract, screenshot, sitemap. An agent
 building or querying a corpus wants different verbs — search *within* what has
