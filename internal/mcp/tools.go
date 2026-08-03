@@ -280,7 +280,7 @@ func (r *ToolRegistry) handleCrawl(ctx context.Context, rawArgs json.RawMessage)
 	}
 	eng.Wait()
 
-	stats := eng.Stats().Snapshot()
+	stats := eng.StatsSnapshot()
 	result := map[string]any{
 		"url":        args.URL,
 		"pages":      stats["requests_sent"],

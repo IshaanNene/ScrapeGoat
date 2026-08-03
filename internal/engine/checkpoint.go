@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/IshaanNene/ScrapeGoat/internal/clock"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // CheckpointManager handles saving and loading crawl state for pause/resume.
 type CheckpointManager struct {
+	clock         clock.Clock
 	interval      time.Duration
 	checkpointDir string
 }
@@ -42,8 +44,9 @@ type checkpointStats struct {
 }
 
 // NewCheckpointManager creates a new CheckpointManager.
-func NewCheckpointManager(interval time.Duration) *CheckpointManager {
+func NewCheckpointManager(interval time.Duration, clk clock.Clock) *CheckpointManager {
 	return &CheckpointManager{
+		clock:         clock.OrSystem(clk),
 		interval:      interval,
 		checkpointDir: ".scrapegoat_checkpoints",
 	}
@@ -59,7 +62,7 @@ func (cm *CheckpointManager) Save(frontier *Frontier, dedup Deduper, stats *Stat
 	requests := frontier.Snapshot()
 
 	data := checkpointData{
-		Timestamp:    time.Now(),
+		Timestamp:    cm.clock.Now(),
 		FrontierURLs: make([]checkpointReq, len(requests)),
 		SeenHashes:   dedup.Export(),
 		Stats: checkpointStats{

@@ -114,7 +114,7 @@ func TestSchedulerPauseResume(t *testing.T) {
 func TestSchedulerConcurrentEnqueueDequeue(t *testing.T) {
 	t.Parallel()
 
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	const goroutines = 100
 	const perGoroutine = 100
 
@@ -164,7 +164,7 @@ func TestSchedulerConcurrentEnqueueDequeue(t *testing.T) {
 func TestFrontierPriorityOrdering(t *testing.T) {
 	t.Parallel()
 
-	f := NewFrontier()
+	f := NewFrontier(nil)
 
 	// Push in non-priority order
 	priorities := []int{5, 1, 4, 0, 3, 2}
@@ -244,7 +244,7 @@ func TestAutoscalerScalesUpAndDown(t *testing.T) {
 		CooldownPeriod:     100 * time.Millisecond,
 		CheckInterval:      50 * time.Millisecond,
 	}
-	pool := NewAutoscaledPool(cfg, func() int { return queueSize }, exhaustiveLogger)
+	pool := NewAutoscaledPool(cfg, func() int { return queueSize }, exhaustiveLogger, nil)
 
 	// Set worker counts to simulate low utilization (should trigger scale up)
 	pool.SetWorkerCounts(1, 9) // 1 active, 9 idle → util = 10%
@@ -282,10 +282,10 @@ func TestAutoscalerScalesUpAndDown(t *testing.T) {
 func TestCheckpointMidCrawlRestore(t *testing.T) {
 	t.Parallel()
 
-	cm := NewCheckpointManager(time.Minute)
+	cm := NewCheckpointManager(time.Minute, nil)
 	cm.checkpointDir = t.TempDir()
 
-	frontier := NewFrontier()
+	frontier := NewFrontier(nil)
 	dedup := NewDeduplicator(1000)
 	stats := &Stats{domainStats: make(map[string]*DomainStats)}
 
@@ -316,7 +316,7 @@ func TestCheckpointMidCrawlRestore(t *testing.T) {
 	}
 
 	// Restore into fresh state
-	f2 := NewFrontier()
+	f2 := NewFrontier(nil)
 	d2 := NewDeduplicator(1000)
 	s2 := &Stats{domainStats: make(map[string]*DomainStats)}
 

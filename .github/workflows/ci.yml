@@ -32,6 +32,10 @@ jobs:
           fi
       - name: Go vet
         run: go vet ./...
+      # The determinism boundary is invisible when broken — nothing fails, the
+      # crawl just stops being reproducible. See docs/design/0001-deterministic-crawl.md.
+      - name: Determinism boundary
+        run: ./scripts/check-determinism.sh
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:

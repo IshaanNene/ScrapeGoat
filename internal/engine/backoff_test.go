@@ -2,6 +2,7 @@ package engine
 
 import (
 	"errors"
+	"math/rand/v2"
 	"testing"
 	"time"
 
@@ -21,7 +22,7 @@ func TestBackoffGrowsExponentially(t *testing.T) {
 		}
 
 		for i := 0; i < 200; i++ {
-			d := backoffFor(base, n)
+			d := backoffFor(testRand(), base, n)
 			if d < 0 {
 				t.Fatalf("attempt %d produced a negative backoff: %v", n, d)
 			}
@@ -35,11 +36,15 @@ func TestBackoffGrowsExponentially(t *testing.T) {
 func TestBackoffIsJittered(t *testing.T) {
 	const base = time.Second
 
+	// One source across all draws: seeding per draw would produce the same value
+	// every time and the test would fail for the wrong reason.
+	jitterRand := testRand()
+
 	// Without jitter, a hundred workers that failed together retry together.
 	// Distinct draws are the property that matters.
 	seen := make(map[time.Duration]bool)
 	for i := 0; i < 100; i++ {
-		seen[backoffFor(base, 4)] = true
+		seen[backoffFor(jitterRand, base, 4)] = true
 	}
 	if len(seen) < 50 {
 		t.Errorf("only %d distinct delays in 100 draws; backoff is not jittered", len(seen))
@@ -50,7 +55,7 @@ func TestBackoffIsCapped(t *testing.T) {
 	// A large attempt number must saturate rather than overflow into a negative
 	// or absurd duration.
 	for _, n := range []int{20, 50, 1000, 1 << 20} {
-		d := backoffFor(time.Second, n)
+		d := backoffFor(testRand(), time.Second, n)
 		if d < 0 || d > maxBackoff {
 			t.Errorf("backoffFor(1s, %d) = %v, outside [0, %v]", n, d, maxBackoff)
 		}
@@ -58,10 +63,10 @@ func TestBackoffIsCapped(t *testing.T) {
 }
 
 func TestBackoffZeroBaseIsZero(t *testing.T) {
-	if d := backoffFor(0, 5); d != 0 {
+	if d := backoffFor(testRand(), 0, 5); d != 0 {
 		t.Errorf("a zero base should disable backoff, got %v", d)
 	}
-	if d := backoffFor(time.Second, 0); d != 0 {
+	if d := backoffFor(testRand(), time.Second, 0); d != 0 {
 		t.Errorf("attempt 0 should be zero, got %v", d)
 	}
 }
@@ -73,7 +78,7 @@ func FuzzBackoffFor(f *testing.F) {
 	f.Add(int64(time.Hour), 1<<20)
 
 	f.Fuzz(func(t *testing.T, baseNanos int64, n int) {
-		d := backoffFor(time.Duration(baseNanos), n)
+		d := backoffFor(testRand(), time.Duration(baseNanos), n)
 		// A negative delay would make time.NewTimer fire immediately, turning
 		// backoff into a tight retry loop; an uncapped one would stall shutdown.
 		if d < 0 || d > maxBackoff {
@@ -86,7 +91,7 @@ func FuzzBackoffFor(f *testing.F) {
 // --- Circuit breaker ---
 
 func TestCircuitOpensAfterConsecutiveFailures(t *testing.T) {
-	cb := NewCircuitBreaker(3, time.Minute, 100)
+	cb := NewCircuitBreaker(3, time.Minute, 100, nil)
 
 	for i := 0; i < 2; i++ {
 		cb.RecordFailure("bad.test")
@@ -104,7 +109,7 @@ func TestCircuitOpensAfterConsecutiveFailures(t *testing.T) {
 }
 
 func TestCircuitIsPerDomain(t *testing.T) {
-	cb := NewCircuitBreaker(2, time.Minute, 100)
+	cb := NewCircuitBreaker(2, time.Minute, 100, nil)
 
 	cb.RecordFailure("bad.test")
 	cb.RecordFailure("bad.test")
@@ -118,7 +123,7 @@ func TestCircuitIsPerDomain(t *testing.T) {
 }
 
 func TestSuccessResetsTheFailureRun(t *testing.T) {
-	cb := NewCircuitBreaker(3, time.Minute, 100)
+	cb := NewCircuitBreaker(3, time.Minute, 100, nil)
 
 	cb.RecordFailure("flaky.test")
 	cb.RecordFailure("flaky.test")
@@ -135,7 +140,7 @@ func TestSuccessResetsTheFailureRun(t *testing.T) {
 
 func TestOpenCircuitAdmitsOneProbeAfterCooldown(t *testing.T) {
 	const cooldown = 50 * time.Millisecond
-	cb := NewCircuitBreaker(1, cooldown, 100)
+	cb := NewCircuitBreaker(1, cooldown, 100, nil)
 
 	cb.RecordFailure("down.test")
 	if cb.Allow("down.test") {
@@ -156,7 +161,7 @@ func TestOpenCircuitAdmitsOneProbeAfterCooldown(t *testing.T) {
 
 func TestFailedProbeReopensTheCircuit(t *testing.T) {
 	const cooldown = 50 * time.Millisecond
-	cb := NewCircuitBreaker(1, cooldown, 100)
+	cb := NewCircuitBreaker(1, cooldown, 100, nil)
 
 	cb.RecordFailure("down.test")
 	time.Sleep(cooldown + 20*time.Millisecond)
@@ -174,7 +179,7 @@ func TestFailedProbeReopensTheCircuit(t *testing.T) {
 
 func TestSuccessfulProbeClosesTheCircuit(t *testing.T) {
 	const cooldown = 50 * time.Millisecond
-	cb := NewCircuitBreaker(1, cooldown, 100)
+	cb := NewCircuitBreaker(1, cooldown, 100, nil)
 
 	cb.RecordFailure("recovering.test")
 	time.Sleep(cooldown + 20*time.Millisecond)
@@ -193,7 +198,7 @@ func TestSuccessfulProbeClosesTheCircuit(t *testing.T) {
 }
 
 func TestCircuitBreakerDisabled(t *testing.T) {
-	cb := NewCircuitBreaker(0, time.Minute, 100)
+	cb := NewCircuitBreaker(0, time.Minute, 100, nil)
 
 	for i := 0; i < 100; i++ {
 		cb.RecordFailure("bad.test")
@@ -205,7 +210,7 @@ func TestCircuitBreakerDisabled(t *testing.T) {
 
 func TestCircuitBreakerEvictsOldDomains(t *testing.T) {
 	const maxSize = 32
-	cb := NewCircuitBreaker(5, time.Minute, maxSize)
+	cb := NewCircuitBreaker(5, time.Minute, maxSize, nil)
 
 	for i := 0; i < maxSize*4; i++ {
 		cb.RecordFailure(string(rune('a'+i%26)) + string(rune('a'+i/26)) + ".test")
@@ -327,3 +332,7 @@ func TestRetryDoesNotBlockAWorker(t *testing.T) {
 		t.Errorf("handleFetchError blocked for %v; the backoff must not occupy the worker", elapsed)
 	}
 }
+
+// testRand returns a deterministically seeded source, so a failing jitter
+// assertion reproduces instead of being a coin flip.
+func testRand() *rand.Rand { return rand.New(rand.NewPCG(1, 2)) }

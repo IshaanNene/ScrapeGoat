@@ -3,8 +3,11 @@ package engine
 import (
 	"container/list"
 	"context"
+
 	"sync"
 	"time"
+
+	"github.com/IshaanNene/ScrapeGoat/internal/clock"
 
 	"golang.org/x/time/rate"
 )
@@ -31,6 +34,7 @@ const defaultMaxThrottleSlots = 10_000
 // ask whether a domain is ready *before* committing to it, so the scheduler can
 // skip a throttled domain instead of parking on it.
 type Throttler struct {
+	clock clock.Clock
 	mu    sync.Mutex
 	slots map[string]*list.Element // domain -> element in lru
 	lru   *list.List               // front = most recently used
@@ -48,12 +52,13 @@ type throttleSlot struct {
 
 // NewThrottler builds a throttler enforcing one request per delay per domain.
 // A delay of zero or less disables throttling entirely.
-func NewThrottler(delay time.Duration, maxSlots int) *Throttler {
+func NewThrottler(delay time.Duration, maxSlots int, clk clock.Clock) *Throttler {
 	if maxSlots <= 0 {
 		maxSlots = defaultMaxThrottleSlots
 	}
 
 	t := &Throttler{
+		clock:   clock.OrSystem(clk),
 		slots:   make(map[string]*list.Element),
 		lru:     list.New(),
 		burst:   1,
@@ -150,7 +155,7 @@ func (t *Throttler) Reserve(domain string) time.Duration {
 	}
 
 	limiter := t.limiterFor(domain)
-	tokens := limiter.TokensAt(time.Now())
+	tokens := limiter.TokensAt(t.clock.Now())
 	if tokens >= 1 {
 		return 0
 	}

@@ -210,7 +210,7 @@ func RunSpider(spider Spider, opts ...Option) error {
 	}
 	eng.Wait()
 
-	stats := eng.Stats().Snapshot()
+	stats := eng.StatsSnapshot()
 	logger.Info("spider complete",
 		"requests", stats["requests_sent"],
 		"items", stats["items_scraped"],

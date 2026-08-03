@@ -172,7 +172,7 @@ func BenchmarkRequestAllocs(b *testing.B) {
 }
 
 func BenchmarkFrontierAllocsPushPop(b *testing.B) {
-	f := engine.NewFrontier()
+	f := engine.NewFrontier(nil)
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {

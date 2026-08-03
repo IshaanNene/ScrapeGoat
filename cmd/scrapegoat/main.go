@@ -236,7 +236,7 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	eng.Wait()
 
 	elapsed := time.Since(start)
-	stats := eng.Stats().Snapshot()
+	stats := eng.StatsSnapshot()
 
 	logger.Info("crawl complete",
 		"elapsed", elapsed,

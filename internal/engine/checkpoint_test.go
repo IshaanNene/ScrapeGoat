@@ -36,10 +36,10 @@ func TestCheckpointSaveLoad(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cm := NewCheckpointManager(time.Minute)
+			cm := NewCheckpointManager(time.Minute, nil)
 			cm.checkpointDir = t.TempDir()
 
-			frontier := NewFrontier()
+			frontier := NewFrontier(nil)
 			dedup := NewDeduplicator(1000)
 			stats := &Stats{domainStats: make(map[string]*DomainStats)}
 			stats.RequestsSent.Store(tt.statsReq)
@@ -62,7 +62,7 @@ func TestCheckpointSaveLoad(t *testing.T) {
 			}
 
 			// Restore into fresh instances
-			f2 := NewFrontier()
+			f2 := NewFrontier(nil)
 			d2 := NewDeduplicator(1000)
 			s2 := &Stats{domainStats: make(map[string]*DomainStats)}
 
@@ -94,10 +94,10 @@ func TestCheckpointSaveLoad(t *testing.T) {
 }
 
 func TestCheckpointLoadNonExistent(t *testing.T) {
-	cm := NewCheckpointManager(time.Minute)
+	cm := NewCheckpointManager(time.Minute, nil)
 	cm.checkpointDir = t.TempDir()
 
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	d := NewDeduplicator(100)
 	s := &Stats{domainStats: make(map[string]*DomainStats)}
 
@@ -111,10 +111,10 @@ func TestCheckpointLoadNonExistent(t *testing.T) {
 }
 
 func TestCheckpointOverwrite(t *testing.T) {
-	cm := NewCheckpointManager(time.Minute)
+	cm := NewCheckpointManager(time.Minute, nil)
 	cm.checkpointDir = t.TempDir()
 
-	frontier := NewFrontier()
+	frontier := NewFrontier(nil)
 	dedup := NewDeduplicator(100)
 	stats := &Stats{domainStats: make(map[string]*DomainStats)}
 
@@ -135,7 +135,7 @@ func TestCheckpointOverwrite(t *testing.T) {
 	}
 
 	// Load should reflect second save
-	f2 := NewFrontier()
+	f2 := NewFrontier(nil)
 	d2 := NewDeduplicator(100)
 	s2 := &Stats{domainStats: make(map[string]*DomainStats)}
 	if err := cm.Load(f2, d2, s2); err != nil {

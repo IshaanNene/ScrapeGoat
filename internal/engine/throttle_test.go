@@ -12,7 +12,7 @@ import (
 
 func TestThrottlerSpacesRequestsPerDomain(t *testing.T) {
 	const delay = 50 * time.Millisecond
-	thr := NewThrottler(delay, 100)
+	thr := NewThrottler(delay, 100, nil)
 
 	// First request goes immediately.
 	if !thr.Allow("example.com") {
@@ -30,7 +30,7 @@ func TestThrottlerSpacesRequestsPerDomain(t *testing.T) {
 }
 
 func TestThrottlerIsPerDomain(t *testing.T) {
-	thr := NewThrottler(time.Second, 100)
+	thr := NewThrottler(time.Second, 100, nil)
 
 	// A domain being throttled must say nothing about any other domain — that
 	// coupling is what made one slow site stall the whole crawl.
@@ -46,7 +46,7 @@ func TestThrottlerIsPerDomain(t *testing.T) {
 }
 
 func TestThrottlerDisabledWhenDelayIsZero(t *testing.T) {
-	thr := NewThrottler(0, 100)
+	thr := NewThrottler(0, 100, nil)
 	if thr.Enabled() {
 		t.Error("a zero delay should disable throttling")
 	}
@@ -61,7 +61,7 @@ func TestThrottlerDisabledWhenDelayIsZero(t *testing.T) {
 // was retained forever, so a broad crawl leaked memory monotonically.
 func TestThrottlerEvictsOldDomains(t *testing.T) {
 	const maxSlots = 32
-	thr := NewThrottler(time.Second, maxSlots)
+	thr := NewThrottler(time.Second, maxSlots, nil)
 
 	for i := 0; i < maxSlots*4; i++ {
 		thr.Allow(fmt.Sprintf("host-%d.test", i))
@@ -73,7 +73,7 @@ func TestThrottlerEvictsOldDomains(t *testing.T) {
 }
 
 func TestThrottlerReserveDoesNotConsume(t *testing.T) {
-	thr := NewThrottler(time.Second, 100)
+	thr := NewThrottler(time.Second, 100, nil)
 
 	// Reserve is used while scanning candidates the worker may not take, so it
 	// must not spend the domain's allowance.
@@ -88,7 +88,7 @@ func TestThrottlerReserveDoesNotConsume(t *testing.T) {
 }
 
 func TestThrottlerWaitRespectsContext(t *testing.T) {
-	thr := NewThrottler(time.Hour, 100)
+	thr := NewThrottler(time.Hour, 100, nil)
 	thr.Allow("example.com") // consume the only token
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -110,8 +110,8 @@ func TestThrottlerWaitRespectsContext(t *testing.T) {
 // for every other domain. A frontier holding one throttled request and one ready
 // request must hand back the ready one immediately.
 func TestPopReadySkipsThrottledDomains(t *testing.T) {
-	thr := NewThrottler(time.Hour, 100)
-	f := NewFrontier()
+	thr := NewThrottler(time.Hour, 100, nil)
+	f := NewFrontier(nil)
 
 	// Spend slow.test's allowance, so anything queued for it is throttled.
 	if !thr.Allow("slow.test") {
@@ -145,8 +145,8 @@ func TestPopReadySkipsThrottledDomains(t *testing.T) {
 // spinning or returning nil.
 func TestPopReadyWaitsWhenNothingIsRunnable(t *testing.T) {
 	const delay = 100 * time.Millisecond
-	thr := NewThrottler(delay, 100)
-	f := NewFrontier()
+	thr := NewThrottler(delay, 100, nil)
+	f := NewFrontier(nil)
 
 	thr.Allow("only.test")
 	f.Push(mustRequest(t, "https://only.test/a"))
@@ -164,8 +164,8 @@ func TestPopReadyWaitsWhenNothingIsRunnable(t *testing.T) {
 }
 
 func TestPopReadyUnblocksOnClose(t *testing.T) {
-	thr := NewThrottler(time.Hour, 100)
-	f := NewFrontier()
+	thr := NewThrottler(time.Hour, 100, nil)
+	f := NewFrontier(nil)
 
 	thr.Allow("only.test")
 	f.Push(mustRequest(t, "https://only.test/a"))
@@ -184,7 +184,7 @@ func TestPopReadyUnblocksOnClose(t *testing.T) {
 }
 
 func TestPopReadyNilGateFallsBackToPop(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	f.Push(mustRequest(t, "https://example.com/a"))
 
 	if req := f.PopReady(context.Background(), nil); req == nil {
@@ -196,8 +196,8 @@ func TestPopReadyNilGateFallsBackToPop(t *testing.T) {
 // does not let two workers dispatch the same domain within one delay window.
 func TestConcurrentPopReadyClaimsExactlyOnce(t *testing.T) {
 	const workers = 16
-	thr := NewThrottler(time.Hour, 100)
-	f := NewFrontier()
+	thr := NewThrottler(time.Hour, 100, nil)
+	f := NewFrontier(nil)
 
 	for i := 0; i < workers; i++ {
 		f.Push(mustRequest(t, fmt.Sprintf("https://one.test/%d", i)))
@@ -238,8 +238,8 @@ func TestThrottledDomainDoesNotStarveOthers(t *testing.T) {
 		fastCount = 20
 	)
 
-	thr := NewThrottler(slowDelay, 100)
-	f := NewFrontier()
+	thr := NewThrottler(slowDelay, 100, nil)
+	f := NewFrontier(nil)
 
 	// Prime the slow domain and queue work for it at the highest priority, so a
 	// naive scheduler takes it first and stalls.

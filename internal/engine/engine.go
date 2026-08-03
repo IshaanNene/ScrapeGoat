@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/IshaanNene/ScrapeGoat/internal/clock"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/observability"
 	"github.com/IshaanNene/ScrapeGoat/internal/safety"
@@ -69,6 +71,11 @@ type DomainStats struct {
 }
 
 // Snapshot returns a copy of stats safe for reading.
+//
+// Deliberately does not compute an "elapsed" field. Stats has no clock of its own,
+// and reaching for the wall clock here would put a nondeterministic value in the
+// middle of the engine's own status output. Engine.Stats adds elapsed from the
+// injected clock instead.
 func (s *Stats) Snapshot() map[string]any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -83,7 +90,6 @@ func (s *Stats) Snapshot() map[string]any {
 		"urls_filtered":    s.URLsFiltered.Load(),
 		"bytes_downloaded": s.BytesDownloaded.Load(),
 		"active_workers":   s.ActiveWorkers.Load(),
-		"elapsed":          time.Since(s.StartTime).String(),
 	}
 }
 
@@ -138,6 +144,13 @@ type Engine struct {
 	subscribers []chan *types.Item
 	subMu       sync.Mutex
 
+	// clock and rand are the engine's controlled sources of nondeterminism.
+	// Everything in the crawl path takes time and entropy from here rather than
+	// from the standard library, so that a crawl can be replayed. See
+	// docs/design/0001-deterministic-crawl.md.
+	clock clock.Clock
+	rand  *rand.Rand
+
 	// metrics may be nil, in which case every recording call is a no-op. This is
 	// the wiring the previous code was missing entirely: cmd/scrapegoat built a
 	// Metrics in a local variable, started its HTTP server, and never handed it to
@@ -154,20 +167,26 @@ type Engine struct {
 }
 
 // New creates a new Engine with the given configuration.
-func New(cfg *config.Config, logger *slog.Logger) *Engine {
+//
+// Options are for controlling nondeterminism (clock, randomness); the defaults are
+// the real ones, so callers who do not care can ignore them entirely.
+func New(cfg *config.Config, logger *slog.Logger, opts ...Option) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
+	o := resolve(opts)
 
 	e := &Engine{
+		clock:    o.clock,
+		rand:     o.rand,
 		cfg:      cfg,
 		logger:   logger,
-		frontier: NewFrontier(),
+		frontier: NewFrontier(o.clock),
 		dedup:    newDeduper(cfg, logger),
 		robots: NewRobotsManager(cfg.Engine.RespectRobotsTxt, safety.New(safety.Config{
 			AllowedSchemes:        cfg.Safety.AllowedSchemes,
 			AllowPrivateAddresses: cfg.Safety.AllowPrivateAddresses,
 			AllowedPrivateHosts:   cfg.Safety.AllowedPrivateHosts,
-		})),
-		checkpoint:   NewCheckpointManager(cfg.Engine.CheckpointInterval),
+		}), o.clock),
+		checkpoint:   NewCheckpointManager(cfg.Engine.CheckpointInterval, o.clock),
 		fetchers:     make(map[string]Fetcher),
 		callbacks:    make(map[string]ResponseCallback),
 		itemChan:     make(chan *types.Item, cfg.Engine.Concurrency*10),
@@ -290,7 +309,7 @@ func (e *Engine) Start() error {
 		"respect_robots", e.cfg.Engine.RespectRobotsTxt,
 	)
 
-	e.stats.StartTime = time.Now()
+	e.stats.StartTime = e.clock.Now()
 
 	// Start item pipeline processor
 	e.wg.Add(1)
@@ -341,7 +360,7 @@ func (e *Engine) Wait() {
 		}
 		e.mu.RUnlock()
 
-		e.logger.Info("engine stopped", "stats", e.stats.Snapshot())
+		e.logger.Info("engine stopped", "stats", e.StatsSnapshot())
 		close(e.shutdownDone)
 	})
 
@@ -378,6 +397,18 @@ func (e *Engine) Resume() {
 // Stats returns the current crawl statistics.
 func (e *Engine) Stats() *Stats {
 	return e.stats
+}
+
+// StatsSnapshot returns the crawl statistics plus an "elapsed" field measured on
+// the engine's clock.
+//
+// Stats.Snapshot deliberately omits elapsed: Stats has no clock, and reaching for
+// the wall clock there would put a nondeterministic value in the engine's own
+// status output. The engine has a clock, so it adds it here.
+func (e *Engine) StatsSnapshot() map[string]any {
+	snap := e.stats.Snapshot()
+	snap["elapsed"] = e.clock.Since(e.stats.StartTime).String()
+	return snap
 }
 
 // State returns the current engine state.
@@ -508,7 +539,7 @@ func (e *Engine) storeResults() {
 // autoCheckpoint periodically saves engine state.
 func (e *Engine) autoCheckpoint() {
 	defer e.wg.Done()
-	ticker := time.NewTicker(e.cfg.Engine.CheckpointInterval)
+	ticker := e.clock.NewTicker(e.cfg.Engine.CheckpointInterval)
 	defer ticker.Stop()
 
 	for {

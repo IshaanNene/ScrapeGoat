@@ -8,6 +8,9 @@ run:
 
 linters:
   enable:
+    # Determinism boundary — see the note under issues.exclude-rules.
+    - forbidigo
+
     # Correctness
     - errorlint    # err.(*T) instead of errors.As — silently broke retry on wrapped errors
     - bodyclose    # unclosed HTTP response bodies
@@ -31,6 +34,18 @@ linters:
     - copyloopvar
 
 linters-settings:
+  forbidigo:
+    analyze-types: true
+    forbid:
+      - p: '^time\.Now$'
+        msg: "use the injected clock.Clock (engine.clock / fetcher clock), not time.Now — see docs/design/0001-deterministic-crawl.md"
+      - p: '^time\.Since$'
+        msg: "use clock.Since"
+      - p: '^time\.(NewTimer|NewTicker|After|Tick|Sleep)$'
+        msg: "use the injected clock.Clock; a simulated clock cannot fire a stdlib timer"
+      - p: '^rand\.(Int|Intn|Int31|Int63|Int64|IntN|Uint32|Uint64|Float32|Float64|Perm|Shuffle)N?$'
+        msg: "use the injected *rand.Rand so a crawl's entropy is part of its identity"
+
   errcheck:
     check-type-assertions: true
     check-blank: true
@@ -76,6 +91,14 @@ issues:
   max-same-issues: 0
 
   exclude-rules:
+    # Determinism boundary. The engine takes time and randomness from injected
+    # sources so that a crawl can be replayed (docs/design/0001-deterministic-crawl.md).
+    # A single time.Now() or global rand in a new middleware breaks replay
+    # silently — nothing fails, the output just stops being reproducible — so the
+    # ban is mechanical rather than a matter of remembering.
+    #
+    # Enforced by scripts/check-determinism.sh in CI as well, because forbidigo
+    # is not enabled in every developer's local run.
     # Tests deliberately ignore errors on setup paths and construct adversarial
     # inputs; gosec in particular has nothing useful to say about them.
     - path: _test\.go

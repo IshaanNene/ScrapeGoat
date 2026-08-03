@@ -194,7 +194,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	}
 	eng.Wait()
 
-	stats := eng.Stats().Snapshot()
+	stats := eng.StatsSnapshot()
 	fmt.Printf("\n  Search index built in %s\n", time.Since(start).Round(time.Millisecond))
 	fmt.Printf("   Pages indexed: %v\n", stats["items_scraped"])
 	fmt.Printf("   Pages crawled: %v\n", stats["requests_sent"])

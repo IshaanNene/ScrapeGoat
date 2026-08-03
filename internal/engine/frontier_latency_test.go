@@ -22,7 +22,7 @@ func mustRequest(t testing.TB, raw string) *types.Request {
 // blocked on an empty frontier is woken by the Push that supplies its work, not by
 // the next tick of a timer.
 func TestPopWakesPromptlyOnPush(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	req := mustRequest(t, "https://example.com/a")
 
 	// The goroutine reports when Pop returned; the latency is measured against the
@@ -68,7 +68,7 @@ func TestPopWakesPromptlyOnPush(t *testing.T) {
 // TestPopUnblocksOnClose ensures a parked worker is released when the crawl ends,
 // rather than waiting out a timer.
 func TestPopUnblocksOnClose(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 
 	done := make(chan *types.Request, 1)
 	go func() { done <- f.Pop(context.Background()) }()
@@ -88,7 +88,7 @@ func TestPopUnblocksOnClose(t *testing.T) {
 
 // TestPopUnblocksOnContextCancel covers shutdown via context rather than Close.
 func TestPopUnblocksOnContextCancel(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan *types.Request, 1)
@@ -110,7 +110,7 @@ func TestPopUnblocksOnContextCancel(t *testing.T) {
 // TestCloseDrainsPendingWork guards the race between a final Push and Close: work
 // already in the queue must still come out.
 func TestCloseDrainsPendingWork(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	f.Push(mustRequest(t, "https://example.com/pending"))
 	f.Close()
 
@@ -132,7 +132,7 @@ func TestConcurrentPopsSeeEveryPush(t *testing.T) {
 		items   = 200
 	)
 
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	seen := 0
@@ -174,7 +174,7 @@ func TestConcurrentPopsSeeEveryPush(t *testing.T) {
 // park on an empty frontier, be woken by a Push. This is the number the "50 ms
 // poll" comment in the old scheduler was hiding.
 func BenchmarkFrontierPopWaiting(b *testing.B) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	req := mustRequest(b, "https://example.com/x")
 	ctx := context.Background()
 
@@ -199,7 +199,7 @@ func BenchmarkFrontierPopWaiting(b *testing.B) {
 // BenchmarkFrontierPopReady measures the uncontended fast path, where an item is
 // already queued.
 func BenchmarkFrontierPopReady(b *testing.B) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	req := mustRequest(b, "https://example.com/x")
 	ctx := context.Background()
 

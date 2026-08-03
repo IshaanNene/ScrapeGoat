@@ -37,7 +37,7 @@ func BenchmarkWakeLatencyEventDriven(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		f := NewFrontier()
+		f := NewFrontier(nil)
 
 		got := make(chan time.Time, 1)
 		go func() {
@@ -78,7 +78,7 @@ func BenchmarkWakeLatencyPolling(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		f := NewFrontier()
+		f := NewFrontier(nil)
 
 		got := make(chan time.Time, 1)
 		go func() {

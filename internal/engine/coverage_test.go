@@ -50,7 +50,7 @@ func TestCanonicalizeURLCoverage(t *testing.T) {
 
 // --- Frontier coverage: Pop (with context), IsEmpty, Drain, RestoreAll ---
 func TestFrontierPopWithContext(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	if !f.IsEmpty() {
 		t.Error("new frontier should be empty")
 	}
@@ -71,7 +71,7 @@ func TestFrontierPopWithContext(t *testing.T) {
 }
 
 func TestFrontierDrainAndRestoreAll(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	urls := []string{"https://example.com/1", "https://example.com/2", "https://example.com/3"}
 	for _, u := range urls {
 		req, _ := types.NewRequest(u)

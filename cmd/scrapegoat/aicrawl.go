@@ -230,7 +230,7 @@ func runAICrawl(cmd *cobra.Command, args []string) error {
 	}
 	eng.Wait()
 
-	stats := eng.Stats().Snapshot()
+	stats := eng.StatsSnapshot()
 	fmt.Printf("\n✅ AI Crawl Complete in %s\n", time.Since(start).Round(time.Millisecond))
 	fmt.Printf("   Pages crawled: %v\n", stats["requests_sent"])
 	fmt.Printf("   Items processed: %v (through AI pipeline)\n", stats["items_scraped"])

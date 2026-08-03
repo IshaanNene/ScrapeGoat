@@ -188,7 +188,7 @@ func (s *Server) executeCrawl(job *Job, req CrawlRequest) {
 	}
 	eng.Wait()
 
-	stats := eng.Stats().Snapshot()
+	stats := eng.StatsSnapshot()
 	s.jobManager.CompleteJob(job.ID, collector.count, stats)
 	s.BroadcastJobEvent(job.ID, map[string]any{
 		"event":      "completed",

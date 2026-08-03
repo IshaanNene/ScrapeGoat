@@ -9,11 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/IshaanNene/ScrapeGoat/internal/clock"
 	"github.com/IshaanNene/ScrapeGoat/internal/safety"
 )
 
 // RobotsManager handles robots.txt fetching, parsing, and enforcement.
 type RobotsManager struct {
+	clock   clock.Clock
 	enabled bool
 	cache   map[string]*robotsData
 	mu      sync.RWMutex
@@ -34,11 +36,12 @@ type robotsData struct {
 // guard may be nil, in which case the default policy applies. The robots.txt URL is
 // derived from the crawl target's own host, so it is exactly as untrusted as the
 // page it governs and needs the same guarded client.
-func NewRobotsManager(enabled bool, guard *safety.URLGuard) *RobotsManager {
+func NewRobotsManager(enabled bool, guard *safety.URLGuard, clk clock.Clock) *RobotsManager {
 	if guard == nil {
 		guard = safety.Default()
 	}
 	return &RobotsManager{
+		clock:   clock.OrSystem(clk),
 		enabled: enabled,
 		cache:   make(map[string]*robotsData),
 		client:  guard.HTTPClient(10*time.Second, 5),
@@ -147,14 +150,14 @@ func (rm *RobotsManager) fetchRobotsTxt(domain string) *robotsData {
 		return nil
 	}
 
-	return parseRobotsTxt(string(body))
+	return rm.parseRobots(string(body))
 }
 
 // parseRobotsTxt parses robots.txt content.
 func parseRobotsTxt(content string) *robotsData {
-	data := &robotsData{
-		fetchedAt: time.Now(),
-	}
+	// fetchedAt is left zero here and stamped by RobotsManager.parseRobots from
+	// the injected clock. A package-level function has no clock to reach for.
+	data := &robotsData{}
 
 	lines := strings.Split(content, "\n")
 	inOurSection := false
@@ -256,4 +259,13 @@ func matchWildcard(pattern, path string, mustEnd bool) bool {
 		return pos == len(path)
 	}
 	return true
+}
+
+// parseRobots parses robots.txt content, stamping it with the manager's clock.
+func (rm *RobotsManager) parseRobots(content string) *robotsData {
+	data := parseRobotsTxt(content)
+	if data != nil {
+		data.fetchedAt = rm.clock.Now()
+	}
+	return data
 }

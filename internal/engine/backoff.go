@@ -3,8 +3,11 @@ package engine
 import (
 	"math"
 	"math/rand/v2"
+
 	"sync"
 	"time"
+
+	"github.com/IshaanNene/ScrapeGoat/internal/clock"
 )
 
 const (
@@ -27,11 +30,15 @@ const (
 // which turns a struggling server into a tight retry loop from every worker at
 // once — the crawler's response to a site falling over was to hit it harder.
 //
+// The random source is injected rather than global so that a crawl's entropy is
+// part of its identity: two runs with the same seed and the same responses back
+// off identically, which replay requires.
+//
 // Jitter is full rather than fixed because the failures that trigger retries are
 // usually correlated: a hundred workers hit the same 503 in the same second, and
 // without jitter they all come back in the same later second too, reproducing the
 // thundering herd at every step.
-func backoffFor(base time.Duration, n int) time.Duration {
+func backoffFor(rng *rand.Rand, base time.Duration, n int) time.Duration {
 	if base <= 0 || n <= 0 {
 		return 0
 	}
@@ -48,7 +55,7 @@ func backoffFor(base time.Duration, n int) time.Duration {
 
 	// Full jitter: uniform in [0, d). AWS's "Exponential Backoff and Jitter"
 	// measured this as beating both no jitter and equal jitter on contention.
-	return time.Duration(rand.Int64N(int64(d) + 1))
+	return time.Duration(rng.Int64N(int64(d) + 1))
 }
 
 // breakerState is a domain's circuit state.
@@ -90,6 +97,7 @@ type domainBreaker struct {
 // Sized by the same LRU discipline as the throttler, since a broad crawl sees
 // unboundedly many domains.
 type CircuitBreaker struct {
+	clock    clock.Clock
 	mu       sync.Mutex
 	domains  map[string]*domainBreaker
 	order    []string // insertion order, for cheap bounded eviction
@@ -99,7 +107,7 @@ type CircuitBreaker struct {
 }
 
 // NewCircuitBreaker builds a breaker. A threshold of zero or less disables it.
-func NewCircuitBreaker(threshold int, cooldown time.Duration, maxSize int) *CircuitBreaker {
+func NewCircuitBreaker(threshold int, cooldown time.Duration, maxSize int, clk clock.Clock) *CircuitBreaker {
 	if cooldown <= 0 {
 		cooldown = breakerDefaultCooldown
 	}
@@ -107,6 +115,7 @@ func NewCircuitBreaker(threshold int, cooldown time.Duration, maxSize int) *Circ
 		maxSize = defaultMaxThrottleSlots
 	}
 	return &CircuitBreaker{
+		clock:    clock.OrSystem(clk),
 		domains:  make(map[string]*domainBreaker),
 		maxSize:  maxSize,
 		failures: threshold,
@@ -151,7 +160,7 @@ func (cb *CircuitBreaker) Allow(domain string) bool {
 		return true
 
 	case breakerOpen:
-		if time.Since(b.openedAt) < cb.cooldown {
+		if cb.clock.Since(b.openedAt) < cb.cooldown {
 			return false
 		}
 		b.state = breakerHalfOpen
@@ -201,7 +210,7 @@ func (cb *CircuitBreaker) RecordFailure(domain string) breakerState {
 	// allowing another probe immediately.
 	if b.state == breakerHalfOpen || b.consecutive >= cb.failures {
 		b.state = breakerOpen
-		b.openedAt = time.Now()
+		b.openedAt = cb.clock.Now()
 	}
 	return b.state
 }

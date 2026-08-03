@@ -338,7 +338,7 @@ func (c *Crawler) Resume() {
 // Stats returns crawl statistics.
 func (c *Crawler) Stats() map[string]any {
 	if c.engine != nil {
-		return c.engine.Stats().Snapshot()
+		return c.engine.StatsSnapshot()
 	}
 	return nil
 }

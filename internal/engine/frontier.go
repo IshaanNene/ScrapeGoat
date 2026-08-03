@@ -3,8 +3,11 @@ package engine
 import (
 	"container/heap"
 	"context"
+
 	"sync"
 	"time"
+
+	"github.com/IshaanNene/ScrapeGoat/internal/clock"
 
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
@@ -16,6 +19,7 @@ import (
 // every 50 ms, which put a ~25 ms median floor under every dequeue and burned two
 // lock acquisitions per worker per second while idle.
 type Frontier struct {
+	clock  clock.Clock
 	mu     sync.Mutex
 	pq     priorityQueue
 	closed bool
@@ -30,9 +34,10 @@ type Frontier struct {
 	closedCh chan struct{}
 }
 
-// NewFrontier creates a new Frontier.
-func NewFrontier() *Frontier {
+// NewFrontier creates a new Frontier. A nil clock means the system clock.
+func NewFrontier(clk clock.Clock) *Frontier {
 	f := &Frontier{
+		clock:    clock.OrSystem(clk),
 		pq:       make(priorityQueue, 0, 1024),
 		notify:   make(chan struct{}, 1),
 		closedCh: make(chan struct{}),
@@ -186,10 +191,10 @@ func (f *Frontier) PopReady(ctx context.Context, gate DomainGate) *types.Request
 		// something is actually throttled, so an idle crawl still costs nothing.
 		// Stopped explicitly rather than deferred: this is a loop, and a deferred
 		// Stop would pile up one timer per iteration until the function returns.
-		var timer *time.Timer
+		var timer *clock.Timer
 		var timerC <-chan time.Time
 		if haveSoonest {
-			timer = time.NewTimer(soonest)
+			timer = f.clock.NewTimer(soonest)
 			timerC = timer.C
 		}
 
@@ -208,7 +213,7 @@ func (f *Frontier) PopReady(ctx context.Context, gate DomainGate) *types.Request
 	}
 }
 
-func stopTimer(t *time.Timer) {
+func stopTimer(t *clock.Timer) {
 	if t != nil {
 		t.Stop()
 	}

@@ -351,7 +351,7 @@ func (r *REPL) cmdStats() {
 		fmt.Println("No crawl running.")
 		return
 	}
-	stats := r.engine.Stats().Snapshot()
+	stats := r.engine.StatsSnapshot()
 	for k, v := range stats {
 		fmt.Printf("  %-20s %v\n", k, v)
 	}

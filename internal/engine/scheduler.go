@@ -45,11 +45,13 @@ func NewScheduler(e *Engine) *Scheduler {
 		throttler: NewThrottler(
 			e.cfg.Engine.PolitenessDelay,
 			e.cfg.Engine.MaxThrottleSlots,
+			e.clock,
 		),
 		breaker: NewCircuitBreaker(
 			e.cfg.Engine.CircuitBreakerThreshold,
 			e.cfg.Engine.CircuitBreakerCooldown,
 			e.cfg.Engine.MaxThrottleSlots,
+			e.clock,
 		),
 		done: make(chan struct{}),
 	}
@@ -114,7 +116,7 @@ func (s *Scheduler) resumeGate() <-chan struct{} {
 // idleMonitor checks if all workers are idle and frontier is empty.
 // When this condition holds for a sustained period, it closes the frontier.
 func (s *Scheduler) idleMonitor(ctx context.Context, concurrency int) {
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := s.engine.clock.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 	idleStreak := 0
 
@@ -347,7 +349,7 @@ func (s *Scheduler) handleFetchError(logger *slog.Logger, req *types.Request, er
 		)
 		// Back off before the request becomes eligible again. A server's
 		// Retry-After wins when present; otherwise exponential with full jitter.
-		delay := backoffFor(s.engine.cfg.Engine.RetryDelay, req.RetryCount)
+		delay := backoffFor(s.engine.rand, s.engine.cfg.Engine.RetryDelay, req.RetryCount)
 		if fetchErr.RetryAfter > delay {
 			delay = fetchErr.RetryAfter
 			logger.Info("rate limited — honouring Retry-After",
@@ -387,7 +389,7 @@ func (s *Scheduler) requeueAfter(delay time.Duration, req *types.Request) {
 		defer s.wg.Done()
 		defer s.pendingRetries.Add(-1)
 
-		timer := time.NewTimer(delay)
+		timer := s.engine.clock.NewTimer(delay)
 		defer timer.Stop()
 
 		select {
