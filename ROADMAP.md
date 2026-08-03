@@ -66,4 +66,6 @@ cannot export OTLP and cannot reach Jaeger, Tempo, or Honeycomb. It also does no
 - Pluggable frontier: in-memory heap / on-disk (Pebble) / distributed (Redis Streams or NATS
   JetStream) with consistent-hash partitioning by registrable domain.
 - Incremental recrawl driven by per-URL change-frequency estimation.
-- Published benchmark methodology and numbers in `docs/PERFORMANCE.md`.
+- End-to-end crawl throughput against a controlled target, and a fair comparison
+  harness against Scrapy and Colly. Scheduler and dedup numbers are already in
+  [docs/PERFORMANCE.md](docs/PERFORMANCE.md).

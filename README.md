@@ -364,6 +364,7 @@ go test -run=XXX -fuzz=FuzzCompositeParse -fuzztime=60s ./internal/parser
 
 - **[Quick Start](docs/quickstart.md)** — Get running in 3 minutes
 - **[Architecture](docs/architecture.md)** — How the components fit together
+- **[Performance](docs/PERFORMANCE.md)** — Measured numbers, methodology, and what is not measured
 - **[Security](SECURITY.md)** — Trust boundary, the SSRF guard, and known limitations
 - **[Roadmap](ROADMAP.md)** — What is designed but not yet wired in
 - **[Changelog](CHANGELOG.md)** — Release history
