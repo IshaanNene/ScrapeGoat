@@ -107,7 +107,15 @@ type FetcherConfig struct {
 	MaxBodySize     int64         `mapstructure:"max_body_size"     yaml:"max_body_size"`
 	TLSInsecure     bool          `mapstructure:"tls_insecure"      yaml:"tls_insecure"`
 	IdleConnTimeout time.Duration `mapstructure:"idle_conn_timeout" yaml:"idle_conn_timeout"`
-	MaxIdleConns    int           `mapstructure:"max_idle_conns"    yaml:"max_idle_conns"`
+
+	// Fingerprint selects a browser TLS/HTTP identity: "chrome", "firefox",
+	// "safari", "edge", "random", or "" for Go's own stack.
+	//
+	// Go's crypto/tls emits a fixed ClientHello that is instantly recognisable as
+	// a Go program. Setting this makes the JA3 a real browser's — see
+	// internal/fetcher/fingerprint for what that does and does not achieve.
+	Fingerprint  string `mapstructure:"fingerprint" yaml:"fingerprint"`
+	MaxIdleConns int    `mapstructure:"max_idle_conns"    yaml:"max_idle_conns"`
 }
 
 // ProxyConfig controls proxy rotation.

@@ -83,9 +83,12 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
 ### Fixed
 
 - **The scheduler no longer polls.** Workers parked on a 50 ms `time.Sleep` loop,
-  putting a ~25 ms median floor under every dequeue. `Frontier.Pop` is now
-  event-driven, waking on the `Push` that supplies the work. Measured on the
-  parked-worker path: **~25 ms → 142 ns**. Idle CPU drops to zero.
+  putting a floor of tens of milliseconds under every dequeue. `Frontier.Pop` is now
+  event-driven, waking on the `Push` that supplies the work. Measured wake latency
+  on the parked-worker path: **~49 ms → ~3 µs**. Idle CPU drops to zero. See
+  [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for methodology — an earlier draft of
+  this entry quoted 142 ns from a throughput benchmark that does not measure wake
+  latency at all.
 - **Dedup race.** `IsSeen` followed by `MarkSeen` was a check-then-act race, so two
   workers extracting the same link both enqueued it. Replaced with atomic
   `MarkIfUnseen`. URLs rejected by robots.txt or the domain filter are no longer

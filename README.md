@@ -144,7 +144,7 @@ func main() {
 | **MCP Server** | JSON-RPC 2.0, stdio + HTTP/SSE transports, 8 tools for Claude/Cursor/Cline |
 | **LLM Extraction** | OpenAI, Anthropic, Ollama backends; schema-based extraction; SQLite caching |
 | **API Server** | REST + WebSocket, job management, real-time streaming, API key auth, CORS |
-| **Anti-Bot** | Pattern-based block detection (Cloudflare, DataDome, PerimeterX, Akamai), adaptive strategy escalation, human behaviour simulation, 5 stealth browser profiles |
+| **Anti-Bot** | uTLS browser fingerprints (JA3 matched to the advertised User-Agent), pattern-based block detection, adaptive strategy escalation |
 | **Parsing** | CSS selectors, XPath, Regex, JSON-LD, OpenGraph, structured data, auto-extraction |
 | **Transforms** | Schema validation (7 types), 6 composable transforms, drop/annotate/log failure modes |
 | **Change Detection** | SQLite-persisted monitoring, hash/selector diffing, webhook notifications |
@@ -184,6 +184,14 @@ ScrapeGoat treats that as the threat model rather than an edge case:
   `Origin`.
 - **Responses are capped after decompression**, with a compression-ratio limit, so a
   gzip bomb cannot exhaust memory.
+
+Separately, `fetcher.fingerprint: chrome|firefox|safari|edge|random` makes the TLS
+ClientHello a real browser's via uTLS, with the User-Agent and headers bound to it —
+a Chrome JA3 arriving with a Firefox User-Agent is a *stronger* automation signal
+than an honest Go fingerprint. Verified against captured ClientHello bytes rather
+than asserted; see `internal/fetcher/fingerprint`. It closes the loudest signal
+("this is a Go program") and nothing more — HTTP/2 SETTINGS, header order, TCP
+characteristics, and behaviour are all still tells.
 
 Opt out for internal crawling with `safety.allow_private_addresses`. The full trust
 boundary, including what is *not* covered — proxied requests and the headless

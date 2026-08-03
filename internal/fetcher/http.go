@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
+	"github.com/IshaanNene/ScrapeGoat/internal/fetcher/fingerprint"
 	"github.com/IshaanNene/ScrapeGoat/internal/safety"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 	"github.com/andybalholm/brotli"
@@ -33,6 +34,7 @@ type HTTPFetcher struct {
 	proxyCfg   *config.ProxyConfig
 	proxyMgr   *ProxyManager
 	guard      *safety.URLGuard
+	profile    *fingerprint.Profile
 	logger     *slog.Logger
 	userAgents []string
 	uaIndex    atomic.Int64
@@ -87,8 +89,30 @@ func NewHTTPFetcher(cfg *config.Config, logger *slog.Logger) (*HTTPFetcher, erro
 		return guardRedirect(req, via)
 	}
 
+	// A browser fingerprint replaces the transport, but never the guard: the
+	// fingerprinting transport dials through guard.DialContext, so the address
+	// checks still run first. A prettier handshake to 169.254.169.254 is still a
+	// request to 169.254.169.254.
+	var roundTripper http.RoundTripper = transport
+	var profile *fingerprint.Profile
+
+	if name := strings.ToLower(strings.TrimSpace(cfg.Fetcher.Fingerprint)); name != "" {
+		var p fingerprint.Profile
+		if name == "random" {
+			p = fingerprint.Random()
+		} else {
+			p, err = fingerprint.ByName(name)
+			if err != nil {
+				return nil, err
+			}
+		}
+		profile = &p
+		roundTripper = fingerprint.NewTransport(p, guard.DialContext, cfg.Fetcher.TLSInsecure)
+		logger.Info("using browser fingerprint", "profile", p.Name)
+	}
+
 	client := &http.Client{
-		Transport:     transport,
+		Transport:     roundTripper,
 		Jar:           jar,
 		Timeout:       cfg.Engine.RequestTimeout,
 		CheckRedirect: redirectPolicy,
@@ -101,6 +125,7 @@ func NewHTTPFetcher(cfg *config.Config, logger *slog.Logger) (*HTTPFetcher, erro
 		proxyCfg:   &cfg.Proxy,
 		proxyMgr:   proxyMgr,
 		guard:      guard,
+		profile:    profile,
 		logger:     logger.With("component", "http_fetcher"),
 		userAgents: cfg.Engine.UserAgents,
 	}, nil
@@ -120,15 +145,26 @@ func (f *HTTPFetcher) Fetch(ctx context.Context, req *types.Request) (*types.Res
 		return nil, &types.FetchError{URL: req.URLString(), Err: err, Retryable: false}
 	}
 
-	// Set User-Agent
-	ua := f.nextUserAgent()
-	httpReq.Header.Set("User-Agent", ua)
+	// Set User-Agent. When a fingerprint profile is active it owns the identity:
+	// its transport sets a User-Agent matching the ClientHello it just sent, and
+	// overriding it here would produce the browser/UA mismatch that is a louder
+	// signal than no fingerprinting at all.
+	ua := ""
+	if f.profile == nil {
+		ua = f.nextUserAgent()
+		httpReq.Header.Set("User-Agent", ua)
+	}
 
-	// Accept brotli, gzip, deflate
-	httpReq.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-	httpReq.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	httpReq.Header.Set("Accept-Encoding", "gzip, deflate, br")
-	httpReq.Header.Set("Connection", "keep-alive")
+	// Generic headers, only when no profile is active. A profile supplies the exact
+	// Accept, Accept-Language, and Sec-Fetch-* set its browser sends; overwriting
+	// them with these would pair a browser TLS fingerprint with a generic header
+	// set, which is the mismatch the profile exists to avoid.
+	if f.profile == nil {
+		httpReq.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+		httpReq.Header.Set("Accept-Language", "en-US,en;q=0.9")
+		httpReq.Header.Set("Accept-Encoding", "gzip, deflate, br")
+		httpReq.Header.Set("Connection", "keep-alive")
+	}
 
 	// Apply custom headers from request
 	for key, values := range req.Headers {
