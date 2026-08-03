@@ -178,11 +178,14 @@ Implementations:
 
 ### Checkpoint (`internal/engine/checkpoint.go`)
 
-Enables **pause/resume** crawls:
+Periodically snapshots crawl state to disk:
 - Serializes frontier queue, dedup hashes, and stats to JSON
 - **Atomic writes** (write to temp file, then rename)
 - Automatic periodic checkpointing (configurable interval)
-- Restored on engine start if checkpoint file exists
+
+> **Save only.** `CheckpointManager.Load` is implemented and unit-tested but has no caller in the
+> crawl path — there is no `--resume` flag yet, so checkpoint files are written and never read.
+> Wiring restore is tracked in [ROADMAP.md](../ROADMAP.md).
 
 ---
 
@@ -257,7 +260,7 @@ Not all URLs are equally important. Retried requests get `PriorityLow`, while se
 
 ### Why Checkpoint Persistence?
 
-Large crawls may take hours. Checkpointing enables:
-- Resume after crashes
+Large crawls may take hours. Checkpointing is the substrate for:
+- Resume after crashes (snapshot format in place; restore not yet wired — see ROADMAP)
 - Graceful shutdown on SIGINT/SIGTERM
-- Pause/resume via SDK API
+- In-process pause/resume via the SDK API (`Pause()` / `Resume()`, no disk round-trip)

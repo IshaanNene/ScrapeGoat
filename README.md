@@ -19,7 +19,7 @@
 
 | Tool | Weakness | ScrapeGoat's Advantage |
 |------|----------|----------------------|
-| **Scrapy** | Python, slower concurrency, no MCP | Go goroutines = 10x throughput + native MCP server |
+| **Scrapy** | Python, slower concurrency, no MCP | Go goroutines, single-binary deploy, native MCP server |
 | **Playwright** | Heavy browser automation, no extraction | Lightweight HTTP + LLM-powered structured extraction |
 | **Apify** | SaaS lock-in, paid tiers | Self-hosted, open-source, REST API included |
 | **Colly** | Limited pipeline, no anti-bot | Full middleware pipeline + adaptive anti-bot engine |
@@ -72,11 +72,11 @@ graph TD
     CFG --> ENG["Engine"]
     ENG --> SCH["Scheduler"]
     ENG --> FRT["Frontier<br>(Priority Queue)"]
-    ENG --> DDP["Deduplicator<br>(Map + Bloom Filter)"]
+    ENG --> DDP["Deduplicator<br>(Exact set)"]
     ENG --> RBT["Robots Manager"]
-    ENG --> CHK["Checkpoint Manager"]
+    ENG --> CHK["Checkpoint Manager<br>(save only)"]
     ENG --> MET["Prometheus Metrics"]
-    SCH --> WRK["Worker Pool<br>(Autoscaled)"]
+    SCH --> WRK["Worker Pool<br>(Fixed size)"]
     WRK -->|"dequeue"| FRT
     WRK -->|"request middleware"| MID["Request Pipeline<br>(7 middlewares)"]
     MID --> FET["Fetcher<br>(HTTP / Browser)"]
@@ -140,7 +140,7 @@ func main() {
 
 | Category | Features |
 |----------|----------|
-| **Core Engine** | Priority queue frontier, per-domain throttling, autoscaled worker pool, Bloom filter dedup |
+| **Core Engine** | Priority queue frontier, per-domain throttling, fixed-size worker pool, exact-set dedup |
 | **MCP Server** | JSON-RPC 2.0, stdio + HTTP/SSE transports, 8 tools for Claude/Cursor/Cline |
 | **LLM Extraction** | OpenAI, Anthropic, Ollama backends; schema-based extraction; SQLite caching |
 | **API Server** | REST + WebSocket, job management, real-time streaming, API key auth, CORS |
@@ -155,8 +155,39 @@ func main() {
 | **Storage** | JSON, JSONL, CSV file storage; experimental S3/Kafka/PostgreSQL plugin stubs |
 | **Distributed** | Master/worker HTTP coordination with an in-memory queue |
 | **Browser** | Headless Chromium via go-rod, JS rendering, form filling, infinite scroll |
-| **Observability** | Prometheus metrics, OpenTelemetry tracing, web dashboard, real-time stats |
-| **DevEx** | CLI scaffolding, REPL, YAML config, checkpoint pause/resume, `robots.txt` compliance |
+| **Observability** | Prometheus metrics endpoint, web dashboard, real-time stats |
+| **DevEx** | CLI scaffolding, REPL, YAML config, periodic checkpoint snapshots, `robots.txt` compliance |
+
+> Subsystems that are implemented and tested but **not yet wired into the crawl path** — autoscaled pool,
+> Bloom filter dedup, checkpoint restore, and in-process tracing — are tracked in [ROADMAP.md](ROADMAP.md)
+> rather than listed above. If it is in the table, it runs.
+
+---
+
+## Security posture
+
+A crawler is a program that fetches URLs someone else chose. When it also exposes an
+MCP server, those URLs come from a model whose output was shaped by the last page it
+read — which is a prompt-injection channel aimed straight at your network.
+
+ScrapeGoat treats that as the threat model rather than an edge case:
+
+- **Outbound requests are guarded.** Scheme allowlist, plus post-DNS blocking of
+  loopback, RFC1918, link-local (including the cloud metadata endpoint at
+  `169.254.169.254`), CGNAT, and their IPv4-mapped and NAT64-embedded equivalents.
+- **DNS rebinding does not work.** The guard resolves once and dials the address it
+  validated, rather than handing the hostname back to the resolver.
+- **Every redirect hop is re-checked.** A `302` to the metadata endpoint is blocked
+  at hop three the same as at hop one.
+- **The API server fails closed.** No API key, no start — unless you pass
+  `--insecure-no-auth`. CORS is deny-by-default and WebSocket upgrades check
+  `Origin`.
+- **Responses are capped after decompression**, with a compression-ratio limit, so a
+  gzip bomb cannot exhaust memory.
+
+Opt out for internal crawling with `safety.allow_private_addresses`. The full trust
+boundary, including what is *not* covered — proxied requests and the headless
+browser — is in [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -287,7 +318,7 @@ ScrapeGoat/
 │   ├── storage/             # JSON, JSONL, CSV storage
 │   ├── plugin/              # Plugin registry + SDK + experimental storage stubs
 │   ├── distributed/         # Master/worker, in-memory task queue
-│   ├── observability/       # Prometheus metrics, OpenTelemetry tracing
+│   ├── observability/       # Prometheus metrics, in-process tracing primitives
 │   ├── dashboard/           # Web dashboard
 │   ├── automation/          # Browser automation (go-rod)
 │   ├── benchmark/           # Performance comparison tool
@@ -315,12 +346,27 @@ make lint           # Linting
 make build          # Build binary
 ```
 
+### Fuzzing
+
+Everything ScrapeGoat parses comes from a site it does not control, so the parsers
+are fuzz-tested and CI runs each target for 60 seconds on every push. Targets cover
+HTML parsing, CSS selectors, regex patterns, URL canonicalisation, `robots.txt`
+parsing and pattern matching, the decompression path, `Retry-After`, the MCP
+JSON-RPC decoder, and the SSRF guard.
+
+```bash
+go test -run=XXX -fuzz=FuzzCompositeParse -fuzztime=60s ./internal/parser
+```
+
 ---
 
 ## Documentation
 
 - **[Quick Start](docs/quickstart.md)** — Get running in 3 minutes
 - **[Architecture](docs/architecture.md)** — How the components fit together
+- **[Security](SECURITY.md)** — Trust boundary, the SSRF guard, and known limitations
+- **[Roadmap](ROADMAP.md)** — What is designed but not yet wired in
+- **[Changelog](CHANGELOG.md)** — Release history
 - **[API Reference](docs/api.yaml)** — OpenAPI 3.1 specification
 - **[MCP Integration](docs/mcp.md)** — Claude Desktop / Cursor / Cline setup
 - **[Middleware](docs/middleware.md)** — Request and item middleware system
