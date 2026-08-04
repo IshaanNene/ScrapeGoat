@@ -122,10 +122,16 @@ func (p *S3StoragePlugin) flush() error {
 
 	// Fallback: write to local directory
 	localDir := filepath.Join("output", "s3-fallback", p.bucket)
-	os.MkdirAll(localDir, 0o755)
+	if err := os.MkdirAll(localDir, 0o755); err != nil {
+		return fmt.Errorf("s3 fallback: create %s: %w", localDir, err)
+	}
 	localPath := filepath.Join(localDir, filepath.Base(key))
-	os.WriteFile(localPath, data, 0o644)
+	if err := os.WriteFile(localPath, data, 0o644); err != nil {
+		return fmt.Errorf("s3 fallback: write %s: %w", localPath, err)
+	}
 
+	// Only now is the buffer safe to drop. Clearing it before the write landed
+	// discarded the only copy of the data on a failure the caller never saw.
 	p.buffer = nil
 	return nil
 }
@@ -150,7 +156,6 @@ type KafkaPublisherPlugin struct {
 	brokers   []string
 	topic     string
 	logger    *slog.Logger
-	buffer    []*types.Item
 	mu        sync.Mutex
 	published int64
 }
@@ -192,8 +197,9 @@ func (p *KafkaPublisherPlugin) Store(items []*types.Item) error {
 			"scraped_at": item.Timestamp,
 		})
 
-		// In production, this would use confluent-kafka-go or sarama.
-		// For now, we log the publish operation and buffer locally.
+		// In production this would use confluent-kafka-go or sarama. For now it
+		// logs the publish and counts it — nothing is buffered, despite what an
+		// earlier version of this comment claimed.
 		p.logger.Debug("Kafka publish",
 			"topic", p.topic,
 			"key", item.URL,

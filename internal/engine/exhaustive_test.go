@@ -380,8 +380,15 @@ func TestEngineAddSeed(t *testing.T) {
 // Engine: full crawl stop + goroutine cleanup
 // ---------------------------------------------------------------------------
 
+// TestEngineStopGoroutineCleanup checks that Stop unwinds the worker pool.
+//
+// Deliberately not t.Parallel(). runtime.NumGoroutine() counts the whole process,
+// so while other parallel tests ran this measured their goroutines as well as the
+// engine's — deltas from -32 to +50 on identical code, and the negative sign alone
+// shows what it was really counting. It passed or failed on whichever tests
+// happened to overlap it, which is worse than not testing this at all: a red run
+// said nothing and a green one said less.
 func TestEngineStopGoroutineCleanup(t *testing.T) {
-	t.Parallel()
 	ts := testServer()
 	defer ts.Close()
 
@@ -407,9 +414,10 @@ func TestEngineStopGoroutineCleanup(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	eng.Stop()
 
-	// Wait for goroutine cleanup (need enough time for OS/runtime cleanup)
-	time.Sleep(1 * time.Second)
-	goroutinesAfter := runtime.NumGoroutine()
+	// Poll for the count to settle rather than sleeping a fixed second and hoping.
+	// Shutdown is asynchronous — idle HTTP connections in particular linger — so a
+	// fixed wait is a race against a machine whose speed is not ours to choose.
+	goroutinesAfter := settleGoroutines(goroutinesBefore, 5*time.Second)
 
 	delta := goroutinesAfter - goroutinesBefore
 	if delta > 30 {
@@ -462,4 +470,38 @@ func TestEngineContextCancellation(t *testing.T) {
 		t.Errorf("Stop() did not terminate quickly: took %s", waitTime)
 	}
 	t.Logf("Stop+Wait completed in %s", waitTime)
+}
+
+// settleGoroutines waits for the goroutine count to fall back to target, or to
+// stop falling, whichever comes first.
+//
+// Returns as soon as the count is at or below target, so a clean shutdown costs
+// milliseconds rather than the whole budget. Otherwise it gives up once the count
+// has held steady for several polls: still falling means still shutting down,
+// stopped falling means this is as low as it goes.
+func settleGoroutines(target int, budget time.Duration) int {
+	const poll = 25 * time.Millisecond
+
+	deadline := time.Now().Add(budget)
+	last := runtime.NumGoroutine()
+	stable := 0
+
+	for time.Now().Before(deadline) {
+		time.Sleep(poll)
+		runtime.GC() // release goroutines waiting on finalisable resources
+
+		n := runtime.NumGoroutine()
+		if n <= target {
+			return n
+		}
+		if n >= last {
+			if stable++; stable >= 8 {
+				return n
+			}
+		} else {
+			stable = 0
+		}
+		last = n
+	}
+	return runtime.NumGoroutine()
 }
