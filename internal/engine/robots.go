@@ -145,14 +145,14 @@ func (rm *RobotsManager) GetSitemaps(domain string) []string {
 //
 // Reads the cache the enforcement path already populated, so it costs no extra
 // fetch and — more importantly — reports the same bytes the crawl actually obeyed.
-func (rm *RobotsManager) Report(rawURL string) provenance.RobotsReport {
+func (rm *RobotsManager) Report(ctx context.Context, rawURL string) provenance.RobotsReport {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return provenance.RobotsReport{}
 	}
 	domain := u.Scheme + "://" + u.Host
 
-	if data := rm.getRobotsData(context.Background(), domain); data != nil {
+	if data := rm.getRobotsData(ctx, domain); data != nil {
 		return data.report
 	}
 	return provenance.RobotsReport{}

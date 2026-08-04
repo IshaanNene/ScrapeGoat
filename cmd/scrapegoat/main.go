@@ -29,6 +29,7 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/observability"
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
+	"github.com/IshaanNene/ScrapeGoat/internal/provenance"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
@@ -47,6 +48,7 @@ var (
 	allowedDomains string
 	resumeCrawl    bool
 	recordDir      string
+	corpusPath     string
 )
 
 func main() {
@@ -109,6 +111,7 @@ func crawlCmd() *cobra.Command {
 	cmd.Flags().StringVar(&allowedDomains, "allowed-domains", "", "comma-separated domains to stay within (e.g. en.wikipedia.org)")
 	cmd.Flags().BoolVar(&resumeCrawl, "resume", false, "resume from the last checkpoint instead of starting fresh")
 	cmd.Flags().StringVar(&recordDir, "record", "", "record every fetch to this directory so the crawl can be replayed")
+	cmd.Flags().StringVar(&corpusPath, "corpus", "", "write a provenance record per page to this JSONL file")
 
 	return cmd
 }
@@ -177,6 +180,14 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 
 	if err := wireCrawlPipeline(eng, cfg, logger); err != nil {
 		return err
+	}
+
+	corpus, err := openCorpus(eng, recordDir)
+	if err != nil {
+		return err
+	}
+	if corpus != nil {
+		defer corpus.Close()
 	}
 
 	// Setup metrics (if enabled). The recorder must be handed to the engine, not
@@ -259,6 +270,8 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   Data:      %v bytes downloaded\n", stats["bytes_downloaded"])
 	fmt.Printf("   Output:    %s\n", cfg.Storage.OutputPath)
 
+	reportCorpus(corpus)
+
 	if stats["items_scraped"] == int64(0) {
 		fmt.Println("\n  No items were scraped. The crawl command discovers and follows links by default.")
 		fmt.Println("   For automatic content extraction, try:")
@@ -268,6 +281,69 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// openCorpus attaches a provenance corpus writer when --corpus was given.
+//
+// The crawl ID is the fetch log's directory when there is one, so a corpus record
+// points at the log that can prove it. Without a log the records still stand on
+// their own; they just cannot be re-derived.
+func openCorpus(eng *engine.Engine, logDir string) (*provenance.CorpusWriter, error) {
+	if corpusPath == "" {
+		return nil, nil
+	}
+
+	w, err := provenance.NewCorpusWriter(corpusPath)
+	if err != nil {
+		return nil, err
+	}
+
+	crawlID := logDir
+	if crawlID == "" {
+		crawlID = fmt.Sprintf("crawl-%d", time.Now().UnixNano())
+	}
+	eng.SetCorpusWriter(w, crawlID)
+
+	fmt.Fprintf(os.Stderr, "  writing provenance records to %s\n", corpusPath)
+	return w, nil
+}
+
+// reportCorpus prints what the corpus ended up holding.
+func reportCorpus(w *provenance.CorpusWriter) {
+	if w == nil {
+		return
+	}
+	if err := w.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "  corpus did not close cleanly: %v\n", err)
+		return
+	}
+
+	written, skipped := w.Stats()
+	fmt.Printf("\n  Corpus:    %d records -> %s\n", written, w.Path())
+	if skipped > 0 {
+		fmt.Printf("             %d skipped for incomplete provenance\n", skipped)
+	}
+
+	records, err := provenance.ReadCorpus(w.Path())
+	if err != nil {
+		return
+	}
+	s := provenance.Summarise(records)
+
+	// Reported, not filtered. A crawl that had dropped these would print zero and
+	// look clean; the number is the point.
+	if s.Restrictive > 0 {
+		fmt.Printf("             %d from sources that asked to be excluded from AI training\n", s.Restrictive)
+	}
+	if s.AISiteWide > 0 {
+		fmt.Printf("             %d from sites whose robots.txt turns AI crawlers away\n", s.AISiteWide)
+	}
+	if s.Licensed > 0 {
+		fmt.Printf("             %d carry an explicit licence\n", s.Licensed)
+	}
+	if s.RobotsDisallowed > 0 {
+		fmt.Printf("             ! %d were fetched despite robots.txt — investigate\n", s.RobotsDisallowed)
+	}
 }
 
 // wireCrawlPipeline attaches the parser, pipeline, and storage to an engine.
