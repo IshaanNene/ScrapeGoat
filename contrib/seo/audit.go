@@ -24,10 +24,21 @@ type MetaAuditResult struct {
 
 // AuditIssue represents a single SEO issue.
 type AuditIssue struct {
-	Severity string `json:"severity"` // error, warning, info
+	Severity string `json:"severity"` // one of SeverityError, SeverityWarning, SeverityInfo
 	Category string `json:"category"`
 	Message  string `json:"message"`
 }
+
+// Severity levels for AuditIssue.
+//
+// Named because Severity is the first positional field of a struct built by
+// literal in thirteen places: a typo compiles cleanly and silently downgrades a
+// finding, and nothing downstream would ever notice.
+const (
+	SeverityError   = "error"
+	SeverityWarning = "warning"
+	SeverityInfo    = "info"
+)
 
 // MetaAuditor audits pages for SEO best practices.
 type MetaAuditor struct {
@@ -58,13 +69,13 @@ func (ma *MetaAuditor) Audit(resp *types.Response) (*MetaAuditResult, error) {
 	result.Tags["title"] = title
 	switch {
 	case title == "":
-		result.Issues = append(result.Issues, AuditIssue{"error", "title", "Missing title tag"})
+		result.Issues = append(result.Issues, AuditIssue{SeverityError, "title", "Missing title tag"})
 		score -= 20
 	case len(title) > 60:
-		result.Issues = append(result.Issues, AuditIssue{"warning", "title", fmt.Sprintf("Title too long (%d chars, max 60)", len(title))})
+		result.Issues = append(result.Issues, AuditIssue{SeverityWarning, "title", fmt.Sprintf("Title too long (%d chars, max 60)", len(title))})
 		score -= 5
 	case len(title) < 10:
-		result.Issues = append(result.Issues, AuditIssue{"warning", "title", "Title too short"})
+		result.Issues = append(result.Issues, AuditIssue{SeverityWarning, "title", "Title too short"})
 		score -= 5
 	}
 
@@ -72,10 +83,10 @@ func (ma *MetaAuditor) Audit(resp *types.Response) (*MetaAuditResult, error) {
 	desc := metaContent(doc, "description")
 	result.Tags["description"] = desc
 	if desc == "" {
-		result.Issues = append(result.Issues, AuditIssue{"error", "description", "Missing meta description"})
+		result.Issues = append(result.Issues, AuditIssue{SeverityError, "description", "Missing meta description"})
 		score -= 15
 	} else if len(desc) > 160 {
-		result.Issues = append(result.Issues, AuditIssue{"warning", "description", fmt.Sprintf("Description too long (%d chars, max 160)", len(desc))})
+		result.Issues = append(result.Issues, AuditIssue{SeverityWarning, "description", fmt.Sprintf("Description too long (%d chars, max 160)", len(desc))})
 		score -= 5
 	}
 
@@ -83,17 +94,17 @@ func (ma *MetaAuditor) Audit(resp *types.Response) (*MetaAuditResult, error) {
 	canonical, _ := doc.Find(`link[rel="canonical"]`).Attr("href")
 	result.Tags["canonical"] = canonical
 	if canonical == "" {
-		result.Issues = append(result.Issues, AuditIssue{"warning", "canonical", "Missing canonical URL"})
+		result.Issues = append(result.Issues, AuditIssue{SeverityWarning, "canonical", "Missing canonical URL"})
 		score -= 5
 	}
 
 	// H1 tag
 	h1Count := doc.Find("h1").Length()
 	if h1Count == 0 {
-		result.Issues = append(result.Issues, AuditIssue{"error", "headings", "Missing H1 tag"})
+		result.Issues = append(result.Issues, AuditIssue{SeverityError, "headings", "Missing H1 tag"})
 		score -= 10
 	} else if h1Count > 1 {
-		result.Issues = append(result.Issues, AuditIssue{"warning", "headings", fmt.Sprintf("Multiple H1 tags (%d)", h1Count)})
+		result.Issues = append(result.Issues, AuditIssue{SeverityWarning, "headings", fmt.Sprintf("Multiple H1 tags (%d)", h1Count)})
 		score -= 5
 	}
 
@@ -101,14 +112,14 @@ func (ma *MetaAuditor) Audit(resp *types.Response) (*MetaAuditResult, error) {
 	ogTitle := metaProperty(doc, "og:title")
 	result.Tags["og:title"] = ogTitle
 	if ogTitle == "" {
-		result.Issues = append(result.Issues, AuditIssue{"info", "opengraph", "Missing og:title"})
+		result.Issues = append(result.Issues, AuditIssue{SeverityInfo, "opengraph", "Missing og:title"})
 		score -= 3
 	}
 
 	ogImage := metaProperty(doc, "og:image")
 	result.Tags["og:image"] = ogImage
 	if ogImage == "" {
-		result.Issues = append(result.Issues, AuditIssue{"info", "opengraph", "Missing og:image"})
+		result.Issues = append(result.Issues, AuditIssue{SeverityInfo, "opengraph", "Missing og:image"})
 		score -= 3
 	}
 
@@ -121,7 +132,7 @@ func (ma *MetaAuditor) Audit(resp *types.Response) (*MetaAuditResult, error) {
 		}
 	})
 	if imgNoAlt > 0 {
-		result.Issues = append(result.Issues, AuditIssue{"warning", "images", fmt.Sprintf("%d images without alt text", imgNoAlt)})
+		result.Issues = append(result.Issues, AuditIssue{SeverityWarning, "images", fmt.Sprintf("%d images without alt text", imgNoAlt)})
 		score -= min(imgNoAlt*2, 10)
 	}
 
@@ -129,14 +140,14 @@ func (ma *MetaAuditor) Audit(resp *types.Response) (*MetaAuditResult, error) {
 	robots := metaContent(doc, "robots")
 	result.Tags["robots"] = robots
 	if strings.Contains(robots, "noindex") {
-		result.Issues = append(result.Issues, AuditIssue{"warning", "robots", "Page is set to noindex"})
+		result.Issues = append(result.Issues, AuditIssue{SeverityWarning, "robots", "Page is set to noindex"})
 	}
 
 	// Viewport
 	viewport := metaContent(doc, "viewport")
 	result.Tags["viewport"] = viewport
 	if viewport == "" {
-		result.Issues = append(result.Issues, AuditIssue{"warning", "mobile", "Missing viewport meta tag"})
+		result.Issues = append(result.Issues, AuditIssue{SeverityWarning, "mobile", "Missing viewport meta tag"})
 		score -= 5
 	}
 

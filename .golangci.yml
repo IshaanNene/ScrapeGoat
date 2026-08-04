@@ -39,6 +39,21 @@ linters:
     goconst:
       min-len: 4
       min-occurrences: 5
+
+      # goconst cannot tell a repeated *identifier* from a repeated *key*, and this
+      # codebase writes a lot of both JSON and HTTP: schema keywords, response
+      # payload keys, and header names all recur inside composite literals where
+      # naming them would make the literal harder to read, not safer. The leading
+      # alternative matches header-shaped names (Accept-Language, Sec-Fetch-Dest)
+      # as a pattern rather than a list, because the browser-fingerprint tables are
+      # literal transcriptions of a protocol and enumerating them here would just
+      # be maintaining the same list twice.
+      #
+      # What is left is what goconst is good for: a domain value repeated across
+      # positional struct literals, where a typo compiles and silently means
+      # something else. That is how it caught the task status "pending" and the
+      # SEO severity "warning"; both are named constants now.
+      ignore-strings: '^([A-Z][A-Za-z0-9]*(-[A-Za-z0-9]+)+|Accept|Host|Connection|Referer|Cookie|Origin|type|description|string|object|array|number|boolean|properties|required|items|status|error|message|title|text|name|value|url|job_id|crawl|product|article|email|regex|xpath|unspecified|en-US|http)$'
     gosec:
       excludes:
         # TLSInsecure is driven by operator config and carries its own nolint at

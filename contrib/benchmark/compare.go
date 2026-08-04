@@ -201,7 +201,7 @@ func ComparisonTable(results []*BenchmarkResult) string {
 	sb.WriteString("|------|-------------|-------------|-------------|-------------|------------|------------|\n")
 
 	for _, r := range results {
-		sb.WriteString(fmt.Sprintf("| **%s** | %.0f req/s | %s | %s | %s | %.2f%% | %.2f MB/s |\n",
+		fmt.Fprintf(&sb, "| **%s** | %.0f req/s | %s | %s | %s | %.2f%% | %.2f MB/s |\n",
 			r.Tool,
 			r.ReqsPerSec,
 			formatDuration(r.AvgLatency),
@@ -209,7 +209,7 @@ func ComparisonTable(results []*BenchmarkResult) string {
 			formatDuration(r.P99Latency),
 			r.ErrorRate,
 			r.Throughput,
-		))
+		)
 	}
 
 	return sb.String()

@@ -39,10 +39,16 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          # Must be built with a Go at least as new as go.mod's target, or it
-          # refuses to load the config and the step fails without linting — which
-          # is what v1.64.8 did silently on every run before this.
-          version: v2.1.6
+          version: v2.12.2
+
+          # Build the linter from source with this repo's Go toolchain instead of
+          # downloading a release binary. golangci-lint refuses to load a config
+          # whose target Go version is newer than the Go it was built with, and the
+          # published binaries lag: both v1.64.8 and v2.1.6 are built with Go 1.24
+          # and so exited in ~90ms against our go 1.25 module, having linted
+          # nothing, on every run. Building here pins the two together by
+          # construction, and cannot silently drift when go.mod moves again.
+          install-mode: goinstall
           args: --timeout=5m
 
   test:

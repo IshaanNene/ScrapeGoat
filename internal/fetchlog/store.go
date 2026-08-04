@@ -30,8 +30,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ErrNotFound is returned when a digest is absent from the store.
@@ -59,10 +61,35 @@ func Digest(body []byte) string {
 // path splits the digest so that no directory holds millions of entries — many
 // filesystems degrade badly past a few tens of thousands of children.
 func (s *Store) path(digest string) string {
+	return filepath.Join(s.dir, "objects", objectRel(digest))
+}
+
+// objectRel is the object's path relative to the objects directory.
+func objectRel(digest string) string {
 	if len(digest) < 4 {
-		return filepath.Join(s.dir, "objects", digest)
+		return digest
 	}
-	return filepath.Join(s.dir, "objects", digest[:2], digest[2:])
+	return filepath.Join(digest[:2], digest[2:])
+}
+
+// openObjects opens the objects directory as a root.
+//
+// Every read of a stored body goes through this rather than through a plain
+// os.Open on a joined path. The reason is the threat model this package exists to
+// serve: a log is meant to be checkable by someone who does not trust whoever
+// published it, so the directory itself is untrusted input. filepath.Walk uses
+// Lstat and will not traverse a symlink, but os.Open follows one — so a log
+// carrying a symlink at objects/ab/cdef… would have the verifier hash a file
+// outside the store. That is not merely an information leak: point the link at a
+// file whose hash you already know and a fabricated object verifies clean, which
+// is precisely the guarantee Verify is supposed to provide. os.Root refuses to
+// escape, so the question does not arise.
+func (s *Store) openObjects() (*os.Root, error) {
+	root, err := os.OpenRoot(filepath.Join(s.dir, "objects"))
+	if err != nil {
+		return nil, fmt.Errorf("fetchlog: open store: %w", err)
+	}
+	return root, nil
 }
 
 // Put stores a body and returns its digest.
@@ -119,11 +146,23 @@ func (s *Store) Put(body []byte) (string, error) {
 // been altered on disk would otherwise replay silently wrong data, which defeats
 // the entire point of recording them.
 func (s *Store) Get(digest string) ([]byte, error) {
-	body, err := os.ReadFile(s.path(digest))
+	root, err := s.openObjects()
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
+	f, err := root.Open(objectRel(digest))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: %s", ErrNotFound, digest)
 		}
+		return nil, fmt.Errorf("fetchlog: read object: %w", err)
+	}
+	defer f.Close()
+
+	body, err := io.ReadAll(f)
+	if err != nil {
 		return nil, fmt.Errorf("fetchlog: read object: %w", err)
 	}
 
@@ -178,30 +217,37 @@ func (s *Store) Stat() (Stats, error) {
 // confirm that no byte has changed since it was written, without trusting whoever
 // wrote it.
 func (s *Store) Verify() error {
-	root := filepath.Join(s.dir, "objects")
+	root, err := s.openObjects()
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // nothing stored yet
+		}
+		return err
+	}
+	defer root.Close()
 
-	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	return fs.WalkDir(root.FS(), ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if os.IsNotExist(err) {
 				return nil
 			}
 			return err
 		}
-		if info.IsDir() {
+
+		// Anything that is not a regular file cannot be an object. Skipping rather
+		// than following is the point: a symlink planted in a published log must
+		// not be dereferenced by the tool that is supposed to be auditing it.
+		if d.IsDir() {
 			return nil
 		}
-
-		// Reconstruct the digest from the path: objects/<2>/<rest>.
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		digest := filepath.Dir(rel) + filepath.Base(rel)
-		if filepath.Dir(rel) == "." {
-			digest = filepath.Base(rel)
+		if !d.Type().IsRegular() {
+			return fmt.Errorf("fetchlog: %s is not a regular file; a log should contain only objects", path)
 		}
 
-		f, err := os.Open(path)
+		// Reconstruct the digest from the path: <2>/<rest>.
+		digest := strings.ReplaceAll(path, "/", "")
+
+		f, err := root.Open(path)
 		if err != nil {
 			return err
 		}
