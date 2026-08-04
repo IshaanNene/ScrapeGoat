@@ -200,3 +200,64 @@ func TestStoreLeavesNoTempFiles(t *testing.T) {
 		t.Fatalf("walk: %v", err)
 	}
 }
+
+// A published log is untrusted input — that is the entire premise of `verify`.
+// A symlink planted in the objects tree must not be followed: if it were, an
+// attacker could point it at a file whose hash they already know and have a
+// fabricated object verify clean, which is exactly the guarantee being claimed.
+func TestStoreDoesNotFollowSymlinksOutOfTheStore(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	// A file outside the store whose content we control.
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	secret := []byte("content from outside the store")
+	if err := os.WriteFile(outside, secret, 0o644); err != nil {
+		t.Fatalf("write outside file: %v", err)
+	}
+
+	// File it under the address its content actually hashes to, so that following
+	// the link would make the object look perfectly valid.
+	digest := Digest(secret)
+	linkDir := filepath.Join(dir, "objects", digest[:2])
+	if err := os.MkdirAll(linkDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	link := filepath.Join(linkDir, digest[2:])
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	if err := s.Verify(); err == nil {
+		t.Error("Verify accepted a symlink pointing outside the store")
+	}
+
+	if _, err := s.Get(digest); err == nil {
+		t.Error("Get followed a symlink out of the store")
+	}
+}
+
+// Traversal via the digest itself must not escape either.
+func TestStoreGetRejectsPathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "manifest.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	for _, digest := range []string{
+		"../manifest.json",
+		"../../etc/passwd",
+	} {
+		if _, err := s.Get(digest); err == nil {
+			t.Errorf("Get(%q) escaped the store", digest)
+		}
+	}
+}

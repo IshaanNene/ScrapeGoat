@@ -14,6 +14,8 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	scrapegoat "github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat"
 )
@@ -67,7 +69,7 @@ func (s *ProductSpider) Parse(resp *scrapegoat.Response) (*scrapegoat.SpiderResu
 		}
 		s.Find(".star-rating").Each(func(j int, star *goquery.Selection) {
 			for className, rating := range ratingMap {
-				if star.HasClass(strings.Title(className)) {
+				if star.HasClass(cases.Title(language.English).String(className)) {
 					item.Set("rating", rating)
 				}
 			}

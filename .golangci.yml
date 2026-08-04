@@ -1,135 +1,156 @@
-# Without this file golangci-lint runs only its default set — errcheck, gosimple,
-# govet, ineffassign, staticcheck, unused — which is why the errors.As misuse, the
-# discarded errors, and the unclosed decompressors all passed CI.
+# golangci-lint v2. The pin matters: v1.64.8 — the last v1 — is built with Go 1.24
+# and refuses to start against a module targeting Go 1.25, so CI's lint step exited
+# in 88ms with a config error on every run and never actually linted anything. It
+# looked like an ordinary red check, which is how it survived.
+#
+# Keep the version in .github/workflows/ci.yml in step with this file, and when
+# go.mod's Go version moves, check the pinned linter was built with at least that.
+version: "2"
 
 run:
-  timeout: 5m
   tests: true
-
 linters:
   enable:
-    # Correctness
-    - errorlint    # err.(*T) instead of errors.As — silently broke retry on wrapped errors
-    - bodyclose    # unclosed HTTP response bodies
-    - contextcheck # functions that should take a context but don't
-    - nilerr       # returning nil after checking err != nil
+    - bodyclose
+    - contextcheck
+    - copyloopvar
+    - durationcheck
+    - errorlint
+    - goconst
+    - gosec
+    - makezero
+    - misspell
+    - nakedret
+    - nilerr
+    - revive
     - rowserrcheck
     - sqlclosecheck
-    - durationcheck # time.Duration multiplied by a Duration
-    - makezero     # make([]T, n) then append — a classic length/capacity slip
-
-    # Security
-    - gosec
-
-    # Clarity
-    - revive
-    - misspell
     - unconvert
     - wastedassign
-    - nakedret
-    - goconst
-    - copyloopvar
+  settings:
+    errcheck:
+      check-type-assertions: true
 
-# The determinism boundary is enforced by scripts/check-determinism.sh, which runs
-# as its own CI step. forbidigo was enabled here too and was the wrong tool for it:
-# it has no notion of *where* the boundary is, so it flagged internal/clock — the
-# package that implements the clock every other package is told to use — along with
-# contrib/, tests/, and cmd/, none of which are in the crawl path. The script knows
-# the boundary, carries an allowlist, and supports a per-line `//determinism:allow`
-# opt-out at the call site. One precise gate beats two, one of which cries wolf.
+      # check-blank stays off. An explicit `_ = f()` is Go's way of saying "I have
+      # considered this error and am discarding it deliberately"; flagging it turns
+      # the acknowledgement into the offence and pushes people toward the bare
+      # call, which errcheck's real check catches anyway.
+      check-blank: false
+    goconst:
+      min-len: 4
+      min-occurrences: 5
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
+      # goconst cannot tell a repeated *identifier* from a repeated *key*, and this
+      # codebase writes a lot of both JSON and HTTP: schema keywords, response
+      # payload keys, and header names all recur inside composite literals where
+      # naming them would make the literal harder to read, not safer. The leading
+      # alternative matches header-shaped names (Accept-Language, Sec-Fetch-Dest)
+      # as a pattern rather than a list, because the browser-fingerprint tables are
+      # literal transcriptions of a protocol and enumerating them here would just
+      # be maintaining the same list twice.
+      #
+      # What is left is what goconst is good for: a domain value repeated across
+      # positional struct literals, where a typo compiles and silently means
+      # something else. That is how it caught the task status "pending" and the
+      # SEO severity "warning"; both are named constants now.
+      # Canonical v2 name; v1 called this ignore-strings, and `run` still accepts
+      # that spelling while `config verify` rejects it — which is how a config that
+      # linted clean locally failed in CI.
+      ignore-string-values:
+        - '^[A-Z][A-Za-z0-9]*(-[A-Za-z0-9]+)+$'
+        - '^(Accept|Host|Connection|Referer|Cookie|Origin)$'
+        - '^(type|description|string|object|array|number|boolean|properties|required|items)$'
+        - '^(status|error|message|title|text|name|value|url|job_id)$'
+        - '^(crawl|product|article|email|regex|xpath|unspecified|en-US|http)$'
+    gosec:
+      excludes:
+        # TLSInsecure is driven by operator config and carries its own nolint at
+        # the call site.
+        - G402
 
-    # check-blank stays off. An explicit `_ = f()` is Go's way of saying "I have
-    # considered this error and am discarding it deliberately"; flagging it turns
-    # the acknowledgement into the offence and pushes people toward the bare call,
-    # which errcheck's real check catches. The unchecked returns that motivated
-    # this config were bare calls, not blank assignments.
-    check-blank: false
+        # Weak RNG. Every use is jitter, proxy rotation, or fingerprint variation —
+        # none of it secret, none of it worth guessing. crypto/rand would also
+        # defeat the point: reproducibility needs a *seedable* source, so a crawl's
+        # entropy can be part of its identity. See
+        # docs/design/0001-deterministic-crawl.md.
+        - G404
+      config:
+        G306: "0644"
+    govet:
+      enable-all: true
+      disable:
+        # Field alignment is a micro-optimisation that costs more in readability
+        # than it returns here; the hot path is network-bound, not cache-bound.
+        - fieldalignment
 
-  govet:
-    enable-all: true
-    disable:
-      # Struct field alignment is a micro-optimisation that hurts readability far
-      # more than it helps here; the hot path is network-bound, not cache-bound.
-      - fieldalignment
+        # shadow fires on `if err := f(); err != nil` inside a function that
+        # already has an err — the most common shape in Go, and not a bug in any
+        # of the ~44 places it fired. A check that is wrong every time trains
+        # people to skim past the output.
+        - shadow
+    misspell:
+      # No locale, on purpose. Under `locale: UK` it flagged the CSS property
+      # `color` and the value `center`; under `locale: US` it flagged the prose,
+      # which is British throughout. With neither it catches actual typos.
+      ignore-rules:
+        - cancelled
+        - cancelling
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+            - disableStutteringCheck
+        - name: context-as-argument
+        - name: error-return
+        - name: error-strings
+        - name: indent-error-flow
+        - name: var-naming
+        - name: unreachable-code
 
-      # shadow fires on `if err := f(); err != nil` inside a function that already
-      # has an err — the single most common shape in Go, and not a bug in any of
-      # the places it fired here. A check that is wrong ~100% of the time trains
-      # people to skim past the output, which costs more than it catches.
-      - shadow
-
-  gosec:
-    excludes:
-      # Covered explicitly: TLSInsecure is driven by operator config and carries
-      # its own nolint at the call site.
-      - G402
-
-      # Weak RNG. Every use here is jitter, proxy rotation, or fingerprint
-      # variation — none of it is a secret, and none of it is guessed by an
-      # attacker to any advantage. Worse, crypto/rand would defeat the point: the
-      # project's reproducibility guarantee depends on a *seedable* source, so a
-      # crawl's entropy can be part of its identity. See
-      # docs/design/0001-deterministic-crawl.md.
-      - G404
-    config:
-      G306: "0644"
-
-  revive:
+  # The determinism boundary is enforced by scripts/check-determinism.sh, its own
+  # CI step. forbidigo was enabled here too and was the wrong tool: it has no
+  # notion of *where* the boundary is, so it flagged internal/clock — the package
+  # that implements the clock everything else is told to use — along with contrib/,
+  # tests/, and cmd/. The script knows the boundary, carries an allowlist, and
+  # supports a per-line `//determinism:allow` at the call site.
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: exported
-        arguments: [checkPrivateReceivers, disableStutteringCheck]
-      - name: context-as-argument
-      - name: error-return
-      - name: error-strings
-      - name: indent-error-flow
-      - name: var-naming
-      - name: unreachable-code
-
-  goconst:
-    min-len: 4
-    min-occurrences: 5
-    ignore-tests: true
-
-  misspell:
-    # No locale. misspell's job here is to catch typos — `recieve`, `seperate` —
-    # not to adjudicate British against American spelling. With `locale: UK` it
-    # flagged the CSS property `color` and the value `center`; with `locale: US` it
-    # turned on the prose, which is written in British English throughout. Setting
-    # neither leaves it doing the thing that is actually useful.
-    ignore-words:
-      - cancelled
-      - cancelling
-
+      # Tests ignore errors on setup paths and construct adversarial inputs on
+      # purpose; gosec in particular has nothing useful to say about them.
+      - linters:
+          - errcheck
+          - goconst
+          - gosec
+        path: _test\.go
+      # Example functions are documentation: they elide error handling so the
+      # shape of the API stays visible.
+      - linters:
+          - errcheck
+          - revive
+        path: example_test\.go
+      - linters:
+          - goconst
+        path: (.+)_test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  # The defaults hide most findings behind a per-linter cap, which turns a clean
-  # run into false reassurance.
+  # The defaults cap findings per linter, which turns a truncated run into false
+  # reassurance.
   max-issues-per-linter: 0
   max-same-issues: 0
-
-  exclude-rules:
-    # Determinism boundary. The engine takes time and randomness from injected
-    # sources so that a crawl can be replayed (docs/design/0001-deterministic-crawl.md).
-    # A single time.Now() or global rand in a new middleware breaks replay
-    # silently — nothing fails, the output just stops being reproducible — so the
-    # ban is mechanical rather than a matter of remembering.
-    #
-    # Enforced by scripts/check-determinism.sh in CI as well, because forbidigo
-    # is not enabled in every developer's local run.
-    # Tests deliberately ignore errors on setup paths and construct adversarial
-    # inputs; gosec in particular has nothing useful to say about them.
-    - path: _test\.go
-      linters:
-        - gosec
-        - errcheck
-        - goconst
-
-    # Example functions in the SDK are documentation; they elide error handling on
-    # purpose so the shape of the API stays visible.
-    - path: example_test\.go
-      linters:
-        - errcheck
-        - revive
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

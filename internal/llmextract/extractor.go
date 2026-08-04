@@ -216,9 +216,9 @@ func BuildPrompt(html string, schema ExtractionSchema) string {
 		if field.Required {
 			required = " (REQUIRED)"
 		}
-		sb.WriteString(fmt.Sprintf("- **%s** (%s)%s: %s", field.Name, field.Type, required, field.Description))
+		fmt.Fprintf(&sb, "- **%s** (%s)%s: %s", field.Name, field.Type, required, field.Description)
 		if field.Example != nil {
-			sb.WriteString(fmt.Sprintf(" Example: %v", field.Example))
+			fmt.Fprintf(&sb, " Example: %v", field.Example)
 		}
 		sb.WriteString("\n")
 	}

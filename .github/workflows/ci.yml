@@ -37,9 +37,18 @@ jobs:
       - name: Determinism boundary
         run: ./scripts/check-determinism.sh
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: v1.64.8
+          version: v2.12.2
+
+          # Build the linter from source with this repo's Go toolchain instead of
+          # downloading a release binary. golangci-lint refuses to load a config
+          # whose target Go version is newer than the Go it was built with, and the
+          # published binaries lag: both v1.64.8 and v2.1.6 are built with Go 1.24
+          # and so exited in ~90ms against our go 1.25 module, having linted
+          # nothing, on every run. Building here pins the two together by
+          # construction, and cannot silently drift when go.mod moves again.
+          install-mode: goinstall
           args: --timeout=5m
 
   test:

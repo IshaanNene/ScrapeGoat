@@ -108,7 +108,7 @@ func generateRealisticHTML(sizeKB int) []byte {
 		id := rand.IntN(100000)
 		price := float64(rand.IntN(10000)) / 100
 		rating := float64(rand.IntN(50)) / 10
-		b.WriteString(fmt.Sprintf(`
+		fmt.Fprintf(&b, `
 <article class="product-card" data-id="%d">
     <img src="/images/product-%d.jpg" alt="Product %d" loading="lazy">
     <div class="product-info">
@@ -133,7 +133,7 @@ func generateRealisticHTML(sizeKB int) []byte {
 </article>
 `, id, id, id, id, price, rating, rand.IntN(500)+10,
 			rand.IntN(100)+10, rand.IntN(100)+10, rand.IntN(50)+5,
-			float64(rand.IntN(100))/10, rand.IntN(5)+1, id, id))
+			float64(rand.IntN(100))/10, rand.IntN(5)+1, id, id)
 	}
 
 	b.WriteString(`

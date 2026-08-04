@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"html"
 	"math/rand"
 	"net"
 	"net/http"
@@ -355,7 +356,8 @@ func robotsTxtAdversarialHandler(stats *Stats, variant string) http.Handler {
 		}
 
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<html><body><h1>Page: %s</h1><a href="/page2">Next</a></body></html>`, r.URL.Path)
+		fmt.Fprintf(w, `<html><body><h1>Page: %s</h1><a href="/page2">Next</a></body></html>`,
+			html.EscapeString(r.URL.Path))
 	})
 }
 
@@ -364,9 +366,9 @@ func robotsTxtAdversarialHandler(stats *Stats, variant string) http.Handler {
 func generateFiller(sizeKB int) string {
 	var b strings.Builder
 	for b.Len() < sizeKB*1024 {
-		b.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&b,
 			"<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Item #%d.</p>\n",
-			rand.Intn(100000)))
+			rand.Intn(100000))
 	}
 	return b.String()
 }
@@ -403,9 +405,11 @@ func cookieJarPoisoningHandler(stats *Stats) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		stats.RequestsServed.Add(1)
 
-		// Set 500 cookies on every response
+		// Set 500 cookies on every response. Attributes are deliberately bare: this
+		// endpoint exists to stress header handling with a hostile-sized Set-Cookie
+		// pile, and hardening it would be hardening the thing under test.
 		for i := 0; i < 500; i++ {
-			http.SetCookie(w, &http.Cookie{
+			http.SetCookie(w, &http.Cookie{ // #nosec G124 -- deliberately awkward test fixture
 				Name:    fmt.Sprintf("tracking_%d", i),
 				Value:   strings.Repeat("x", 200), // 200-byte value per cookie
 				Path:    "/",
