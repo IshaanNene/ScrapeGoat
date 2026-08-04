@@ -1,7 +1,7 @@
 # The builder must be at least the version in go.mod's `go` directive. It was
 # pinned to 1.24 against a go1.25.0 module, which made every image build silently
 # download a second toolchain before it could compile anything.
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 # hadolint ignore=DL3018
 RUN apk add --no-cache git ca-certificates tzdata
