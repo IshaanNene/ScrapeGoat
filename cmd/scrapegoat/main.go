@@ -49,6 +49,7 @@ var (
 	resumeCrawl    bool
 	recordDir      string
 	corpusPath     string
+	compliancePath string
 )
 
 func main() {
@@ -112,6 +113,7 @@ func crawlCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&resumeCrawl, "resume", false, "resume from the last checkpoint instead of starting fresh")
 	cmd.Flags().StringVar(&recordDir, "record", "", "record every fetch to this directory so the crawl can be replayed")
 	cmd.Flags().StringVar(&corpusPath, "corpus", "", "write a provenance record per page here (.parquet or .jsonl, by extension)")
+	cmd.Flags().StringVar(&compliancePath, "compliance-report", "", "write a machine-readable compliance report here (JSON; requires --corpus)")
 
 	return cmd
 }
@@ -180,6 +182,11 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 
 	if err := wireCrawlPipeline(eng, cfg, logger); err != nil {
 		return err
+	}
+
+	if compliancePath != "" && corpusPath == "" {
+		return fmt.Errorf("--compliance-report needs --corpus: the report is derived from the corpus, " +
+			"so that the two cannot disagree about the crawl they describe")
 	}
 
 	corpus, err := openCorpus(eng, recordDir)
@@ -332,6 +339,8 @@ func reportCorpus(w provenance.RecordWriter) {
 	}
 	s := provenance.Summarise(records)
 
+	writeComplianceReport(records, w.Path())
+
 	// Reported, not filtered. A crawl that had dropped these would print zero and
 	// look clean; the number is the point.
 	if s.Restrictive > 0 {
@@ -345,6 +354,33 @@ func reportCorpus(w provenance.RecordWriter) {
 	}
 	if s.RobotsDisallowed > 0 {
 		fmt.Printf("             ! %d were fetched despite robots.txt — investigate\n", s.RobotsDisallowed)
+	}
+}
+
+// writeComplianceReport emits the auditable account of what the crawl respected.
+//
+// Derived from the corpus rather than tallied alongside it. A report that counted
+// independently could disagree with the data it describes, and then neither would
+// be worth anything to the person holding both.
+func writeComplianceReport(records []provenance.Record, corpus string) {
+	if compliancePath == "" {
+		return
+	}
+
+	// 10,000 keeps the report a document rather than a second copy of the corpus.
+	// When the cap bites the report says so, because a silently truncated audit is
+	// worse than a long one.
+	const maxListed = 10_000
+
+	report := provenance.BuildComplianceReport(records, recordDir, corpus, maxListed)
+	if err := provenance.WriteComplianceReport(compliancePath, report); err != nil {
+		fmt.Fprintf(os.Stderr, "  could not write the compliance report: %v\n", err)
+		return
+	}
+
+	fmt.Printf("\n  Compliance report -> %s\n", compliancePath)
+	for _, w := range report.Warnings {
+		fmt.Printf("             ! %s\n", w)
 	}
 }
 

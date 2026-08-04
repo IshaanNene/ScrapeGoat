@@ -156,6 +156,58 @@ Text columns are zstd-compressed and low-cardinality ones (`mime_type`,
 `language`, `licence`, `crawler_identity`) are dictionary-encoded. Row groups hold
 10,000 records, so a query with a predicate can skip most of a large file.
 
+## Compliance report
+
+```bash
+scrapegoat crawl https://example.com \
+  --corpus ./corpus.parquet \
+  --compliance-report ./compliance.json
+```
+
+```json
+{
+  "version": 1,
+  "totals": {
+    "records": 2, "sites": 1,
+    "robots_allowed": 2, "robots_disallowed": 0,
+    "restricted": 2, "noai": 1, "tdm_reserved": 1, "tdm_unstated": 1,
+    "site_wide_ai_blocked": 2, "licensed": 1
+  },
+  "restricted": [
+    { "url": "https://example.com/reserved",
+      "reasons": ["page-noai", "tdm-reservation", "robots-blocks-ai-crawlers"],
+      "content_hash": "0076009…" }
+  ],
+  "sites_blocking_ai": [
+    { "host": "example.com",
+      "agents_blocked": ["ccbot", "gptbot"],
+      "vendors_blocked": ["Common Crawl", "OpenAI"],
+      "records": 2 }
+  ]
+}
+```
+
+Restricted pages are **listed, not just counted**. A number can be dismissed; a
+list can be checked, and each entry carries the content hash so it joins to the
+corpus and thence to the fetch log. Every applicable ground is recorded rather
+than the first — a page carrying both a `noai` tag and a TDM reservation has said
+no twice, and collapsing that would understate it.
+
+The report is derived from the corpus, which is why `--compliance-report`
+requires `--corpus`. A report tallied independently could disagree with the data
+it describes, and then neither would be worth anything.
+
+`warnings` is empty on a clean crawl, and is the reason to read the report at all.
+`robots_disallowed` above zero means the crawl did not respect robots.txt, or the
+records are mislabelled — either way it says so in words.
+
+Two reports over the same corpus are the same file, so an audit artefact can be
+diffed.
+
+**It records what happened; it does not certify that it was right.** No field says
+"compliant", because that is a judgement about a particular use in a particular
+jurisdiction, and a crawler is not in a position to make it.
+
 ## Limits
 
 - **No language detection.** `language` comes from `<html lang>` or

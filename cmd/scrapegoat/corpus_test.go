@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -259,5 +260,99 @@ func TestCrawlWritesParquetCorpus(t *testing.T) {
 	s := provenance.Summarise(records)
 	if s.Restrictive != 3 {
 		t.Errorf("restrictive = %d, want 3", s.Restrictive)
+	}
+}
+
+func TestCrawlWritesComplianceReport(t *testing.T) {
+	resetGlobals(t)
+
+	var hits int32
+	srv := corpusSite(t, &hits)
+	defer srv.Close()
+
+	work := t.TempDir()
+	reportFile := filepath.Join(work, "compliance.json")
+
+	cfgFile = loopbackConfigFile(t, filepath.Join(work, "out"))
+	corpusPath = filepath.Join(work, "corpus.jsonl")
+	compliancePath = reportFile
+	t.Cleanup(func() { corpusPath, compliancePath = "", "" })
+
+	if err := runCrawl(nil, []string{srv.URL + "/"}); err != nil {
+		t.Fatalf("crawl: %v", err)
+	}
+
+	rep, err := provenance.ReadComplianceReport(reportFile)
+	if err != nil {
+		t.Fatalf("ReadComplianceReport: %v", err)
+	}
+
+	if rep.Version != provenance.ComplianceReportVersion {
+		t.Errorf("version = %d", rep.Version)
+	}
+	if rep.Totals.Records != 3 {
+		t.Errorf("records = %d, want 3", rep.Totals.Records)
+	}
+
+	// The crawl was entirely permitted, so this must be zero and there must be no
+	// warning. A non-zero value here is the loudest signal the report can give.
+	if rep.Totals.RobotsDisallowed != 0 {
+		t.Errorf("robots disallowed = %d, want 0", rep.Totals.RobotsDisallowed)
+	}
+	if len(rep.Warnings) != 0 {
+		t.Errorf("a clean crawl produced warnings: %v", rep.Warnings)
+	}
+
+	// ...and yet every record is restricted, because the site blocks AI crawlers.
+	// Permitted and restricted are different questions and the report keeps both.
+	if rep.Totals.Restricted != 3 {
+		t.Errorf("restricted = %d, want 3", rep.Totals.Restricted)
+	}
+	if len(rep.Restricted) != 3 {
+		t.Errorf("restricted list has %d entries, want 3", len(rep.Restricted))
+	}
+	for _, r := range rep.Restricted {
+		if r.ContentHash == "" {
+			t.Errorf("%s has no content hash to check against the corpus", r.URL)
+		}
+		if len(r.Reasons) == 0 {
+			t.Errorf("%s is restricted for no stated reason", r.URL)
+		}
+	}
+
+	if len(rep.SitesBlockingAI) != 1 {
+		t.Fatalf("sites blocking AI = %d, want 1", len(rep.SitesBlockingAI))
+	}
+	if rep.SitesBlockingAI[0].Records != 3 {
+		t.Errorf("site record count = %d, want 3", rep.SitesBlockingAI[0].Records)
+	}
+
+	// The totals must agree with the corpus the report claims to describe.
+	records, err := provenance.ReadAnyCorpus(corpusPath)
+	if err != nil {
+		t.Fatalf("ReadAnyCorpus: %v", err)
+	}
+	if rep.Totals.Records != len(records) {
+		t.Errorf("report claims %d records, corpus holds %d", rep.Totals.Records, len(records))
+	}
+}
+
+// The report is derived from the corpus, so asking for one without the other is a
+// mistake worth naming rather than silently producing nothing.
+func TestComplianceReportRequiresCorpus(t *testing.T) {
+	resetGlobals(t)
+
+	work := t.TempDir()
+	cfgFile = loopbackConfigFile(t, filepath.Join(work, "out"))
+	corpusPath = ""
+	compliancePath = filepath.Join(work, "compliance.json")
+	t.Cleanup(func() { compliancePath = "" })
+
+	err := runCrawl(nil, []string{"http://127.0.0.1:1/"})
+	if err == nil {
+		t.Fatal("--compliance-report without --corpus was accepted")
+	}
+	if !strings.Contains(err.Error(), "--corpus") {
+		t.Errorf("error does not explain the requirement: %v", err)
 	}
 }
