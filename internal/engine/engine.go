@@ -4,12 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/IshaanNene/ScrapeGoat/internal/clock"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/observability"
+	"github.com/IshaanNene/ScrapeGoat/internal/safety"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // State represents the engine's current lifecycle state.
@@ -66,6 +71,11 @@ type DomainStats struct {
 }
 
 // Snapshot returns a copy of stats safe for reading.
+//
+// Deliberately does not compute an "elapsed" field. Stats has no clock of its own,
+// and reaching for the wall clock here would put a nondeterministic value in the
+// middle of the engine's own status output. Engine.Stats adds elapsed from the
+// injected clock instead.
 func (s *Stats) Snapshot() map[string]any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -80,7 +90,6 @@ func (s *Stats) Snapshot() map[string]any {
 		"urls_filtered":    s.URLsFiltered.Load(),
 		"bytes_downloaded": s.BytesDownloaded.Load(),
 		"active_workers":   s.ActiveWorkers.Load(),
-		"elapsed":          time.Since(s.StartTime).String(),
 	}
 }
 
@@ -114,7 +123,7 @@ type Engine struct {
 	cfg        *config.Config
 	logger     *slog.Logger
 	frontier   *Frontier
-	dedup      *Deduplicator
+	dedup      Deduper
 	robots     *RobotsManager
 	checkpoint *CheckpointManager
 	scheduler  *Scheduler
@@ -128,7 +137,28 @@ type Engine struct {
 	callbacks  map[string]ResponseCallback
 	itemChan   chan *types.Item
 	resultChan chan *types.Item
-	errChan    chan error
+
+	// subscribers receive a copy of every stored item. Kept separate from
+	// resultChan so that a consumer of ResultsChan does not compete with storage
+	// for items — see ResultsChan.
+	subscribers []chan *types.Item
+	subMu       sync.Mutex
+
+	// clock and rand are the engine's controlled sources of nondeterminism.
+	// Everything in the crawl path takes time and entropy from here rather than
+	// from the standard library, so that a crawl can be replayed. See
+	// docs/design/0001-deterministic-crawl.md.
+	clock clock.Clock
+	rand  *rand.Rand
+
+	// metrics may be nil, in which case every recording call is a no-op. This is
+	// the wiring the previous code was missing entirely: cmd/scrapegoat built a
+	// Metrics in a local variable, started its HTTP server, and never handed it to
+	// the engine — so the endpoint served permanently-zero counters.
+	metrics *observability.Metrics
+
+	shutdownOnce sync.Once
+	shutdownDone chan struct{}
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -137,21 +167,31 @@ type Engine struct {
 }
 
 // New creates a new Engine with the given configuration.
-func New(cfg *config.Config, logger *slog.Logger) *Engine {
+//
+// Options are for controlling nondeterminism (clock, randomness); the defaults are
+// the real ones, so callers who do not care can ignore them entirely.
+func New(cfg *config.Config, logger *slog.Logger, opts ...Option) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
+	o := resolve(opts)
 
 	e := &Engine{
-		cfg:        cfg,
-		logger:     logger,
-		frontier:   NewFrontier(),
-		dedup:      NewDeduplicator(1_000_000),
-		robots:     NewRobotsManager(cfg.Engine.RespectRobotsTxt),
-		checkpoint: NewCheckpointManager(cfg.Engine.CheckpointInterval),
-		fetchers:   make(map[string]Fetcher),
-		callbacks:  make(map[string]ResponseCallback),
-		itemChan:   make(chan *types.Item, cfg.Engine.Concurrency*10),
-		resultChan: make(chan *types.Item, cfg.Engine.Concurrency*10),
-		errChan:    make(chan error, cfg.Engine.Concurrency*10),
+		clock:    o.clock,
+		rand:     o.rand,
+		cfg:      cfg,
+		logger:   logger,
+		frontier: NewFrontier(o.clock),
+		dedup:    newDeduper(cfg, logger),
+		robots: NewRobotsManager(cfg.Engine.RespectRobotsTxt, safety.New(safety.Config{
+			AllowedSchemes:        cfg.Safety.AllowedSchemes,
+			AllowPrivateAddresses: cfg.Safety.AllowPrivateAddresses,
+			AllowedPrivateHosts:   cfg.Safety.AllowedPrivateHosts,
+		}), o.clock),
+		checkpoint:   NewCheckpointManager(cfg.Engine.CheckpointInterval, o.clock),
+		fetchers:     make(map[string]Fetcher),
+		callbacks:    make(map[string]ResponseCallback),
+		itemChan:     make(chan *types.Item, cfg.Engine.Concurrency*10),
+		resultChan:   make(chan *types.Item, cfg.Engine.Concurrency*10),
+		shutdownDone: make(chan struct{}),
 		stats: &Stats{
 			domainStats: make(map[string]*DomainStats),
 		},
@@ -166,8 +206,17 @@ func New(cfg *config.Config, logger *slog.Logger) *Engine {
 // SetFetcher registers a fetcher for a given type.
 func (e *Engine) SetFetcher(fetcherType string, f Fetcher) {
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	e.fetchers[fetcherType] = f
+	e.mu.Unlock()
+
+	// robots.txt goes over the same transport as the pages it governs. Routing it
+	// through the registered fetcher means a recorded crawl records its robots
+	// fetches too, and a replay answers "was this allowed?" from the log instead
+	// of from the live site — without which a replay is neither offline nor a
+	// faithful account of the decisions the original crawl made.
+	if fetcherType == "http" && e.robots != nil {
+		e.robots.SetFetcher(f)
+	}
 }
 
 // SetParser sets the parser implementation.
@@ -182,6 +231,14 @@ func (e *Engine) SetPipeline(p Pipeline) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.pipeline = p
+}
+
+// SetMetrics attaches a Prometheus metrics recorder. Call before Start.
+// Passing nil (or never calling this) disables metric recording.
+func (e *Engine) SetMetrics(m *observability.Metrics) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.metrics = m
 }
 
 // SetStorage sets the storage implementation.
@@ -219,14 +276,8 @@ func (e *Engine) AddRequest(req *types.Request) error {
 		return types.ErrMaxDepth
 	}
 
-	// Check dedup
-	if e.dedup.IsSeen(urlStr) {
-		e.stats.URLsFiltered.Add(1)
-		return types.ErrDuplicate
-	}
-
 	// Check robots.txt
-	if e.cfg.Engine.RespectRobotsTxt && !e.robots.IsAllowed(urlStr) {
+	if e.cfg.Engine.RespectRobotsTxt && !e.robots.IsAllowed(e.ctx, urlStr) {
 		e.stats.URLsFiltered.Add(1)
 		return types.ErrBlocked
 	}
@@ -237,9 +288,21 @@ func (e *Engine) AddRequest(req *types.Request) error {
 		return fmt.Errorf("domain %q is not allowed", req.Domain())
 	}
 
-	e.dedup.MarkSeen(urlStr)
+	// Claim the URL atomically. AddRequest runs on worker goroutines during link
+	// extraction, so a separate IsSeen check followed by MarkSeen would let two
+	// workers that found the same link both pass and both enqueue it.
+	//
+	// This runs last among the filters so that a URL rejected by robots.txt or the
+	// domain allowlist is not recorded as seen — the same URL may legitimately
+	// arrive later with a different depth or after robots.txt is re-read.
+	if !e.dedup.MarkIfUnseen(urlStr) {
+		e.stats.URLsFiltered.Add(1)
+		return types.ErrDuplicate
+	}
+
 	e.frontier.Push(req)
 	e.stats.URLsEnqueued.Add(1)
+	e.metrics.SetFrontierDepth(e.frontier.Len())
 	return nil
 }
 
@@ -255,7 +318,7 @@ func (e *Engine) Start() error {
 		"respect_robots", e.cfg.Engine.RespectRobotsTxt,
 	)
 
-	e.stats.StartTime = time.Now()
+	e.stats.StartTime = e.clock.Now()
 
 	// Start item pipeline processor
 	e.wg.Add(1)
@@ -278,29 +341,39 @@ func (e *Engine) Start() error {
 }
 
 // Wait blocks until all work is done.
+//
+// Safe to call more than once: the shutdown body runs under a sync.Once, so a second
+// Wait blocks until the first has finished rather than panicking on a double channel
+// close. Callers reasonably treat Wait as idempotent, and "close of closed channel"
+// is a poor way to find out otherwise.
 func (e *Engine) Wait() {
 	e.scheduler.Wait()
 
-	// Cancel context to stop checkpoint goroutine and other background tasks
-	e.cancel()
+	e.shutdownOnce.Do(func() {
+		// Cancel context to stop checkpoint goroutine and other background tasks
+		e.cancel()
 
-	// Signal processors to stop
-	close(e.itemChan)
-	close(e.errChan)
+		// Signal processors to stop. itemChan is closed here, after every worker has
+		// returned from scheduler.Wait(), so no worker can still be mid-send.
+		close(e.itemChan)
 
-	e.wg.Wait()
-	e.state.Store(int32(StateStopped))
+		e.wg.Wait()
+		e.state.Store(int32(StateStopped))
 
-	// Close fetchers
-	e.mu.RLock()
-	for _, f := range e.fetchers {
-		if err := f.Close(); err != nil {
-			e.logger.Error("fetcher close error", "error", err)
+		// Close fetchers
+		e.mu.RLock()
+		for _, f := range e.fetchers {
+			if err := f.Close(); err != nil {
+				e.logger.Error("fetcher close error", "error", err)
+			}
 		}
-	}
-	e.mu.RUnlock()
+		e.mu.RUnlock()
 
-	e.logger.Info("engine stopped", "stats", e.stats.Snapshot())
+		e.logger.Info("engine stopped", "stats", e.StatsSnapshot())
+		close(e.shutdownDone)
+	})
+
+	<-e.shutdownDone
 }
 
 // Stop gracefully stops the engine.
@@ -335,54 +408,105 @@ func (e *Engine) Stats() *Stats {
 	return e.stats
 }
 
+// StatsSnapshot returns the crawl statistics plus an "elapsed" field measured on
+// the engine's clock.
+//
+// Stats.Snapshot deliberately omits elapsed: Stats has no clock, and reaching for
+// the wall clock there would put a nondeterministic value in the engine's own
+// status output. The engine has a clock, so it adds it here.
+func (e *Engine) StatsSnapshot() map[string]any {
+	snap := e.stats.Snapshot()
+	snap["elapsed"] = e.clock.Since(e.stats.StartTime).String()
+	return snap
+}
+
 // State returns the current engine state.
 func (e *Engine) GetState() State {
 	return State(e.state.Load())
 }
 
-// ResultsChan returns a channel for streaming scraped items.
+// ResultsChan returns a channel that receives a copy of every scraped item.
+//
+// Each call registers an independent subscriber, so multiple consumers each see the
+// full stream and none of them competes with storage. Previously this handed back
+// the same channel storeResults was draining, which meant every item went to exactly
+// one of them at random: reading the "results" silently corrupted the output file.
+//
+// Call this before Start. Subscribers registered mid-crawl only see items scraped
+// after they register. The channel is closed when the crawl finishes.
+//
+// A slow subscriber applies backpressure to the crawl once its buffer fills, which is
+// deliberate — dropping items to keep a consumer fast is a worse failure than
+// slowing down.
 func (e *Engine) ResultsChan() <-chan *types.Item {
-	return e.resultChan
+	ch := make(chan *types.Item, e.cfg.Engine.Concurrency*10)
+
+	e.subMu.Lock()
+	e.subscribers = append(e.subscribers, ch)
+	e.subMu.Unlock()
+
+	return ch
 }
 
-// isDomainAllowed checks domain allow/disallow lists.
-func (e *Engine) isDomainAllowed(domain string) bool {
-	// If allowed domains are set, domain must be in the list
-	if len(e.cfg.Engine.AllowedDomains) > 0 {
-		for _, d := range e.cfg.Engine.AllowedDomains {
-			if d == domain {
-				return true
-			}
-		}
-		return false
-	}
+// fanOut delivers an item to every registered subscriber.
+//
+// The sends block rather than selecting on ctx.Done: Stop cancels the context to
+// halt fetching, and bailing out here would silently discard items that were already
+// scraped and paid for. A subscriber that stops reading before the channel closes
+// stalls the crawl, which is the documented contract and a far more debuggable
+// failure than losing rows from the output.
+func (e *Engine) fanOut(item *types.Item) {
+	e.subMu.Lock()
+	subs := e.subscribers
+	e.subMu.Unlock()
 
-	// Check disallowed domains
-	for _, d := range e.cfg.Engine.DisallowedDomains {
-		if d == domain {
-			return false
-		}
+	for _, ch := range subs {
+		ch <- item
 	}
-	return true
+}
+
+// closeSubscribers closes every subscriber channel exactly once, at end of crawl.
+func (e *Engine) closeSubscribers() {
+	e.subMu.Lock()
+	subs := e.subscribers
+	e.subscribers = nil
+	e.subMu.Unlock()
+
+	for _, ch := range subs {
+		close(ch)
+	}
 }
 
 // processItems runs the pipeline on scraped items.
 func (e *Engine) processItems() {
 	defer e.wg.Done()
+	// Deferred so that an early return on cancellation still releases storeResults
+	// and every subscriber, rather than leaving them ranging over a channel that
+	// will never close.
+	defer e.closeSubscribers()
+	defer close(e.resultChan)
+
 	for item := range e.itemChan {
 		if e.pipeline != nil {
 			processed, err := e.pipeline.Process(item)
 			if err != nil {
 				e.stats.ItemsDropped.Add(1)
+				e.metrics.RecordItem("dropped")
 				e.logger.Warn("pipeline dropped item", "url", item.URL, "error", err)
 				continue
 			}
 			item = processed
 		}
 		e.stats.ItemsScraped.Add(1)
+		e.metrics.RecordItem("scraped")
+
+		// Storage is the primary consumer; subscribers get their own copies.
+		// Both sends block: itemChan is closed once every worker has exited, so this
+		// loop is guaranteed to terminate, and abandoning it on cancellation would
+		// throw away items that have already been fetched and parsed.
 		e.resultChan <- item
+		e.fanOut(item)
 	}
-	close(e.resultChan)
 }
 
 // storeResults persists items from the result channel.
@@ -397,6 +521,10 @@ func (e *Engine) storeResults() {
 		if e.storage != nil {
 			if err := e.storage.Store(batch); err != nil {
 				e.logger.Error("storage error", "error", err, "batch_size", len(batch))
+			} else {
+				for range batch {
+					e.metrics.RecordItem("stored")
+				}
 			}
 		}
 		batch = batch[:0]
@@ -420,7 +548,7 @@ func (e *Engine) storeResults() {
 // autoCheckpoint periodically saves engine state.
 func (e *Engine) autoCheckpoint() {
 	defer e.wg.Done()
-	ticker := time.NewTicker(e.cfg.Engine.CheckpointInterval)
+	ticker := e.clock.NewTicker(e.cfg.Engine.CheckpointInterval)
 	defer ticker.Stop()
 
 	for {
@@ -438,5 +566,66 @@ func (e *Engine) autoCheckpoint() {
 				e.logger.Debug("checkpoint saved")
 			}
 		}
+	}
+}
+
+// HasCheckpoint reports whether a checkpoint from a previous run is available.
+func (e *Engine) HasCheckpoint() bool { return e.checkpoint.HasCheckpoint() }
+
+// ResumeFromCheckpoint restores frontier, dedup, and stats from the last
+// checkpoint. Distinct from Resume, which un-pauses a running engine.
+//
+// Call before Start and before adding seeds. Checkpointing was previously
+// write-only: Save ran on a ticker and Load had no caller outside tests, so the
+// crawler produced checkpoint files that nothing ever read.
+//
+// Seeds added after a resume are still filtered through the restored dedup set,
+// so re-running the same command with the same seeds does not re-crawl what the
+// previous run already covered — the restored frontier is the remaining work, and
+// the seeds are a no-op unless they are genuinely new.
+func (e *Engine) ResumeFromCheckpoint() error {
+	if !e.checkpoint.HasCheckpoint() {
+		return fmt.Errorf("no checkpoint found in %s", e.checkpoint.Dir())
+	}
+
+	if err := e.checkpoint.Load(e.frontier, e.dedup, e.stats); err != nil {
+		return fmt.Errorf("load checkpoint: %w", err)
+	}
+
+	e.logger.Info("resumed from checkpoint",
+		"queued", e.frontier.Len(),
+		"seen", e.dedup.Count(),
+		"requests_sent", e.stats.RequestsSent.Load(),
+	)
+	e.metrics.SetFrontierDepth(e.frontier.Len())
+	return nil
+}
+
+// ClearCheckpoint removes the checkpoint file. Called after a crawl finishes
+// normally, so the next run does not resume work that is already done.
+func (e *Engine) ClearCheckpoint() error { return e.checkpoint.Clean() }
+
+// newDeduper builds the deduplication strategy named in the configuration.
+//
+// The default is exact. Bloom is opt-in because it is lossy: a false positive
+// means a URL is treated as already-seen and never crawled, which is a silent
+// data-completeness cost, not a performance knob. Engine.New previously hardcoded
+// NewDeduplicator(1_000_000) — so the Bloom implementation, its tests, and its
+// documented memory saving were all unreachable.
+func newDeduper(cfg *config.Config, logger *slog.Logger) Deduper {
+	expected := cfg.Engine.ExpectedURLs
+	if expected <= 0 {
+		expected = 1_000_000
+	}
+
+	switch strings.ToLower(cfg.Engine.DedupStrategy) {
+	case "bloom":
+		logger.Warn("using bloom deduplication — memory-bounded but lossy",
+			"expected_urls", expected,
+			"target_fp_rate", cfg.Engine.DedupFPRate,
+			"note", "a false positive silently skips a URL that was never crawled")
+		return NewBloomDeduplicator(expected, cfg.Engine.DedupFPRate)
+	default:
+		return NewDeduplicator(expected)
 	}
 }

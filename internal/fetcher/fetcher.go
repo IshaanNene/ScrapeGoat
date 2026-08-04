@@ -3,7 +3,7 @@ package fetcher
 import (
 	"context"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // Fetcher is the interface for all request fetcher implementations.

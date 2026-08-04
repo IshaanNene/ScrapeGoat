@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // ---------------------------------------------------------------------------
@@ -365,7 +365,6 @@ func TestPipelineOrdering(t *testing.T) {
 
 	// Create tracking middlewares
 	for _, name := range []string{"first", "second", "third"} {
-		name := name
 		p.Use(&trackingMiddleware{name: name, order: &order})
 	}
 

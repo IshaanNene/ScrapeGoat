@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+// statusPending is the initial state of a queued task. Named because it is
+// compared in four places and a typo in any of them silently strands work.
+const statusPending = "pending"
+
 // Role identifies whether a node is a master or worker.
 type Role string
 
@@ -100,7 +104,7 @@ func (m *Master) UnregisterNode(nodeID string) {
 func (m *Master) SubmitTask(task *Task) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	task.Status = "pending"
+	task.Status = statusPending
 	task.Created = time.Now()
 	if task.ID == "" {
 		task.ID = fmt.Sprintf("task-%d", time.Now().UnixMilli())
@@ -118,7 +122,7 @@ func (m *Master) AssignTasks() []Assignment {
 	assignments := make([]Assignment, 0, len(m.taskQueue))
 
 	for _, task := range m.taskQueue {
-		if task.Status != "pending" {
+		if task.Status != statusPending {
 			continue
 		}
 
@@ -147,7 +151,7 @@ func (m *Master) AssignTasks() []Assignment {
 	// Remove assigned tasks from queue
 	var remaining []*Task
 	for _, t := range m.taskQueue {
-		if t.Status == "pending" {
+		if t.Status == statusPending {
 			remaining = append(remaining, t)
 		}
 	}
@@ -211,7 +215,7 @@ func (m *Master) GetClusterStatus() ClusterStatus {
 	doneTasks := 0
 	for _, t := range m.tasks {
 		switch t.Status {
-		case "pending":
+		case statusPending:
 			pendingTasks++
 		case "running":
 			runningTasks++

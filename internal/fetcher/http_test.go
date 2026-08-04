@@ -3,6 +3,7 @@ package fetcher
 import (
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,11 +13,12 @@ import (
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 func testConfig() *config.Config {
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.UserAgents = []string{"Bot/1.0", "Bot/2.0", "Bot/3.0"}
 	cfg.Fetcher.MaxBodySize = 1024 * 1024
 	return cfg
@@ -190,8 +192,8 @@ func TestFetch429(t *testing.T) {
 		t.Fatal("expected error on 429 response")
 	}
 
-	fetchErr, ok := err.(*types.FetchError)
-	if !ok {
+	var fetchErr *types.FetchError
+	if !errors.As(err, &fetchErr) {
 		t.Fatalf("expected *FetchError, got %T", err)
 	}
 	if !fetchErr.Retryable {
@@ -225,8 +227,8 @@ func TestFetch5xx(t *testing.T) {
 		t.Fatal("expected error on 503 response")
 	}
 
-	fetchErr, ok := err.(*types.FetchError)
-	if !ok {
+	var fetchErr *types.FetchError
+	if !errors.As(err, &fetchErr) {
 		t.Fatalf("expected *FetchError, got %T", err)
 	}
 	if !fetchErr.Retryable {

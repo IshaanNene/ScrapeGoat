@@ -13,16 +13,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var testLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
 func newTestEngine(concurrency, maxDepth, maxRequests int) (*engine.Engine, error) {
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = concurrency
 	cfg.Engine.MaxDepth = maxDepth
 	cfg.Engine.MaxRequests = maxRequests
@@ -84,7 +84,7 @@ func TestMode2_RedirectLoop(t *testing.T) {
 	ts, _ := NewServer(ServerConfig{Mode: ModeRedirectLoop})
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 2
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 5
@@ -137,7 +137,7 @@ func TestMode3_SlowDrip(t *testing.T) {
 	ts, _ := NewServer(ServerConfig{Mode: ModeSlowDrip})
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 2
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 1
@@ -189,7 +189,7 @@ func TestMode4_HugeResponseBomb(t *testing.T) {
 	var memBefore runtime.MemStats
 	runtime.ReadMemStats(&memBefore)
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 1
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 1
@@ -242,7 +242,6 @@ func TestMode5_MalformedHTML(t *testing.T) {
 	variants := []string{"deep_nesting", "unclosed_tags", "mixed_encoding", "null_bytes", "combined"}
 
 	for _, variant := range variants {
-		variant := variant
 		t.Run(variant, func(t *testing.T) {
 			t.Parallel()
 			ts, _ := NewServer(ServerConfig{Mode: ModeMalformedHTML, Variant: variant})
@@ -298,11 +297,10 @@ func TestMode6_DNSFailure(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := config.DefaultConfig()
+			cfg := testutil.LoopbackConfig()
 			cfg.Engine.Concurrency = 1
 			cfg.Engine.MaxDepth = 0
 			cfg.Engine.MaxRequests = 1
@@ -347,7 +345,7 @@ func TestMode8_ConcurrencyStampede(t *testing.T) {
 
 	const maxConcurrency = 20
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = maxConcurrency
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 200
@@ -456,13 +454,12 @@ func TestMode10_RobotsTxtAdversarial(t *testing.T) {
 	}
 
 	for _, v := range variants {
-		v := v
 		t.Run(v.name, func(t *testing.T) {
 			t.Parallel()
 			ts, _ := NewServer(ServerConfig{Mode: ModeRobotsTxtAdversarial, Variant: v.variant})
 			defer ts.Close()
 
-			cfg := config.DefaultConfig()
+			cfg := testutil.LoopbackConfig()
 			cfg.Engine.Concurrency = 2
 			cfg.Engine.MaxDepth = 0
 			cfg.Engine.MaxRequests = 3

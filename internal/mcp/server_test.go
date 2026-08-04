@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 func testLogger() *slog.Logger {
@@ -76,7 +76,6 @@ func TestServer_ToolsList(t *testing.T) {
 		"scrapegoat_batch",
 		"scrapegoat_job_status",
 		"scrapegoat_sitemap",
-		"scrapegoat_seo_audit",
 	}
 
 	if len(toolList.Tools) != len(expectedTools) {
@@ -398,4 +397,3 @@ func TestMemoryCollector(t *testing.T) {
 
 // Ensure types import is used.
 var _ = (*types.Item)(nil)
-

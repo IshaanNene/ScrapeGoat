@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "h1": [
+        "Heading One",
+        "Another H1"
+      ],
+      "images": [
+        "/a.png",
+        "/b.png",
+        "/c.png"
+      ],
+      "meta_description": "first description",
+      "meta_title": "First Title",
+      "title": [
+        "First Title",
+        "Second Title"
+      ]
+    }
+  ],
+  "links": null
+}

@@ -7,14 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/IshaanNene/ScrapeGoat/contrib/seo"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
-	"github.com/IshaanNene/ScrapeGoat/internal/seo"
+	"github.com/IshaanNene/ScrapeGoat/internal/sitemap"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var testLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -25,7 +27,7 @@ func TestLiveFetch(t *testing.T) {
 		t.Skip("skipping live test")
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	f, err := fetcher.NewHTTPFetcher(cfg, testLogger)
 	if err != nil {
 		t.Fatalf("create fetcher: %v", err)
@@ -60,7 +62,7 @@ func TestLiveParse(t *testing.T) {
 		t.Skip("skipping live test")
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	f, _ := fetcher.NewHTTPFetcher(cfg, testLogger)
 	defer f.Close()
 
@@ -102,39 +104,13 @@ func TestLiveParse(t *testing.T) {
 	}
 }
 
-// TestLiveSEOAudit tests the SEO auditor against a real page.
-func TestLiveSEOAudit(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping live test")
-	}
-
-	cfg := config.DefaultConfig()
-	f, _ := fetcher.NewHTTPFetcher(cfg, testLogger)
-	defer f.Close()
-
-	req, _ := types.NewRequest("https://quotes.toscrape.com")
-	resp, _ := f.Fetch(context.Background(), req)
-
-	auditor := seo.NewMetaAuditor(testLogger)
-	result, err := auditor.Audit(resp)
-	if err != nil {
-		t.Fatalf("audit: %v", err)
-	}
-
-	t.Logf("SEO Score: %d/100", result.Score)
-	for _, issue := range result.Issues {
-		t.Logf("  [%s] %s: %s", issue.Severity, issue.Category, issue.Message)
-	}
-	t.Logf("Tags: %v", result.Tags)
-}
-
 // TestLiveSitemap tests sitemap crawling.
 func TestLiveSitemap(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping live test")
 	}
 
-	sc := seo.NewSitemapCrawler(testLogger)
+	sc := sitemap.New(testLogger)
 	discovered := sc.DiscoverSitemap("quotes.toscrape.com")
 	t.Logf("Discovered sitemap: %s", discovered)
 
@@ -153,7 +129,7 @@ func TestLiveCrawl(t *testing.T) {
 		t.Skip("skipping live test")
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.MaxDepth = 1
 	cfg.Engine.Concurrency = 2
 	cfg.Engine.PolitenessDelay = 500 * time.Millisecond
@@ -217,7 +193,7 @@ func TestBacklinkExtraction(t *testing.T) {
 		t.Skip("skipping live test")
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	f, _ := fetcher.NewHTTPFetcher(cfg, testLogger)
 	defer f.Close()
 

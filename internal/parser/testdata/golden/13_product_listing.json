@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "images": [
+        "/media/one.jpg",
+        "/media/two.jpg",
+        "/media/three.jpg"
+      ],
+      "meta_title": "All products | Shop",
+      "title": "All products | Shop"
+    }
+  ],
+  "links": [
+    "https://example.com/",
+    "https://example.com/about",
+    "https://example.com/books",
+    "https://example.com/catalogue/one/",
+    "https://example.com/catalogue/three/",
+    "https://example.com/catalogue/two/",
+    "https://example.com/contact"
+  ]
+}

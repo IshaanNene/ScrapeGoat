@@ -114,13 +114,13 @@ func TestBloomFilterReset(t *testing.T) {
 }
 
 func TestBloomDeduplicator(t *testing.T) {
-	bd := NewBloomDeduplicator(10000)
+	bd := NewBloomDeduplicator(10000, 0.01)
 
 	if bd.IsSeen("https://example.com") {
 		t.Error("should not be seen before marking")
 	}
 
-	bd.MarkSeen("https://example.com")
+	bd.MarkIfUnseen("https://example.com")
 
 	if !bd.IsSeen("https://example.com") {
 		t.Error("should be seen after marking")

@@ -10,7 +10,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/extract"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // AutoExtractor automatically extracts structured data from any webpage
@@ -89,11 +90,23 @@ func (ae *AutoExtractor) Extract(resp *types.Response) (*ExtractedData, error) {
 	// 4. Extract tables
 	ae.extractTables(doc, result)
 
-	// 5. Extract product data (price, name, image patterns)
+	// 5. Extract product data (price, name, image patterns).
+	// The selector pass handles well-marked-up sites; the structural pass catches
+	// the rest, which is most of them. Only run the fallback if the first found
+	// nothing, so a site that marks its products up properly is not second-guessed.
+	before := len(result.Data)
 	ae.extractProducts(doc, result)
+	if len(result.Data) == before {
+		ae.extractProductsStructural(doc, result)
+	}
 
-	// 6. Extract article/content data
-	ae.extractArticles(doc, result)
+	// 6. Extract article/content data. Density scoring first; the selector pass
+	// is the fallback for pages where it declines to answer.
+	before = len(result.Data)
+	ae.extractArticleContent(doc, result)
+	if len(result.Data) == before {
+		ae.extractArticlesBySelector(doc, result)
+	}
 
 	// 7. Extract links and images
 	ae.extractLinks(doc, result)
@@ -319,7 +332,44 @@ func (ae *AutoExtractor) extractProducts(doc *goquery.Document, result *Extracte
 }
 
 // extractArticles attempts to extract article/content data.
-func (ae *AutoExtractor) extractArticles(doc *goquery.Document, result *ExtractedData) {
+// extractProductsStructural is the fallback when the selector list finds nothing.
+// See detectRepeatedItems for why guessing class names is not enough on its own.
+func (ae *AutoExtractor) extractProductsStructural(doc *goquery.Document, result *ExtractedData) {
+	items := detectRepeatedItems(doc)
+	result.Data = append(result.Data, items...)
+	if len(items) > 0 {
+		ae.logger.Debug("extracted listing by structure", "items", len(items))
+	}
+}
+
+// extractArticleContent uses density scoring to find the main content.
+//
+// Replaces the selector list below for the article case. On the extraction
+// benchmark the selector approach scored F1 0.438 — below the 0.537 of returning
+// the whole page body — because it is perfect on pages using <article> or
+// .entry-content and returns nothing at all on anything else. See
+// docs/EXTRACTION.md.
+func (ae *AutoExtractor) extractArticleContent(doc *goquery.Document, result *ExtractedData) {
+	res := extract.New().FromDocument(goquery.CloneDocument(doc))
+	if res.Text == "" {
+		return
+	}
+
+	article := map[string]any{
+		"_type": "article",
+		"text":  res.Text,
+	}
+	if res.Title != "" {
+		article["title"] = res.Title
+	}
+	// Carried through so a downstream filter can drop low-confidence extractions
+	// rather than treating every result as equally trustworthy.
+	article["_confidence"] = res.Confidence
+
+	result.Data = append(result.Data, article)
+}
+
+func (ae *AutoExtractor) extractArticlesBySelector(doc *goquery.Document, result *ExtractedData) {
 	articleSelectors := []string{
 		"article",
 		"[itemtype*='Article']",

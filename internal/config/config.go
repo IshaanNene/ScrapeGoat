@@ -25,17 +25,71 @@ type Config struct {
 	Distributed DistributedConfig     `mapstructure:"distributed" yaml:"distributed"`
 	Middleware  MiddlewareGroupConfig `mapstructure:"middleware" yaml:"middleware"`
 	Project     ProjectConfig         `mapstructure:"project"     yaml:"project"`
+	Safety      SafetyConfig          `mapstructure:"safety"      yaml:"safety"`
+}
+
+// SafetyConfig controls the outbound network trust boundary — which URLs the
+// crawler is willing to fetch. The defaults deny everything that is not a public
+// http/https endpoint, because URLs reach the fetcher from callers the operator
+// does not control (MCP clients, the REST API, links in crawled pages).
+//
+// See internal/safety and SECURITY.md for the threat model.
+type SafetyConfig struct {
+	// AllowedSchemes is the set of permitted URL schemes. Empty means http+https.
+	AllowedSchemes []string `mapstructure:"allowed_schemes" yaml:"allowed_schemes"`
+
+	// AllowPrivateAddresses permits fetching loopback, RFC1918, link-local, and
+	// other non-public addresses. Turning this on makes the process an SSRF proxy
+	// for anything that can hand it a URL — only enable it for a deliberate crawl
+	// of an internal network.
+	AllowPrivateAddresses bool `mapstructure:"allow_private_addresses" yaml:"allow_private_addresses"`
+
+	// AllowedPrivateHosts exempts specific hostnames from the address checks
+	// without opening up the whole private range.
+	AllowedPrivateHosts []string `mapstructure:"allowed_private_hosts" yaml:"allowed_private_hosts"`
 }
 
 // EngineConfig controls the core crawler engine.
 type EngineConfig struct {
-	Concurrency        int           `mapstructure:"concurrency"          yaml:"concurrency"`
-	MaxDepth           int           `mapstructure:"max_depth"            yaml:"max_depth"`
-	RequestTimeout     time.Duration `mapstructure:"request_timeout"      yaml:"request_timeout"`
-	PolitenessDelay    time.Duration `mapstructure:"politeness_delay"     yaml:"politeness_delay"`
-	RespectRobotsTxt   bool          `mapstructure:"respect_robots_txt"   yaml:"respect_robots_txt"`
-	MaxRetries         int           `mapstructure:"max_retries"          yaml:"max_retries"`
-	RetryDelay         time.Duration `mapstructure:"retry_delay"          yaml:"retry_delay"`
+	Concurrency     int           `mapstructure:"concurrency"          yaml:"concurrency"`
+	MaxDepth        int           `mapstructure:"max_depth"            yaml:"max_depth"`
+	RequestTimeout  time.Duration `mapstructure:"request_timeout"      yaml:"request_timeout"`
+	PolitenessDelay time.Duration `mapstructure:"politeness_delay"     yaml:"politeness_delay"`
+
+	// DedupStrategy selects how visited URLs are tracked: "exact" (default) keeps
+	// every hash in a map, "bloom" keeps only a Bloom filter.
+	//
+	// Bloom is memory-bounded but lossy — a false positive means a URL is treated
+	// as already-seen and silently never crawled. Choose it only when the crawl is
+	// large enough that an exact set will not fit.
+	DedupStrategy string `mapstructure:"dedup_strategy" yaml:"dedup_strategy"`
+
+	// ExpectedURLs sizes the deduplicator. For the bloom strategy this determines
+	// the filter's memory and its actual false-positive rate; undersizing it makes
+	// the filter far lossier than DedupFPRate suggests.
+	ExpectedURLs int `mapstructure:"expected_urls" yaml:"expected_urls"`
+
+	// DedupFPRate is the target false-positive rate for the bloom strategy.
+	// Zero uses 1%.
+	DedupFPRate float64 `mapstructure:"dedup_fp_rate" yaml:"dedup_fp_rate"`
+
+	// MaxThrottleSlots bounds how many per-domain rate limiters are retained.
+	// The map used to grow one entry per domain with no eviction, which leaked
+	// memory monotonically on a broad crawl. Zero uses the default.
+	MaxThrottleSlots int `mapstructure:"max_throttle_slots" yaml:"max_throttle_slots"`
+
+	RespectRobotsTxt bool          `mapstructure:"respect_robots_txt"   yaml:"respect_robots_txt"`
+	MaxRetries       int           `mapstructure:"max_retries"          yaml:"max_retries"`
+	RetryDelay       time.Duration `mapstructure:"retry_delay"          yaml:"retry_delay"`
+
+	// CircuitBreakerThreshold is how many consecutive failures open a domain's
+	// circuit. Zero disables the breaker.
+	CircuitBreakerThreshold int `mapstructure:"circuit_breaker_threshold" yaml:"circuit_breaker_threshold"`
+
+	// CircuitBreakerCooldown is how long an open circuit waits before allowing
+	// a single probe through.
+	CircuitBreakerCooldown time.Duration `mapstructure:"circuit_breaker_cooldown" yaml:"circuit_breaker_cooldown"`
+
 	CheckpointInterval time.Duration `mapstructure:"checkpoint_interval"  yaml:"checkpoint_interval"`
 	UserAgents         []string      `mapstructure:"user_agents"          yaml:"user_agents"`
 	AllowedDomains     []string      `mapstructure:"allowed_domains"      yaml:"allowed_domains"`
@@ -53,7 +107,15 @@ type FetcherConfig struct {
 	MaxBodySize     int64         `mapstructure:"max_body_size"     yaml:"max_body_size"`
 	TLSInsecure     bool          `mapstructure:"tls_insecure"      yaml:"tls_insecure"`
 	IdleConnTimeout time.Duration `mapstructure:"idle_conn_timeout" yaml:"idle_conn_timeout"`
-	MaxIdleConns    int           `mapstructure:"max_idle_conns"    yaml:"max_idle_conns"`
+
+	// Fingerprint selects a browser TLS/HTTP identity: "chrome", "firefox",
+	// "safari", "edge", "random", or "" for Go's own stack.
+	//
+	// Go's crypto/tls emits a fixed ClientHello that is instantly recognisable as
+	// a Go program. Setting this makes the JA3 a real browser's — see
+	// internal/fetcher/fingerprint for what that does and does not achieve.
+	Fingerprint  string `mapstructure:"fingerprint" yaml:"fingerprint"`
+	MaxIdleConns int    `mapstructure:"max_idle_conns"    yaml:"max_idle_conns"`
 }
 
 // ProxyConfig controls proxy rotation.
@@ -97,6 +159,16 @@ type StorageConfig struct {
 	Type       string `mapstructure:"type"        yaml:"type"`
 	OutputPath string `mapstructure:"output_path" yaml:"output_path"`
 	BatchSize  int    `mapstructure:"batch_size"  yaml:"batch_size"`
+
+	// DeterministicOrder writes records in a total order rather than in whatever
+	// order concurrent workers happened to finish, so two runs over identical
+	// responses produce byte-identical files.
+	//
+	// Off by default because it makes the streaming formats buffer every item in
+	// memory. Turn it on when the output is going to be compared or published —
+	// `scrapegoat replay` turns it on for itself, since reproducing a recorded run
+	// is the only thing it does. See docs/REPLAY.md.
+	DeterministicOrder bool `mapstructure:"deterministic_order" yaml:"deterministic_order"`
 }
 
 // AIConfig controls LLM integration.
@@ -125,14 +197,17 @@ type MetricsConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Engine: EngineConfig{
-			Concurrency:        10,
-			MaxDepth:           5,
-			RequestTimeout:     30 * time.Second,
-			PolitenessDelay:    1 * time.Second,
-			RespectRobotsTxt:   true,
-			MaxRetries:         3,
-			RetryDelay:         2 * time.Second,
-			CheckpointInterval: 60 * time.Second,
+			Concurrency:             10,
+			MaxDepth:                5,
+			RequestTimeout:          30 * time.Second,
+			PolitenessDelay:         1 * time.Second,
+			MaxThrottleSlots:        10_000,
+			RespectRobotsTxt:        true,
+			MaxRetries:              3,
+			RetryDelay:              2 * time.Second,
+			CircuitBreakerThreshold: 5,
+			CircuitBreakerCooldown:  30 * time.Second,
+			CheckpointInterval:      60 * time.Second,
 			UserAgents: []string{
 				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 				"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -151,6 +226,10 @@ func DefaultConfig() *Config {
 			Rotation:     "round_robin",
 			HealthCheck:  true,
 			RotateOnFail: true,
+		},
+		Safety: SafetyConfig{
+			AllowedSchemes:        []string{"http", "https"},
+			AllowPrivateAddresses: false,
 		},
 		Parser: ParserConfig{
 			AutoDetect: true,
@@ -222,24 +301,40 @@ type ProjectConfig struct {
 
 // LLMConfig configures the LLM extraction engine.
 type LLMConfig struct {
-	Enabled    bool          `mapstructure:"enabled"      yaml:"enabled"`
-	Provider   string        `mapstructure:"provider"     yaml:"provider"` // openai, anthropic, ollama
-	Model      string        `mapstructure:"model"        yaml:"model"`
-	APIKey     string        `mapstructure:"api_key"      yaml:"api_key"`
-	Endpoint   string        `mapstructure:"endpoint"     yaml:"endpoint"`
-	CachePath  string        `mapstructure:"cache_path"   yaml:"cache_path"`
-	CacheTTL   time.Duration `mapstructure:"cache_ttl"    yaml:"cache_ttl"`
-	MaxTokens  int           `mapstructure:"max_tokens"   yaml:"max_tokens"`
+	Enabled   bool          `mapstructure:"enabled"      yaml:"enabled"`
+	Provider  string        `mapstructure:"provider"     yaml:"provider"` // openai, anthropic, ollama
+	Model     string        `mapstructure:"model"        yaml:"model"`
+	APIKey    string        `mapstructure:"api_key"      yaml:"api_key"`
+	Endpoint  string        `mapstructure:"endpoint"     yaml:"endpoint"`
+	CachePath string        `mapstructure:"cache_path"   yaml:"cache_path"`
+	CacheTTL  time.Duration `mapstructure:"cache_ttl"    yaml:"cache_ttl"`
+	MaxTokens int           `mapstructure:"max_tokens"   yaml:"max_tokens"`
 }
 
 // APIServerConfig configures the REST/WebSocket API server.
 type APIServerConfig struct {
-	Enabled  bool   `mapstructure:"enabled"   yaml:"enabled"`
-	Port     int    `mapstructure:"port"      yaml:"port"`
-	APIKey   string `mapstructure:"api_key"   yaml:"api_key"`
-	DBPath   string `mapstructure:"db_path"   yaml:"db_path"`
-	CORS     bool   `mapstructure:"cors"      yaml:"cors"`
-	RateRPS  int    `mapstructure:"rate_rps"  yaml:"rate_rps"` // requests per second per key
+	Enabled bool   `mapstructure:"enabled"   yaml:"enabled"`
+	Port    int    `mapstructure:"port"      yaml:"port"`
+	APIKey  string `mapstructure:"api_key"   yaml:"api_key"`
+	DBPath  string `mapstructure:"db_path"   yaml:"db_path"`
+	CORS    bool   `mapstructure:"cors"      yaml:"cors"`
+	RateRPS int    `mapstructure:"rate_rps"  yaml:"rate_rps"` // requests per second per key
+
+	// AllowNoAuth permits starting without an API key. The server otherwise
+	// refuses to start unauthenticated, because an empty key used to mean "let
+	// everyone in" — and an unauthenticated crawl endpoint on localhost is
+	// reachable from any web page the operator happens to visit.
+	AllowNoAuth bool `mapstructure:"allow_no_auth" yaml:"allow_no_auth"`
+
+	// AllowedOrigins lists the origins permitted by CORS and accepted on the
+	// WebSocket upgrade. Empty means same-origin only: no Access-Control-Allow-Origin
+	// header is emitted and cross-origin WebSocket upgrades are refused.
+	//
+	// "*" is honoured but makes every response readable by any site the operator
+	// visits; combined with a crawl endpoint that is an SSRF primitive, that is a
+	// drive-by credential-theft chain. Set it only for a deliberately public,
+	// authenticated deployment.
+	AllowedOrigins []string `mapstructure:"allowed_origins" yaml:"allowed_origins"`
 }
 
 // MCPConfig configures the MCP server.

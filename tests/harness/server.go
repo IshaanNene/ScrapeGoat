@@ -377,7 +377,11 @@ func ListenerOnRandomPort() (net.Listener, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	port := ln.Addr().(*net.TCPAddr).Port
+	addr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		panic("harness: listener is not TCP")
+	}
+	port := addr.Port
 	return ln, port, nil
 }
 

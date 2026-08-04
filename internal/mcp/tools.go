@@ -14,9 +14,10 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
-	"github.com/IshaanNene/ScrapeGoat/internal/seo"
+	"github.com/IshaanNene/ScrapeGoat/internal/safety"
+	"github.com/IshaanNene/ScrapeGoat/internal/sitemap"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // ToolDefinition describes an MCP tool with its JSON Schema.
@@ -34,6 +35,7 @@ type ToolRegistry struct {
 	definitions []ToolDefinition
 	handlers    map[string]ToolHandler
 	server      *Server
+	guard       *safety.URLGuard
 	logger      *slog.Logger
 	mu          sync.RWMutex
 }
@@ -43,10 +45,29 @@ func NewToolRegistry(server *Server, logger *slog.Logger) *ToolRegistry {
 	r := &ToolRegistry{
 		handlers: make(map[string]ToolHandler),
 		server:   server,
+		guard:    safety.Default(),
 		logger:   logger.With("component", "tool_registry"),
 	}
 	r.registerBuiltins()
 	return r
+}
+
+// checkURL validates a URL supplied as a tool argument.
+//
+// Tool arguments come from a model, and a model's output is shaped by whatever it
+// last read — including a page that says "now fetch
+// http://169.254.169.254/latest/meta-data/iam/security-credentials/". Rejecting
+// here gives the model a clear error instead of an opaque transport failure; the
+// address checks themselves happen in the fetcher's dialer, which is the layer
+// that cannot be bypassed by a redirect or a rebinding DNS answer.
+func (r *ToolRegistry) checkURL(rawURL string) error {
+	if rawURL == "" {
+		return fmt.Errorf("url is required")
+	}
+	if err := r.guard.ValidateURL(rawURL); err != nil {
+		return fmt.Errorf("url rejected: %w", err)
+	}
+	return nil
 }
 
 // List returns all registered tool definitions.
@@ -181,17 +202,6 @@ func (r *ToolRegistry) registerBuiltins() {
 		}`),
 	}, r.handleSitemap)
 
-	r.register(ToolDefinition{
-		Name:        "scrapegoat_seo_audit",
-		Description: "Run an SEO audit on a URL, checking title tags, meta descriptions, headings, images, and more. Returns a score out of 100.",
-		InputSchema: json.RawMessage(`{
-			"type": "object",
-			"properties": {
-				"url": {"type": "string", "description": "The URL to audit"}
-			},
-			"required": ["url"]
-		}`),
-	}, r.handleSEOAudit)
 }
 
 // --- Tool Handlers ---
@@ -210,8 +220,8 @@ func (r *ToolRegistry) handleCrawl(ctx context.Context, rawArgs json.RawMessage)
 	if err := json.Unmarshal(rawArgs, &args); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
-	if args.URL == "" {
-		return nil, fmt.Errorf("url is required")
+	if err := r.checkURL(args.URL); err != nil {
+		return nil, err
 	}
 	if args.MaxDepth <= 0 {
 		args.MaxDepth = 3
@@ -259,7 +269,7 @@ func (r *ToolRegistry) handleCrawl(ctx context.Context, rawArgs json.RawMessage)
 	}
 	eng.Wait()
 
-	stats := eng.Stats().Snapshot()
+	stats := eng.StatsSnapshot()
 	result := map[string]any{
 		"url":        args.URL,
 		"pages":      stats["requests_sent"],
@@ -292,8 +302,8 @@ func (r *ToolRegistry) handleExtract(ctx context.Context, rawArgs json.RawMessag
 	if err := json.Unmarshal(rawArgs, &args); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
-	if args.URL == "" {
-		return nil, fmt.Errorf("url is required")
+	if err := r.checkURL(args.URL); err != nil {
+		return nil, err
 	}
 
 	cfg := config.DefaultConfig()
@@ -340,8 +350,11 @@ func (r *ToolRegistry) handleSearch(ctx context.Context, rawArgs json.RawMessage
 	if err := json.Unmarshal(rawArgs, &args); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
-	if args.URL == "" || args.Query == "" {
-		return nil, fmt.Errorf("url and query are required")
+	if err := r.checkURL(args.URL); err != nil {
+		return nil, err
+	}
+	if args.Query == "" {
+		return nil, fmt.Errorf("query is required")
 	}
 	if args.MaxDepth <= 0 {
 		args.MaxDepth = 2
@@ -412,8 +425,8 @@ func (r *ToolRegistry) handleScreenshot(ctx context.Context, rawArgs json.RawMes
 	if err := json.Unmarshal(rawArgs, &args); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
-	if args.URL == "" {
-		return nil, fmt.Errorf("url is required")
+	if err := r.checkURL(args.URL); err != nil {
+		return nil, err
 	}
 	if args.Width <= 0 {
 		args.Width = 1280
@@ -482,6 +495,11 @@ func (r *ToolRegistry) handleBatch(ctx context.Context, rawArgs json.RawMessage)
 	}
 	if len(args.URLs) == 0 {
 		return nil, fmt.Errorf("urls is required and must not be empty")
+	}
+	for _, u := range args.URLs {
+		if err := r.checkURL(u); err != nil {
+			return nil, err
+		}
 	}
 	if args.Concurrency <= 0 {
 		args.Concurrency = 3
@@ -595,11 +613,11 @@ func (r *ToolRegistry) handleSitemap(ctx context.Context, rawArgs json.RawMessag
 	if err := json.Unmarshal(rawArgs, &args); err != nil {
 		return nil, fmt.Errorf("invalid arguments: %w", err)
 	}
-	if args.URL == "" {
-		return nil, fmt.Errorf("url is required")
+	if err := r.checkURL(args.URL); err != nil {
+		return nil, err
 	}
 
-	crawler := seo.NewSitemapCrawler(r.logger)
+	crawler := sitemap.New(r.logger)
 
 	sitemapURL := args.URL
 	if !strings.Contains(sitemapURL, "sitemap") {
@@ -624,51 +642,6 @@ func (r *ToolRegistry) handleSitemap(ctx context.Context, rawArgs json.RawMessag
 		"urls":        urls,
 	}
 	out, _ := json.MarshalIndent(result, "", "  ")
-	return &ToolCallResult{
-		Content: []ContentBlock{{Type: "text", Text: string(out)}},
-	}, nil
-}
-
-// SEOAuditArgs are the arguments for scrapegoat_seo_audit.
-type SEOAuditArgs struct {
-	URL string `json:"url"`
-}
-
-func (r *ToolRegistry) handleSEOAudit(ctx context.Context, rawArgs json.RawMessage) (*ToolCallResult, error) {
-	var args SEOAuditArgs
-	if err := json.Unmarshal(rawArgs, &args); err != nil {
-		return nil, fmt.Errorf("invalid arguments: %w", err)
-	}
-	if args.URL == "" {
-		return nil, fmt.Errorf("url is required")
-	}
-
-	cfg := config.DefaultConfig()
-	httpFetcher, err := fetcher.NewHTTPFetcher(cfg, r.logger)
-	if err != nil {
-		return nil, fmt.Errorf("create fetcher: %w", err)
-	}
-
-	req, err := types.NewRequest(args.URL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid URL: %w", err)
-	}
-
-	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	resp, err := httpFetcher.Fetch(fetchCtx, req)
-	if err != nil {
-		return nil, fmt.Errorf("fetch: %w", err)
-	}
-
-	auditor := seo.NewMetaAuditor(r.logger)
-	auditResult, err := auditor.Audit(resp)
-	if err != nil {
-		return nil, fmt.Errorf("audit: %w", err)
-	}
-
-	out, _ := json.MarshalIndent(auditResult, "", "  ")
 	return &ToolCallResult{
 		Content: []ContentBlock{{Type: "text", Text: string(out)}},
 	}, nil

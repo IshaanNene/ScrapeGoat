@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"github.com/IshaanNene/ScrapeGoat/internal/clock"
+
 	"fmt"
 	"log/slog"
 	"runtime"
@@ -46,6 +48,7 @@ func DefaultAutoscaleConfig() *AutoscaleConfig {
 // AutoscaledPool dynamically adjusts worker concurrency based on system load.
 // Inspired by Crawlee's AutoscaledPool — ramp up when idle, back off when strained.
 type AutoscaledPool struct {
+	clock      clock.Clock
 	config     *AutoscaleConfig
 	current    atomic.Int32
 	desired    atomic.Int32
@@ -60,12 +63,13 @@ type AutoscaledPool struct {
 }
 
 // NewAutoscaledPool creates an autoscaled pool.
-func NewAutoscaledPool(cfg *AutoscaleConfig, queueSizeFn func() int, logger *slog.Logger) *AutoscaledPool {
+func NewAutoscaledPool(cfg *AutoscaleConfig, queueSizeFn func() int, logger *slog.Logger, clk clock.Clock) *AutoscaledPool {
 	if cfg == nil {
 		cfg = DefaultAutoscaleConfig()
 	}
 
 	pool := &AutoscaledPool{
+		clock:     clock.OrSystem(clk),
 		config:    cfg,
 		queueSize: queueSizeFn,
 		logger:    logger.With("component", "autoscale"),
@@ -148,7 +152,7 @@ func (p *AutoscaledPool) Evaluate() ScaleDecision {
 	}
 
 	// Check cooldown
-	if time.Since(p.lastAction) < p.config.CooldownPeriod {
+	if p.clock.Since(p.lastAction) < p.config.CooldownPeriod {
 		return decision
 	}
 
@@ -159,7 +163,7 @@ func (p *AutoscaledPool) Evaluate() ScaleDecision {
 		decision.Action = ScaleUp
 		p.desired.Store(int32(newCount)) // nolint:gosec // Always small positive int
 		p.current.Store(int32(newCount)) // nolint:gosec // Always small positive int
-		p.lastAction = time.Now()
+		p.lastAction = p.clock.Now()
 		p.logger.Info("scaling up",
 			"from", current, "to", newCount,
 			"utilization", fmt.Sprintf("%.1f%%", utilization*100),
@@ -172,9 +176,11 @@ func (p *AutoscaledPool) Evaluate() ScaleDecision {
 		newCount := max(current-scaleStep(current), p.config.MinConcurrency)
 		decision.Desired = newCount
 		decision.Action = ScaleDown
-		p.desired.Store(int32(newCount))
-		p.current.Store(int32(newCount))
-		p.lastAction = time.Now()
+		// newCount is clamped to [MinConcurrency, MaxConcurrency], both validated
+		// positive ints far below int32's range.
+		p.desired.Store(int32(newCount)) // #nosec G115 -- clamped, see above
+		p.current.Store(int32(newCount)) // #nosec G115 -- clamped, see above
+		p.lastAction = p.clock.Now()
 		p.logger.Info("scaling down",
 			"from", current, "to", newCount,
 			"utilization", fmt.Sprintf("%.1f%%", utilization*100),

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,14 +9,27 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/IshaanNene/ScrapeGoat/internal/clock"
+	"github.com/IshaanNene/ScrapeGoat/internal/safety"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // RobotsManager handles robots.txt fetching, parsing, and enforcement.
 type RobotsManager struct {
+	clock   clock.Clock
 	enabled bool
 	cache   map[string]*robotsData
 	mu      sync.RWMutex
 	client  *http.Client
+
+	// fetcher, when set, replaces the manager's own HTTP client. The engine wires
+	// its registered fetcher in here so that robots.txt travels the same path as
+	// everything else — which is what makes a replay actually offline. A robots
+	// fetch that went straight to the network would reach out mid-replay, and the
+	// crawl's own policy decisions would then depend on what the live site says
+	// today rather than on what it said when the log was recorded.
+	fetcher Fetcher
 }
 
 // robotsData holds parsed robots.txt rules for a domain.
@@ -28,18 +42,36 @@ type robotsData struct {
 }
 
 // NewRobotsManager creates a new RobotsManager.
-func NewRobotsManager(enabled bool) *RobotsManager {
+//
+// guard may be nil, in which case the default policy applies. The robots.txt URL is
+// derived from the crawl target's own host, so it is exactly as untrusted as the
+// page it governs and needs the same guarded client.
+func NewRobotsManager(enabled bool, guard *safety.URLGuard, clk clock.Clock) *RobotsManager {
+	if guard == nil {
+		guard = safety.Default()
+	}
 	return &RobotsManager{
+		clock:   clock.OrSystem(clk),
 		enabled: enabled,
 		cache:   make(map[string]*robotsData),
-		client: &http.Client{
-			Timeout: 10 * time.Second,
-		},
+		client:  guard.HTTPClient(10*time.Second, 5),
 	}
 }
 
+// SetFetcher routes robots.txt through the given fetcher instead of the
+// manager's own client. Nil restores the direct client.
+func (rm *RobotsManager) SetFetcher(f Fetcher) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	rm.fetcher = f
+}
+
 // IsAllowed checks if a URL is allowed by the domain's robots.txt.
-func (rm *RobotsManager) IsAllowed(rawURL string) bool {
+//
+// Takes a context because answering may require fetching robots.txt, and a crawl
+// that has been cancelled should not sit waiting on a network round trip to learn
+// whether it was allowed to make a request it is no longer going to make.
+func (rm *RobotsManager) IsAllowed(ctx context.Context, rawURL string) bool {
 	if !rm.enabled {
 		return true
 	}
@@ -50,7 +82,7 @@ func (rm *RobotsManager) IsAllowed(rawURL string) bool {
 	}
 
 	domain := u.Scheme + "://" + u.Host
-	data := rm.getRobotsData(domain)
+	data := rm.getRobotsData(ctx, domain)
 	if data == nil {
 		return true // Can't fetch robots.txt = allow
 	}
@@ -102,7 +134,7 @@ func (rm *RobotsManager) GetSitemaps(domain string) []string {
 }
 
 // getRobotsData fetches and caches robots.txt for a domain.
-func (rm *RobotsManager) getRobotsData(domain string) *robotsData {
+func (rm *RobotsManager) getRobotsData(ctx context.Context, domain string) *robotsData {
 	rm.mu.RLock()
 	data, ok := rm.cache[domain]
 	rm.mu.RUnlock()
@@ -112,7 +144,7 @@ func (rm *RobotsManager) getRobotsData(domain string) *robotsData {
 	}
 
 	// Fetch robots.txt
-	data = rm.fetchRobotsTxt(domain)
+	data = rm.fetchRobotsTxt(ctx, domain)
 
 	rm.mu.Lock()
 	rm.cache[domain] = data
@@ -122,10 +154,22 @@ func (rm *RobotsManager) getRobotsData(domain string) *robotsData {
 }
 
 // fetchRobotsTxt downloads and parses robots.txt.
-func (rm *RobotsManager) fetchRobotsTxt(domain string) *robotsData {
+func (rm *RobotsManager) fetchRobotsTxt(ctx context.Context, domain string) *robotsData {
 	robotsURL := domain + "/robots.txt"
 
-	resp, err := rm.client.Get(robotsURL)
+	rm.mu.RLock()
+	f := rm.fetcher
+	rm.mu.RUnlock()
+
+	if f != nil {
+		return rm.fetchRobotsVia(ctx, f, robotsURL)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, robotsURL, nil)
+	if err != nil {
+		return nil
+	}
+	resp, err := rm.client.Do(req)
 	if err != nil {
 		return nil
 	}
@@ -140,18 +184,45 @@ func (rm *RobotsManager) fetchRobotsTxt(domain string) *robotsData {
 		return nil
 	}
 
-	return parseRobotsTxt(string(body))
+	return rm.parseRobots(string(body))
+}
+
+// fetchRobotsVia fetches robots.txt through an injected fetcher.
+//
+// A missing or unreadable robots.txt returns nil, which the caller reads as "no
+// rules" — the same answer the direct path gives. During a replay that is the
+// right default: a log recorded from a site with no robots.txt should replay as a
+// site with no robots.txt, not as a hard failure.
+func (rm *RobotsManager) fetchRobotsVia(ctx context.Context, f Fetcher, robotsURL string) *robotsData {
+	req, err := types.NewRequest(robotsURL)
+	if err != nil {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	resp, err := f.Fetch(ctx, req)
+	if err != nil || resp == nil || resp.StatusCode != http.StatusOK {
+		return nil
+	}
+
+	body := resp.Body
+	if len(body) > 512*1024 {
+		body = body[:512*1024]
+	}
+	return rm.parseRobots(string(body))
 }
 
 // parseRobotsTxt parses robots.txt content.
 func parseRobotsTxt(content string) *robotsData {
-	data := &robotsData{
-		fetchedAt: time.Now(),
-	}
+	// fetchedAt is left zero here and stamped by RobotsManager.parseRobots from
+	// the injected clock. A package-level function has no clock to reach for.
+	data := &robotsData{}
 
 	lines := strings.Split(content, "\n")
 	inOurSection := false
-	userAgent := ""
+	var userAgent string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -249,4 +320,13 @@ func matchWildcard(pattern, path string, mustEnd bool) bool {
 		return pos == len(path)
 	}
 	return true
+}
+
+// parseRobots parses robots.txt content, stamping it with the manager's clock.
+func (rm *RobotsManager) parseRobots(content string) *robotsData {
+	data := parseRobotsTxt(content)
+	if data != nil {
+		data.fetchedAt = rm.clock.Now()
+	}
+	return data
 }

@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // --- Frontier Tests ---
 
 func TestFrontierPushPop(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 
 	r1, _ := types.NewRequest("https://example.com/page1")
 	r1.Priority = 5
@@ -41,7 +41,7 @@ func TestFrontierPushPop(t *testing.T) {
 }
 
 func TestFrontierTryPopEmpty(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	got := f.TryPop()
 	if got != nil {
 		t.Errorf("expected nil from empty frontier, got %v", got)
@@ -49,7 +49,7 @@ func TestFrontierTryPopEmpty(t *testing.T) {
 }
 
 func TestFrontierClose(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	f.Close()
 
 	if !f.IsClosed() {
@@ -58,7 +58,7 @@ func TestFrontierClose(t *testing.T) {
 }
 
 func TestFrontierMultipleItems(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 
 	for i := 0; i < 100; i++ {
 		r, _ := types.NewRequest("https://example.com/page")
@@ -139,7 +139,7 @@ func TestStatsSnapshot(t *testing.T) {
 // --- Benchmarks ---
 
 func BenchmarkFrontierPushPop(b *testing.B) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

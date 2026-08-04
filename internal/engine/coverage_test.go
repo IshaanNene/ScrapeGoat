@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var coverLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -50,7 +50,7 @@ func TestCanonicalizeURLCoverage(t *testing.T) {
 
 // --- Frontier coverage: Pop (with context), IsEmpty, Drain, RestoreAll ---
 func TestFrontierPopWithContext(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	if !f.IsEmpty() {
 		t.Error("new frontier should be empty")
 	}
@@ -71,7 +71,7 @@ func TestFrontierPopWithContext(t *testing.T) {
 }
 
 func TestFrontierDrainAndRestoreAll(t *testing.T) {
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	urls := []string{"https://example.com/1", "https://example.com/2", "https://example.com/3"}
 	for _, u := range urls {
 		req, _ := types.NewRequest(u)
@@ -94,7 +94,7 @@ func TestFrontierDrainAndRestoreAll(t *testing.T) {
 
 // --- Engine setters: SetPipeline, SetStorage, Stats, GetState, ResultsChan ---
 func TestEngineSettersAndGetters(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.RespectRobotsTxt = false
 	eng := New(cfg, coverLogger)
 
@@ -144,35 +144,12 @@ func TestStateString(t *testing.T) {
 
 // --- Engine Pause/Resume (on idle engine) ---
 func TestEnginePauseResumeBasic(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.RespectRobotsTxt = false
 	eng := New(cfg, coverLogger)
 	eng.Pause()
 	eng.Resume()
 	t.Log("PASS: Pause+Resume on idle engine did not panic")
-}
-
-// --- Engine isDomainAllowed ---
-func TestIsDomainAllowed(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.Engine.AllowedDomains = []string{"example.com", "test.com"}
-	cfg.Engine.RespectRobotsTxt = false
-	eng := New(cfg, coverLogger)
-
-	tests := []struct {
-		domain string
-		want   bool
-	}{
-		{"example.com", true},
-		{"test.com", true},
-		{"evil.com", false},
-	}
-	for _, tt := range tests {
-		got := eng.isDomainAllowed(tt.domain)
-		if got != tt.want {
-			t.Errorf("isDomainAllowed(%q) = %v, want %v", tt.domain, got, tt.want)
-		}
-	}
 }
 
 // --- Full pipeline + storage exercising processItems + storeResults ---
@@ -185,7 +162,7 @@ func TestEngineProcessItemsAndStore(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 2
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 5

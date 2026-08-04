@@ -74,16 +74,6 @@ go run ./examples/dynamic_content/
 
 ---
 
-## 8. LinkedIn Scraper
-
-Profile-style data extraction (demo using quotes.toscrape.com).
-
-```bash
-go run ./examples/linkedin_scraper/
-```
-
----
-
 ## Auto-Extract (No Code Required)
 
 Extract structured data from any URL without writing a spider:

@@ -43,6 +43,27 @@ func (d *Deduplicator) MarkSeen(rawURL string) {
 	d.seen[hash] = struct{}{}
 }
 
+// MarkIfUnseen atomically marks a URL as seen and reports whether it was new.
+//
+// This is the method the crawl path must use. Calling IsSeen followed by MarkSeen
+// is a check-then-act race: two workers extracting the same link from two different
+// pages can both observe "unseen" between the read lock and the write lock, and both
+// enqueue it. The result is duplicate fetches, duplicate items, and a request budget
+// spent twice on the same page.
+func (d *Deduplicator) MarkIfUnseen(rawURL string) bool {
+	canonical := CanonicalizeURL(rawURL)
+	hash := hashURL(canonical)
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if _, ok := d.seen[hash]; ok {
+		return false
+	}
+	d.seen[hash] = struct{}{}
+	return true
+}
+
 // Count returns the number of unique URLs seen.
 func (d *Deduplicator) Count() int {
 	d.mu.RLock()

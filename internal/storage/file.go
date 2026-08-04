@@ -10,7 +10,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // --- JSON Storage ---
@@ -57,6 +57,9 @@ func (s *JSONStorage) Close() error {
 	}
 	defer f.Close()
 
+	// Free here: the items are already buffered, so a total order costs one sort.
+	SortItems(s.items)
+
 	// Build output as array of field maps
 	output := make([]map[string]any, len(s.items))
 	for i, item := range s.items {
@@ -92,10 +95,33 @@ type JSONLStorage struct {
 	mu     sync.Mutex
 	count  int
 	logger *slog.Logger
+
+	// ordered makes the writer buffer instead of stream, so the records can be put
+	// into a total order before anything is written. Off by default: streaming is
+	// why this format exists, and a crawl of a hundred million pages must not be
+	// made to hold them all in memory to get its output.
+	ordered bool
+	buf     []*types.Item
 }
 
 // NewJSONLStorage creates a new JSONL file storage (streaming writes).
 func NewJSONLStorage(outputPath string, logger *slog.Logger) (*JSONLStorage, error) {
+	return newJSONLStorage(outputPath, logger, false)
+}
+
+// NewOrderedJSONLStorage creates a JSONL storage that buffers every item and
+// writes them in a total order at close.
+//
+// This is what "bit-identical output" needs from a concurrent crawler: records
+// otherwise land in whatever order workers finished, so two runs over identical
+// bytes produce the same records in different sequences. Buffering is the price,
+// and it is charged explicitly rather than imposed on every crawl — see
+// SortItems and docs/REPLAY.md.
+func NewOrderedJSONLStorage(outputPath string, logger *slog.Logger) (*JSONLStorage, error) {
+	return newJSONLStorage(outputPath, logger, true)
+}
+
+func newJSONLStorage(outputPath string, logger *slog.Logger, ordered bool) (*JSONLStorage, error) {
 	dir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create output dir: %w", err)
@@ -107,10 +133,11 @@ func NewJSONLStorage(outputPath string, logger *slog.Logger) (*JSONLStorage, err
 	}
 
 	return &JSONLStorage{
-		path:   outputPath,
-		file:   f,
-		enc:    json.NewEncoder(f),
-		logger: logger.With("component", "jsonl_storage"),
+		path:    outputPath,
+		file:    f,
+		enc:     json.NewEncoder(f),
+		logger:  logger.With("component", "jsonl_storage"),
+		ordered: ordered,
 	}, nil
 }
 
@@ -120,18 +147,14 @@ func (s *JSONLStorage) Store(items []*types.Item) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, item := range items {
-		entry := make(map[string]any, len(item.Fields)+3)
-		entry["_url"] = item.URL
-		entry["_timestamp"] = item.Timestamp
-		if item.SpiderName != "" {
-			entry["_spider"] = item.SpiderName
-		}
-		for k, v := range item.Fields {
-			entry[k] = v
-		}
+	if s.ordered {
+		s.buf = append(s.buf, items...)
+		s.count += len(items)
+		return nil
+	}
 
-		if err := s.enc.Encode(entry); err != nil {
+	for _, item := range items {
+		if err := s.enc.Encode(jsonlEntry(item)); err != nil {
 			return fmt.Errorf("encode JSONL: %w", err)
 		}
 		s.count++
@@ -140,11 +163,40 @@ func (s *JSONLStorage) Store(items []*types.Item) error {
 }
 
 func (s *JSONLStorage) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.ordered {
+		SortItems(s.buf)
+		for _, item := range s.buf {
+			if err := s.enc.Encode(jsonlEntry(item)); err != nil {
+				s.file.Close()
+				return fmt.Errorf("encode JSONL: %w", err)
+			}
+		}
+		s.buf = nil
+	}
+
 	s.logger.Info("JSONL written", "path", s.path, "items", s.count)
 	if s.file != nil {
 		return s.file.Close()
 	}
 	return nil
+}
+
+// jsonlEntry flattens an item into the on-disk shape. Shared by the streaming and
+// buffered paths so the two cannot drift into writing different records.
+func jsonlEntry(item *types.Item) map[string]any {
+	entry := make(map[string]any, len(item.Fields)+3)
+	entry["_url"] = item.URL
+	entry["_timestamp"] = item.Timestamp
+	if item.SpiderName != "" {
+		entry["_spider"] = item.SpiderName
+	}
+	for k, v := range item.Fields {
+		entry[k] = v
+	}
+	return entry
 }
 
 // --- CSV Storage ---
@@ -231,10 +283,21 @@ func (s *CSVStorage) Close() error {
 
 // NewFileStorage creates the appropriate file-based storage by type.
 func NewFileStorage(storageType, outputDir string, logger *slog.Logger) (Storage, error) {
+	return NewFileStorageOrdered(storageType, outputDir, logger, false)
+}
+
+// NewFileStorageOrdered is NewFileStorage with an explicit choice about output
+// ordering. With ordered set, records are written in a total order that does not
+// depend on how the crawl was scheduled — at the cost of buffering them. JSON
+// buffers regardless, so the flag only changes JSONL.
+func NewFileStorageOrdered(storageType, outputDir string, logger *slog.Logger, ordered bool) (Storage, error) {
 	switch storageType {
 	case "json":
 		return NewJSONStorage(filepath.Join(outputDir, "results.json"), logger)
 	case "jsonl":
+		if ordered {
+			return NewOrderedJSONLStorage(filepath.Join(outputDir, "results.jsonl"), logger)
+		}
 		return NewJSONLStorage(filepath.Join(outputDir, "results.jsonl"), logger)
 	case "csv":
 		return NewCSVStorage(filepath.Join(outputDir, "results.csv"), logger)

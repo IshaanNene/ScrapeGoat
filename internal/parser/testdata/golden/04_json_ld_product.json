@@ -1,0 +1,27 @@
+{
+  "items": [
+    {
+      "h1": "Blue Widget",
+      "json_ld": {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "4.4",
+          "reviewCount": "89"
+        },
+        "name": "Blue Widget",
+        "offers": {
+          "@type": "Offer",
+          "availability": "InStock",
+          "price": "19.99",
+          "priceCurrency": "GBP"
+        },
+        "sku": "BW-001"
+      },
+      "meta_title": "Widget — Example Shop",
+      "title": "Widget — Example Shop"
+    }
+  ],
+  "links": null
+}

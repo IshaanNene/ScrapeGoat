@@ -251,12 +251,12 @@ func EstimateTokens(text string) int {
 func EstimateCost(model string, usage TokenUsage) float64 {
 	// Pricing per 1M tokens (input/output) as of 2025.
 	pricing := map[string][2]float64{
-		"gpt-4o":             {2.50, 10.00},
-		"gpt-4o-mini":        {0.15, 0.60},
-		"gpt-4-turbo":        {10.00, 30.00},
-		"claude-3-5-haiku":   {0.25, 1.25},
-		"claude-3-5-sonnet":  {3.00, 15.00},
-		"claude-3-opus":      {15.00, 75.00},
+		"gpt-4o":            {2.50, 10.00},
+		"gpt-4o-mini":       {0.15, 0.60},
+		"gpt-4-turbo":       {10.00, 30.00},
+		"claude-3-5-haiku":  {0.25, 1.25},
+		"claude-3-5-sonnet": {3.00, 15.00},
+		"claude-3-opus":     {15.00, 75.00},
 	}
 
 	rate, ok := pricing[model]

@@ -1,13 +1,8 @@
 package fetcher
 
 import (
-	"crypto/tls"
 	"fmt"
-	"log/slog"
 	"math/rand"
-	"net"
-	"net/http"
-	"time"
 )
 
 // StealthConfig configures anti-detection and fingerprint spoofing.
@@ -147,96 +142,3 @@ Function.prototype.toString = function() {
 }
 
 // TLSTransport creates an http.Transport with randomized TLS fingerprint.
-type TLSTransport struct {
-	inner  *http.Transport
-	logger *slog.Logger
-}
-
-// NewTLSTransport creates a transport that mimics common browser TLS fingerprints.
-func NewTLSTransport(logger *slog.Logger) *TLSTransport {
-	return &TLSTransport{
-		inner: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-			TLSClientConfig:     randomTLSConfig(),
-			TLSHandshakeTimeout: 10 * time.Second,
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 50,
-			IdleConnTimeout:     90 * time.Second,
-		},
-		logger: logger.With("component", "tls_transport"),
-	}
-}
-
-// RoundTrip implements http.RoundTripper.
-func (t *TLSTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Add realistic headers in correct order (browser-like)
-	if req.Header.Get("Accept") == "" {
-		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
-	}
-	if req.Header.Get("Accept-Language") == "" {
-		req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	}
-	if req.Header.Get("Sec-Fetch-Dest") == "" {
-		req.Header.Set("Sec-Fetch-Dest", "document")
-		req.Header.Set("Sec-Fetch-Mode", "navigate")
-		req.Header.Set("Sec-Fetch-Site", "none")
-		req.Header.Set("Sec-Fetch-User", "?1")
-	}
-	if req.Header.Get("Upgrade-Insecure-Requests") == "" {
-		req.Header.Set("Upgrade-Insecure-Requests", "1")
-	}
-	if req.Header.Get("Sec-Ch-Ua") == "" {
-		req.Header.Set("Sec-Ch-Ua", `"Chromium";v="120", "Not?A_Brand";v="8", "Google Chrome";v="120"`)
-		req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
-		req.Header.Set("Sec-Ch-Ua-Platform", `"Windows"`)
-	}
-
-	return t.inner.RoundTrip(req)
-}
-
-// randomTLSConfig creates a TLS config that mimics browser fingerprints.
-func randomTLSConfig() *tls.Config {
-	// Cipher suites commonly used by Chrome/Firefox
-	cipherSuites := [][]uint16{
-		// Chrome-like
-		{
-			tls.TLS_AES_128_GCM_SHA256,
-			tls.TLS_AES_256_GCM_SHA384,
-			tls.TLS_CHACHA20_POLY1305_SHA256,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-		},
-		// Firefox-like
-		{
-			tls.TLS_AES_128_GCM_SHA256,
-			tls.TLS_CHACHA20_POLY1305_SHA256,
-			tls.TLS_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-		},
-	}
-
-	selected := cipherSuites[rand.Intn(len(cipherSuites))]
-
-	return &tls.Config{
-		CipherSuites: selected,
-		MinVersion:   tls.VersionTLS12,
-		MaxVersion:   tls.VersionTLS13,
-		CurvePreferences: []tls.CurveID{
-			tls.X25519,
-			tls.CurveP256,
-			tls.CurveP384,
-		},
-	}
-}

@@ -71,7 +71,7 @@ func TestChunkHTML_LargeDocument(t *testing.T) {
 
 func TestChunkHTML_NoSemanticBoundaries(t *testing.T) {
 	html := strings.Repeat("a", 50000) // 50k chars, no HTML structure
-	chunks := ChunkHTML(html, 5000)     // ~20k chars max
+	chunks := ChunkHTML(html, 5000)    // ~20k chars max
 
 	if len(chunks) < 2 {
 		t.Errorf("expected multiple chunks, got %d", len(chunks))
@@ -191,10 +191,10 @@ func TestBuildPrompt(t *testing.T) {
 
 func TestEstimateCost(t *testing.T) {
 	tests := []struct {
-		model    string
-		usage    TokenUsage
-		wantMin  float64
-		wantMax  float64
+		model   string
+		usage   TokenUsage
+		wantMin float64
+		wantMax float64
 	}{
 		{
 			model:   "gpt-4o",

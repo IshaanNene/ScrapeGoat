@@ -33,7 +33,7 @@ func TestAutoscaledPoolCreation(t *testing.T) {
 		CooldownPeriod:     0, // no cooldown for testing
 	}
 
-	pool := NewAutoscaledPool(cfg, func() int { return 0 }, testAutoscaleLogger)
+	pool := NewAutoscaledPool(cfg, func() int { return 0 }, testAutoscaleLogger, nil)
 
 	if pool.CurrentConcurrency() != 2 {
 		t.Errorf("expected initial concurrency 2, got %d", pool.CurrentConcurrency())
@@ -53,7 +53,7 @@ func TestAutoscaleScaleUp(t *testing.T) {
 		CooldownPeriod:     0,
 	}
 
-	pool := NewAutoscaledPool(cfg, func() int { return queueSize }, testAutoscaleLogger)
+	pool := NewAutoscaledPool(cfg, func() int { return queueSize }, testAutoscaleLogger, nil)
 
 	// Simulate low utilization: 1 active, 9 idle
 	pool.SetWorkerCounts(1, 9)
@@ -77,7 +77,7 @@ func TestAutoscaleScaleDown(t *testing.T) {
 		CooldownPeriod:     0,
 	}
 
-	pool := NewAutoscaledPool(cfg, func() int { return 0 }, testAutoscaleLogger)
+	pool := NewAutoscaledPool(cfg, func() int { return 0 }, testAutoscaleLogger, nil)
 	pool.current.Store(10) // pretend we're at 10 workers
 
 	// Simulate very high utilization: all 10 active, 0 idle → utilization = 1.0
@@ -98,7 +98,7 @@ func TestAutoscaleNoAction(t *testing.T) {
 		CooldownPeriod:     0,
 	}
 
-	pool := NewAutoscaledPool(cfg, func() int { return 0 }, testAutoscaleLogger)
+	pool := NewAutoscaledPool(cfg, func() int { return 0 }, testAutoscaleLogger, nil)
 
 	// Moderate utilization, empty queue
 	pool.SetWorkerCounts(3, 3)
@@ -119,7 +119,7 @@ func TestAutoscaleRespectsMaxConcurrency(t *testing.T) {
 		CooldownPeriod:     0,
 	}
 
-	pool := NewAutoscaledPool(cfg, func() int { return 1000 }, testAutoscaleLogger)
+	pool := NewAutoscaledPool(cfg, func() int { return 1000 }, testAutoscaleLogger, nil)
 	pool.current.Store(5) // already at max
 
 	pool.SetWorkerCounts(1, 4) // low utilization
@@ -139,7 +139,7 @@ func TestAutoscaleRespectsMinConcurrency(t *testing.T) {
 		CooldownPeriod:     0,
 	}
 
-	pool := NewAutoscaledPool(cfg, func() int { return 0 }, testAutoscaleLogger)
+	pool := NewAutoscaledPool(cfg, func() int { return 0 }, testAutoscaleLogger, nil)
 	pool.current.Store(3) // already at min
 
 	pool.SetWorkerCounts(3, 0) // high utilization
@@ -175,7 +175,7 @@ func TestScaleStep(t *testing.T) {
 
 func TestWorkerCounts(t *testing.T) {
 	cfg := DefaultAutoscaleConfig()
-	pool := NewAutoscaledPool(cfg, func() int { return 0 }, testAutoscaleLogger)
+	pool := NewAutoscaledPool(cfg, func() int { return 0 }, testAutoscaleLogger, nil)
 
 	pool.SetWorkerCounts(5, 3)
 	pool.RecordWorkerActive()
@@ -194,7 +194,7 @@ func BenchmarkAutoscaleEvaluate(b *testing.B) {
 		CooldownPeriod:     0,
 	}
 
-	pool := NewAutoscaledPool(cfg, func() int { return 50 }, testAutoscaleLogger)
+	pool := NewAutoscaledPool(cfg, func() int { return 50 }, testAutoscaleLogger, nil)
 	pool.SetWorkerCounts(5, 5)
 
 	b.ResetTimer()

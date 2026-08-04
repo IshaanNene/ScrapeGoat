@@ -8,14 +8,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
-	"github.com/IshaanNene/ScrapeGoat/internal/seo"
+	"github.com/IshaanNene/ScrapeGoat/internal/sitemap"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // --- Request Types ---
@@ -99,8 +98,8 @@ func (s *Server) handleCrawl(w http.ResponseWriter, r *http.Request) {
 		Priority: priority,
 		Config: map[string]any{
 			"max_depth":       req.MaxDepth,
-			"concurrency":    req.Concurrency,
-			"max_pages":      req.MaxPages,
+			"concurrency":     req.Concurrency,
+			"max_pages":       req.MaxPages,
 			"allowed_domains": req.AllowedDomains,
 		},
 	})
@@ -153,10 +152,12 @@ func (s *Server) handleCrawl(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) executeCrawl(job *Job, req CrawlRequest) {
-	s.jobManager.UpdateStatus(job.ID, StatusRunning)
+	if err := s.jobManager.UpdateStatus(job.ID, StatusRunning); err != nil {
+		s.logger.Warn("could not mark job running", "job", job.ID, "error", err)
+	}
 	s.BroadcastJobEvent(job.ID, map[string]any{"event": "started", "job_id": job.ID})
 
-	cfg := config.DefaultConfig()
+	cfg := s.requestConfig()
 	cfg.Engine.MaxDepth = req.MaxDepth
 	cfg.Engine.Concurrency = req.Concurrency
 	cfg.Engine.MaxRequests = req.MaxPages
@@ -189,7 +190,7 @@ func (s *Server) executeCrawl(job *Job, req CrawlRequest) {
 	}
 	eng.Wait()
 
-	stats := eng.Stats().Snapshot()
+	stats := eng.StatsSnapshot()
 	s.jobManager.CompleteJob(job.ID, collector.count, stats)
 	s.BroadcastJobEvent(job.ID, map[string]any{
 		"event":      "completed",
@@ -209,7 +210,7 @@ func (s *Server) handleExtract(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := s.requestConfig()
 	httpFetcher, err := fetcher.NewHTTPFetcher(cfg, s.logger)
 	if err != nil {
 		s.jsonError(w, http.StatusInternalServerError, "fetcher init failed")
@@ -283,11 +284,13 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) executeBatch(job *Job, req BatchRequest) {
-	s.jobManager.UpdateStatus(job.ID, StatusRunning)
+	if err := s.jobManager.UpdateStatus(job.ID, StatusRunning); err != nil {
+		s.logger.Warn("could not mark job running", "job", job.ID, "error", err)
+	}
 
 	totalItems := 0
 	for _, url := range req.URLs {
-		cfg := config.DefaultConfig()
+		cfg := s.requestConfig()
 		cfg.Engine.MaxDepth = req.MaxDepth
 		cfg.Engine.Concurrency = req.Concurrency
 		cfg.Engine.MaxRequests = 10
@@ -393,7 +396,7 @@ func (s *Server) handleScreenshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := config.DefaultConfig()
+	cfg := s.requestConfig()
 	cfg.Browser.Headless = true
 
 	browserFetcher, err := fetcher.NewBrowserFetcher(cfg, s.logger)
@@ -419,43 +422,6 @@ func (s *Server) handleScreenshot(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleSEOAudit(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		URL string `json:"url"`
-	}
-	if err := s.decodeJSON(r, &req); err != nil {
-		s.jsonError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if req.URL == "" {
-		s.jsonError(w, http.StatusBadRequest, "url is required")
-		return
-	}
-
-	cfg := config.DefaultConfig()
-	httpFetcher, err := fetcher.NewHTTPFetcher(cfg, s.logger)
-	if err != nil {
-		s.jsonError(w, http.StatusInternalServerError, "fetcher init failed")
-		return
-	}
-
-	fetchReq, _ := types.NewRequest(req.URL)
-	resp, err := httpFetcher.Fetch(r.Context(), fetchReq)
-	if err != nil {
-		s.jsonError(w, http.StatusBadGateway, fmt.Sprintf("fetch failed: %v", err))
-		return
-	}
-
-	auditor := seo.NewMetaAuditor(s.logger)
-	result, err := auditor.Audit(resp)
-	if err != nil {
-		s.jsonError(w, http.StatusInternalServerError, fmt.Sprintf("audit failed: %v", err))
-		return
-	}
-
-	s.jsonResponse(w, http.StatusOK, result)
-}
-
 func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		URL string `json:"url"`
@@ -469,7 +435,7 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	crawler := seo.NewSitemapCrawler(s.logger)
+	crawler := sitemap.New(s.logger)
 	urls, err := crawler.Crawl(req.URL)
 	if err != nil {
 		s.jsonError(w, http.StatusBadGateway, fmt.Sprintf("sitemap crawl failed: %v", err))

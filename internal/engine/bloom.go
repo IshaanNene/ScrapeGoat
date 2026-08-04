@@ -16,6 +16,10 @@ type BloomFilter struct {
 	numHash int
 	mu      sync.RWMutex
 	count   uint64
+
+	// Retained so Reset can rebuild an identically-sized filter.
+	expectedElements int
+	fpRate           float64
 }
 
 // NewBloomFilter creates a new Bloom filter for the expected number of elements
@@ -42,9 +46,11 @@ func NewBloomFilter(expectedElements int, fpRate float64) *BloomFilter {
 	numWords := (numBits + 63) / 64
 
 	return &BloomFilter{
-		bits:    make([]uint64, numWords),
-		numBits: numBits,
-		numHash: int(k),
+		expectedElements: expectedElements,
+		fpRate:           fpRate,
+		bits:             make([]uint64, numWords),
+		numBits:          numBits,
+		numHash:          int(k),
 	}
 }
 
@@ -144,50 +150,130 @@ func popcount(x uint64) uint64 {
 	return count
 }
 
-// BloomDeduplicator combines Bloom filter with exact dedup for best of both worlds.
-// Uses Bloom filter for fast negative lookups, falls back to exact hash for positives.
+// Deduper is the deduplication strategy the engine uses to decide whether a URL
+// has already been claimed.
+//
+// Two implementations, with genuinely different trades:
+//
+//   - Deduplicator keeps every URL hash in a map. Exact, and costs roughly 40
+//     bytes per URL, so a billion-URL crawl needs tens of gigabytes.
+//   - BloomDeduplicator keeps a Bloom filter and nothing else. Roughly 1.8 bytes
+//     per URL at a 1% false-positive rate, and *lossy*: a false positive means a
+//     URL is treated as already-seen and never crawled.
+type Deduper interface {
+	// MarkIfUnseen atomically claims a URL, reporting whether it was new.
+	MarkIfUnseen(rawURL string) bool
+
+	// IsSeen reports whether a URL has been claimed.
+	IsSeen(rawURL string) bool
+
+	// Count returns how many unique URLs have been claimed.
+	Count() int
+
+	// Export and Import carry state across a checkpoint.
+	Export() []string
+	Import(hashes []string)
+
+	// Reset clears all state.
+	Reset()
+}
+
+// BloomDeduplicator is a memory-bounded, lossy deduplicator.
+//
+// It holds a Bloom filter and nothing else. That is the point: the earlier version
+// of this type kept a Bloom filter *and* a complete exact set, so it used strictly
+// more memory than the plain map it was meant to improve on — the fast negative
+// lookup was real, the advertised 10-100x memory saving was not.
+//
+// # The trade
+//
+// Bloom filters have no false negatives and some false positives. For crawl dedup
+// that means: a URL genuinely seen is always reported seen (never re-crawled), and
+// a URL never seen is occasionally reported seen — and therefore silently skipped.
+// At the default 1% rate, roughly one URL in a hundred is dropped.
+//
+// That is a real cost and it is why this is not the default. It is the right trade
+// only when the crawl is large enough that an exact set will not fit, where the
+// alternative is not "crawl everything" but "run out of memory".
+//
+// Export and Import are deliberately unsupported: a Bloom filter cannot enumerate
+// its members, so a checkpoint cannot round-trip through one. Resuming a Bloom
+// crawl restarts with an empty filter, which re-crawls rather than drops — the
+// safer direction of the two.
 type BloomDeduplicator struct {
+	mu    sync.Mutex
 	bloom *BloomFilter
-	exact *Deduplicator
 }
 
-// NewBloomDeduplicator creates a hybrid deduplicator.
-func NewBloomDeduplicator(expectedElements int) *BloomDeduplicator {
-	return &BloomDeduplicator{
-		bloom: NewBloomFilter(expectedElements, 0.001), // 0.1% FP rate
-		exact: NewDeduplicator(expectedElements),
+// NewBloomDeduplicator creates a Bloom-backed deduplicator sized for the expected
+// number of URLs, at the given false-positive rate. A rate of zero uses 1%.
+func NewBloomDeduplicator(expectedElements int, fpRate float64) *BloomDeduplicator {
+	if fpRate <= 0 || fpRate >= 1 {
+		fpRate = 0.01
 	}
+	return &BloomDeduplicator{bloom: NewBloomFilter(expectedElements, fpRate)}
 }
 
-// IsSeen checks if a URL has been seen (fast path via Bloom filter).
-func (bd *BloomDeduplicator) IsSeen(rawURL string) bool {
+// MarkIfUnseen atomically claims a URL, reporting whether it was new.
+func (bd *BloomDeduplicator) MarkIfUnseen(rawURL string) bool {
 	canonical := CanonicalizeURL(rawURL)
-	// Fast negative check via Bloom filter
-	if !bd.bloom.Contains(canonical) {
+
+	bd.mu.Lock()
+	defer bd.mu.Unlock()
+
+	if bd.bloom.Contains(canonical) {
 		return false
 	}
-	// Verify with exact dedup (handles false positives)
-	return bd.exact.IsSeen(rawURL)
-}
-
-// MarkSeen marks a URL as seen in both structures.
-func (bd *BloomDeduplicator) MarkSeen(rawURL string) {
-	canonical := CanonicalizeURL(rawURL)
 	bd.bloom.Add(canonical)
-	bd.exact.MarkSeen(rawURL)
+	return true
 }
 
-// Count returns the number of unique URLs seen.
+// IsSeen reports whether a URL has been claimed, subject to the filter's
+// false-positive rate.
+func (bd *BloomDeduplicator) IsSeen(rawURL string) bool {
+	canonical := CanonicalizeURL(rawURL)
+
+	bd.mu.Lock()
+	defer bd.mu.Unlock()
+	return bd.bloom.Contains(canonical)
+}
+
+// Count returns the number of URLs added.
 func (bd *BloomDeduplicator) Count() int {
-	return bd.exact.Count()
+	bd.mu.Lock()
+	defer bd.mu.Unlock()
+	// #nosec G115 -- the count cannot exceed the number of URLs added in one
+	// process, which is bounded by memory long before it reaches maxint.
+	return int(bd.bloom.Count())
+}
+
+// Export returns nil: a Bloom filter cannot enumerate its members, so there is
+// nothing to checkpoint. See the type comment.
+func (bd *BloomDeduplicator) Export() []string { return nil }
+
+// Import is a no-op, for the same reason as Export.
+func (bd *BloomDeduplicator) Import([]string) {}
+
+// Reset clears the filter.
+func (bd *BloomDeduplicator) Reset() {
+	bd.mu.Lock()
+	defer bd.mu.Unlock()
+	bd.bloom = NewBloomFilter(bd.bloom.expectedElements, bd.bloom.fpRate)
 }
 
 // MemoryStats returns memory usage information.
 func (bd *BloomDeduplicator) MemoryStats() map[string]any {
+	bd.mu.Lock()
+	defer bd.mu.Unlock()
 	return map[string]any{
 		"bloom_memory_bytes": bd.bloom.MemoryUsageBytes(),
 		"bloom_fp_rate":      bd.bloom.EstimatedFPRate(),
 		"bloom_count":        bd.bloom.Count(),
-		"exact_count":        bd.exact.Count(),
 	}
 }
+
+// Compile-time confirmation that both strategies satisfy the interface.
+var (
+	_ Deduper = (*Deduplicator)(nil)
+	_ Deduper = (*BloomDeduplicator)(nil)
+)

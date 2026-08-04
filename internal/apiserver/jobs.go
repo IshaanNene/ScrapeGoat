@@ -207,6 +207,8 @@ func (jm *JobManager) UpdateStatus(id, status string) error {
 	}
 
 	args = append(args, id)
+	// #nosec G202 -- setClause is one of three literals chosen by the switch above;
+	// no caller-supplied text reaches the statement, and every value is bound with ?.
 	result, err := jm.db.Exec("UPDATE jobs SET "+setClause+" WHERE id = ?", args...)
 	if err != nil {
 		return err
@@ -291,15 +293,11 @@ func (jm *JobManager) Close() error {
 
 // --- Row Scanning ---
 
-type scannable interface {
-	Scan(dest ...any) error
-}
-
 func (jm *JobManager) scanJob(row *sql.Row) (*Job, error) {
 	var (
-		job                                       Job
-		errStr, configJSON, statsJSON              sql.NullString
-		createdStr, startedStr, endedStr           sql.NullString
+		job                              Job
+		errStr, configJSON, statsJSON    sql.NullString
+		createdStr, startedStr, endedStr sql.NullString
 	)
 
 	err := row.Scan(&job.ID, &job.Type, &job.URL, &job.Status, &job.Priority,
@@ -334,9 +332,9 @@ func (jm *JobManager) scanJob(row *sql.Row) (*Job, error) {
 
 func (jm *JobManager) scanJobRow(rows *sql.Rows) (*Job, error) {
 	var (
-		job                                       Job
-		errStr, configJSON, statsJSON              sql.NullString
-		createdStr, startedStr, endedStr           sql.NullString
+		job                              Job
+		errStr, configJSON, statsJSON    sql.NullString
+		createdStr, startedStr, endedStr sql.NullString
 	)
 
 	err := rows.Scan(&job.ID, &job.Type, &job.URL, &job.Status, &job.Priority,

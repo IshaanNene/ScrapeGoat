@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/clock"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // CheckpointManager handles saving and loading crawl state for pause/resume.
 type CheckpointManager struct {
+	clock         clock.Clock
 	interval      time.Duration
 	checkpointDir string
 }
@@ -42,15 +44,16 @@ type checkpointStats struct {
 }
 
 // NewCheckpointManager creates a new CheckpointManager.
-func NewCheckpointManager(interval time.Duration) *CheckpointManager {
+func NewCheckpointManager(interval time.Duration, clk clock.Clock) *CheckpointManager {
 	return &CheckpointManager{
+		clock:         clock.OrSystem(clk),
 		interval:      interval,
 		checkpointDir: ".scrapegoat_checkpoints",
 	}
 }
 
 // Save serializes the current crawl state to disk.
-func (cm *CheckpointManager) Save(frontier *Frontier, dedup *Deduplicator, stats *Stats) error {
+func (cm *CheckpointManager) Save(frontier *Frontier, dedup Deduper, stats *Stats) error {
 	if err := os.MkdirAll(cm.checkpointDir, 0o755); err != nil {
 		return fmt.Errorf("create checkpoint dir: %w", err)
 	}
@@ -59,7 +62,7 @@ func (cm *CheckpointManager) Save(frontier *Frontier, dedup *Deduplicator, stats
 	requests := frontier.Snapshot()
 
 	data := checkpointData{
-		Timestamp:    time.Now(),
+		Timestamp:    cm.clock.Now(),
 		FrontierURLs: make([]checkpointReq, len(requests)),
 		SeenHashes:   dedup.Export(),
 		Stats: checkpointStats{
@@ -107,7 +110,7 @@ func (cm *CheckpointManager) Save(frontier *Frontier, dedup *Deduplicator, stats
 }
 
 // Load reads a checkpoint from disk and restores crawl state.
-func (cm *CheckpointManager) Load(frontier *Frontier, dedup *Deduplicator, stats *Stats) error {
+func (cm *CheckpointManager) Load(frontier *Frontier, dedup Deduper, stats *Stats) error {
 	path := filepath.Join(cm.checkpointDir, "checkpoint.json")
 
 	f, err := os.Open(path)
@@ -174,3 +177,6 @@ func newRequestFromCheckpoint(cr checkpointReq) (*types.Request, error) {
 	req.ParentURL = cr.ParentURL
 	return req, nil
 }
+
+// Dir returns the directory checkpoints are written to.
+func (cm *CheckpointManager) Dir() string { return cm.checkpointDir }

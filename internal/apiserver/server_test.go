@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
 )
 
 func testLogger() *slog.Logger {
@@ -23,7 +24,7 @@ func testLogger() *slog.Logger {
 func testServer(t *testing.T) *Server {
 	t.Helper()
 	dir := t.TempDir()
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.APIServer = config.APIServerConfig{
 		Enabled: true,
 		Port:    0,
@@ -377,39 +378,6 @@ func TestIntegration_APIServerWithTestHTTPServer(t *testing.T) {
 	// Verify extraction returned data.
 	if resp["data"] == nil {
 		t.Error("expected non-nil extraction data")
-	}
-}
-
-func TestIntegration_SEOAudit(t *testing.T) {
-	// Test page with SEO issues.
-	testHTTP := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, `<!DOCTYPE html><html><head></head><body><p>No title, no meta, no h1</p></body></html>`)
-	}))
-	defer testHTTP.Close()
-
-	srv := testServer(t)
-	body := fmt.Sprintf(`{"url": "%s"}`, testHTTP.URL)
-	req := httptest.NewRequest(http.MethodPost, "/v1/seo-audit", strings.NewReader(body))
-	req.Header.Set("X-API-Key", "test-key-123")
-	w := httptest.NewRecorder()
-
-	srv.handleSEOAudit(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200; body: %s", w.Code, w.Body.String())
-	}
-
-	var result map[string]any
-	json.Unmarshal(w.Body.Bytes(), &result)
-
-	// Should have a low score due to missing tags.
-	score, ok := result["score"].(float64)
-	if !ok {
-		t.Fatal("expected score field")
-	}
-	if score > 70 {
-		t.Errorf("score = %f, expected <70 for page with missing title/h1/meta", score)
 	}
 }
 

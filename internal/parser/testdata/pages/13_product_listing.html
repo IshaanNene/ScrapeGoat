@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html><head><title>All products | Shop</title></head>
+<body>
+<!-- Navigation: repeated siblings with links, but no price, image, or heading.
+     Must NOT be detected as a listing. -->
+<nav><ul>
+  <li><a href="/">Home</a></li>
+  <li><a href="/books">Books</a></li>
+  <li><a href="/about">About</a></li>
+  <li><a href="/contact">Contact</a></li>
+</ul></nav>
+
+<!-- A real listing, using class names no selector list would guess.
+     This mirrors books.toscrape.com's article.product_pod, whose underscore
+     alone was enough to make the selector-based extractor return nothing. -->
+<section>
+  <ol class="row">
+    <li class="col-xs-6">
+      <article class="product_pod">
+        <div class="image_container"><a href="/catalogue/one/"><img src="/media/one.jpg" alt="A Light in the Attic"></a></div>
+        <p class="star-rating Three"></p>
+        <h3><a href="/catalogue/one/" title="A Light in the Attic">A Light in the ...</a></h3>
+        <div class="product_price"><p class="price_color">£51.77</p><p class="instock">In stock</p></div>
+      </article>
+    </li>
+    <li class="col-xs-6">
+      <article class="product_pod">
+        <div class="image_container"><a href="/catalogue/two/"><img src="/media/two.jpg" alt="Tipping the Velvet"></a></div>
+        <p class="star-rating One"></p>
+        <h3><a href="/catalogue/two/" title="Tipping the Velvet">Tipping the ...</a></h3>
+        <div class="product_price"><p class="price_color">£53.74</p><p class="instock">In stock</p></div>
+      </article>
+    </li>
+    <li class="col-xs-6">
+      <article class="product_pod">
+        <div class="image_container"><a href="/catalogue/three/"><img src="/media/three.jpg" alt="Soumission"></a></div>
+        <p class="star-rating One"></p>
+        <h3><a href="/catalogue/three/" title="Soumission">Soumission</a></h3>
+        <div class="product_price"><p class="price_color">£50.10</p><p class="instock">In stock</p></div>
+      </article>
+    </li>
+  </ol>
+</section>
+
+<footer><p>&copy; Shop</p></footer>
+</body></html>

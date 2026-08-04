@@ -12,7 +12,7 @@ import (
 	"github.com/go-rod/stealth"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // BrowserFetcher implements Fetcher using a headless browser via Rod.

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // ChangeType identifies what kind of change occurred.
@@ -58,11 +58,12 @@ func (cd *ChangeDetector) Detect(item *types.Item) ([]Change, error) {
 	cd.mu.RUnlock()
 
 	if err != nil {
-		// First time seeing this URL
+		// No snapshot on disk means this is the first sighting, which is a result
+		// (ChangeAdded), not a read failure to report.
 		cd.mu.Lock()
 		cd.saveSnapshot(item)
 		cd.mu.Unlock()
-		return []Change{{URL: item.URL, Type: ChangeAdded, Timestamp: time.Now()}}, nil
+		return []Change{{URL: item.URL, Type: ChangeAdded, Timestamp: time.Now()}}, nil //nolint:nilerr // a missing snapshot is a first sighting
 	}
 
 	var changes []Change

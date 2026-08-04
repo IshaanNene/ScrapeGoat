@@ -14,7 +14,7 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
 	"github.com/IshaanNene/ScrapeGoat/internal/pipeline"
 	"github.com/IshaanNene/ScrapeGoat/internal/storage"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // Spider is the Scrapy-style interface for defining crawlers declaratively.
@@ -102,7 +102,7 @@ func NewItem(url string) *types.Item {
 func RunSpider(spider Spider, opts ...Option) error {
 	cfg := config.DefaultConfig()
 	for _, opt := range opts {
-		opt(cfg)
+		opt.apply(cfg)
 	}
 
 	level := slog.LevelInfo
@@ -210,7 +210,7 @@ func RunSpider(spider Spider, opts ...Option) error {
 	}
 	eng.Wait()
 
-	stats := eng.Stats().Snapshot()
+	stats := eng.StatsSnapshot()
 	logger.Info("spider complete",
 		"requests", stats["requests_sent"],
 		"items", stats["items_scraped"],

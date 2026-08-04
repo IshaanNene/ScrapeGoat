@@ -8,7 +8,7 @@ import (
 	"golang.org/x/net/html"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // XPathParser extracts data using XPath expressions.

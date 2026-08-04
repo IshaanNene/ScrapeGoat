@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
 )
 
 // --- Fingerprint coverage ---
@@ -78,7 +78,7 @@ func TestIsRateLimitedCoverage(t *testing.T) {
 func TestHTTPFetcherType(t *testing.T) {
 	t.Parallel()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	f, err := NewHTTPFetcher(cfg, exhaustiveLogger)
 	if err != nil {
 		t.Fatal(err)

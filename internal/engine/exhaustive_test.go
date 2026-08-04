@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
-	"github.com/IshaanNene/ScrapeGoat/internal/types"
+	"github.com/IshaanNene/ScrapeGoat/internal/testutil"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 var exhaustiveLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -36,7 +36,7 @@ func TestSchedulerStartStop(t *testing.T) {
 	ts := testServer()
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 5
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 10
@@ -80,7 +80,7 @@ func TestSchedulerPauseResume(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 2
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 100
@@ -114,7 +114,7 @@ func TestSchedulerPauseResume(t *testing.T) {
 func TestSchedulerConcurrentEnqueueDequeue(t *testing.T) {
 	t.Parallel()
 
-	f := NewFrontier()
+	f := NewFrontier(nil)
 	const goroutines = 100
 	const perGoroutine = 100
 
@@ -164,7 +164,7 @@ func TestSchedulerConcurrentEnqueueDequeue(t *testing.T) {
 func TestFrontierPriorityOrdering(t *testing.T) {
 	t.Parallel()
 
-	f := NewFrontier()
+	f := NewFrontier(nil)
 
 	// Push in non-priority order
 	priorities := []int{5, 1, 4, 0, 3, 2}
@@ -195,7 +195,7 @@ func TestFrontierPriorityOrdering(t *testing.T) {
 func TestBloomDeduplicator_ZeroFalseNegatives(t *testing.T) {
 	t.Parallel()
 
-	bd := NewBloomDeduplicator(1_000_000)
+	bd := NewBloomDeduplicator(1_000_000, 0.01)
 	urls := make([]string, 10000)
 	for i := range urls {
 		urls[i] = fmt.Sprintf("https://example.com/page/%d?q=%d", i, i*7)
@@ -203,7 +203,7 @@ func TestBloomDeduplicator_ZeroFalseNegatives(t *testing.T) {
 
 	// Mark all as seen
 	for _, u := range urls {
-		bd.MarkSeen(u)
+		bd.MarkIfUnseen(u)
 	}
 
 	// Check: zero false negatives
@@ -244,7 +244,7 @@ func TestAutoscalerScalesUpAndDown(t *testing.T) {
 		CooldownPeriod:     100 * time.Millisecond,
 		CheckInterval:      50 * time.Millisecond,
 	}
-	pool := NewAutoscaledPool(cfg, func() int { return queueSize }, exhaustiveLogger)
+	pool := NewAutoscaledPool(cfg, func() int { return queueSize }, exhaustiveLogger, nil)
 
 	// Set worker counts to simulate low utilization (should trigger scale up)
 	pool.SetWorkerCounts(1, 9) // 1 active, 9 idle → util = 10%
@@ -282,10 +282,10 @@ func TestAutoscalerScalesUpAndDown(t *testing.T) {
 func TestCheckpointMidCrawlRestore(t *testing.T) {
 	t.Parallel()
 
-	cm := NewCheckpointManager(time.Minute)
+	cm := NewCheckpointManager(time.Minute, nil)
 	cm.checkpointDir = t.TempDir()
 
-	frontier := NewFrontier()
+	frontier := NewFrontier(nil)
 	dedup := NewDeduplicator(1000)
 	stats := &Stats{domainStats: make(map[string]*DomainStats)}
 
@@ -316,7 +316,7 @@ func TestCheckpointMidCrawlRestore(t *testing.T) {
 	}
 
 	// Restore into fresh state
-	f2 := NewFrontier()
+	f2 := NewFrontier(nil)
 	d2 := NewDeduplicator(1000)
 	s2 := &Stats{domainStats: make(map[string]*DomainStats)}
 
@@ -349,7 +349,7 @@ func TestCheckpointMidCrawlRestore(t *testing.T) {
 func TestEngineAddSeed(t *testing.T) {
 	t.Parallel()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.MaxDepth = 2
 	cfg.Engine.AllowedDomains = []string{"example.com"}
 	cfg.Engine.RespectRobotsTxt = false
@@ -387,7 +387,7 @@ func TestEngineStopGoroutineCleanup(t *testing.T) {
 
 	goroutinesBefore := runtime.NumGoroutine()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 5
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 20
@@ -434,7 +434,7 @@ func TestEngineContextCancellation(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.DefaultConfig()
+	cfg := testutil.LoopbackConfig()
 	cfg.Engine.Concurrency = 5
 	cfg.Engine.MaxDepth = 0
 	cfg.Engine.MaxRequests = 100

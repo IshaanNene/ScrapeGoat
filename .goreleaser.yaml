@@ -1,0 +1,109 @@
+version: 2
+
+project_name: scrapegoat
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./... -count=1
+
+builds:
+  - id: scrapegoat
+    main: ./cmd/scrapegoat
+    binary: scrapegoat
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      # config.Version is what `scrapegoat version` prints and what the default
+      # User-Agent carries; without this it stays "dev" in released binaries.
+      - -s -w
+      - -X github.com/IshaanNene/ScrapeGoat/internal/config.Version={{.Version}}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+      - SECURITY.md
+      - configs/**/*
+
+checksum:
+  name_template: checksums.txt
+
+# Signed checksums: a checksum file an attacker can rewrite proves nothing.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
+sboms:
+  - artifacts: archive
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  # CHANGELOG.md is written by hand; the generated list is a commit dump and a
+  # poor substitute. Keep it as a secondary "what moved" section.
+  use: github
+  sort: asc
+  groups:
+    - title: Security
+      regexp: '^.*?sec(urity)?(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Other
+      order: 99
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - Merge pull request
+
+release:
+  draft: true
+  prerelease: auto
+  header: |
+    ## ScrapeGoat {{ .Tag }}
+
+    See [CHANGELOG.md](https://github.com/IshaanNene/ScrapeGoat/blob/{{ .Tag }}/CHANGELOG.md)
+    for the full notes, and [SECURITY.md](https://github.com/IshaanNene/ScrapeGoat/blob/{{ .Tag }}/SECURITY.md)
+    for the trust boundary.
+  footer: |
+    ---
+    Verify a download:
+
+    ```bash
+    cosign verify-blob checksums.txt \
+      --certificate checksums.txt.pem \
+      --signature checksums.txt.sig \
+      --certificate-identity-regexp 'https://github.com/IshaanNene/ScrapeGoat/.*' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com
+    sha256sum -c checksums.txt --ignore-missing
+    ```
