@@ -13,6 +13,7 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/clock"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/observability"
+	"github.com/IshaanNene/ScrapeGoat/internal/provenance"
 	"github.com/IshaanNene/ScrapeGoat/internal/safety"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
@@ -151,6 +152,15 @@ type Engine struct {
 	clock clock.Clock
 	rand  *rand.Rand
 
+	// corpus, when set, receives a provenance record for every response. Nil by
+	// default: most crawls do not want one, and building records costs an
+	// extraction pass over each body.
+	corpus *provenance.CorpusWriter
+
+	// crawlID identifies this run in the records it emits, so a corpus assembled
+	// from several crawls can still be traced back per record.
+	crawlID string
+
 	// metrics may be nil, in which case every recording call is a no-op. This is
 	// the wiring the previous code was missing entirely: cmd/scrapegoat built a
 	// Metrics in a local variable, started its HTTP server, and never handed it to
@@ -217,6 +227,15 @@ func (e *Engine) SetFetcher(fetcherType string, f Fetcher) {
 	if fetcherType == "http" && e.robots != nil {
 		e.robots.SetFetcher(f)
 	}
+}
+
+// SetCorpusWriter attaches a corpus writer. The engine does not close it: the
+// caller opened it and knows when the run is finished.
+func (e *Engine) SetCorpusWriter(w *provenance.CorpusWriter, crawlID string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.corpus = w
+	e.crawlID = crawlID
 }
 
 // SetParser sets the parser implementation.

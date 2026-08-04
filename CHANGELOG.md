@@ -13,6 +13,56 @@ wired into the running system, and several security properties a crawler needs w
 absent. Both are addressed, and the README now describes only what actually runs —
 everything else moved to [ROADMAP.md](ROADMAP.md).
 
+### Added (Phase 3 — provenance)
+
+- **`crawl --corpus` writes a provenance record per page**: where it came from,
+  what was extracted, and what the source said about reuse — page-level `noai` /
+  `noimageai`, the W3C TDM reservation, declared licences, and the AI-specific
+  directives in the site's robots.txt. See [docs/PROVENANCE.md](docs/PROVENANCE.md).
+
+  Signals are **recorded, never enforced**. A crawler that silently dropped
+  restricted pages would produce a corpus whose gaps are invisible, and a
+  downstream user wanting a different policy would have no way to apply it. The
+  end-of-crawl summary counts them instead — a corpus that had excluded them would
+  print zero and look clean.
+
+  `content_hash` addresses the raw body in the fetch log, so a record is not
+  merely asserted: with `--record` alongside `--corpus`, a third party can
+  re-derive every record from bytes they can verify.
+
+- **Two distinctions the schema keeps.** `tdm_reservation` is a pointer, so "the
+  page said 0" stays distinct from "the page said nothing" — in some jurisdictions
+  those differ, and a boolean would manufacture consent. And `noindex` is a
+  statement about search engines, so it is recorded but excluded from the
+  restrictive test rather than read as an AI opt-out.
+
+- **robots.txt is parsed a second time, for reporting.** The engine's parser
+  correctly discards every group aimed at another agent; provenance needs exactly
+  that. `TestReportAgreesWithEnforcement` drives the real `RobotsManager` and the
+  report over the same files and asserts they agree, so the duplication carries a
+  guard rather than a comment.
+
+- **Four fuzz targets** over robots.txt, page signals, headers, and record
+  construction, all wired into CI. Each consumes bytes chosen by the site being
+  crawled, and the invariants asserted are the ones a corpus depends on: a garbled
+  robots.txt must not be reported as permission, and a malformed page must not come
+  back claiming a reservation it never made.
+
+### Fixed (Phase 3)
+
+- **Extracted text lost block boundaries.** goquery's `Text()` concatenates
+  descendant text with nothing between it, so `<h1>Reserved</h1><p>This page…</p>`
+  flattened to `ReservedThis page…` — fabricating a token that appears in no
+  document, which every tokeniser, language detector, and dedupe hash downstream
+  would inherit. The eight-tier extraction benchmark is byte-identical before and
+  after the fix, which is the finding: the synthetic corpus never produces adjacent
+  blocks whose text would fuse.
+
+- **A config file's `storage.output_path` and `storage.type` were unreachable.**
+  `-o` defaults to `./output` and `-f` to `json`, and both were assigned
+  unconditionally, so a crawl configured to write to one place wrote to another.
+  Third instance of this trap after `max_depth`; same `flagChanged` guard.
+
 ### Added (Phase 2 — record & replay)
 
 - **`crawl --record`, `scrapegoat replay`, and `scrapegoat verify`.** A crawl can

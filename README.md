@@ -333,7 +333,7 @@ runs.
 
 **Start here:** [Quick Start](docs/quickstart.md) · [Examples](docs/examples.md) · [MCP setup](docs/mcp.md)
 
-**Going deeper:** [Architecture](docs/architecture.md) · [Record & replay](docs/REPLAY.md) · [Middleware](docs/middleware.md) · [Distributed](docs/distributed.md) · [API spec](docs/api.yaml)
+**Going deeper:** [Architecture](docs/architecture.md) · [Record & replay](docs/REPLAY.md) · [Provenance](docs/PROVENANCE.md) · [Middleware](docs/middleware.md) · [Distributed](docs/distributed.md) · [API spec](docs/api.yaml)
 
 **Design:** [Design docs](docs/design/) — accepted proposals, with the alternatives that were rejected
 

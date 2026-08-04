@@ -209,7 +209,7 @@ func (e *Extractor) scoreCandidates(doc *goquery.Document) map[*goquery.Selectio
 	selFor := map[*html.Node]*goquery.Selection{}
 
 	doc.Find("p, pre, blockquote, li, td").Each(func(_ int, s *goquery.Selection) {
-		text := normalise(s.Text())
+		text := flattenText(s.Clone())
 		if len(text) < minLen {
 			return
 		}
@@ -352,11 +352,30 @@ func sqrt(x float64) float64 {
 	return z
 }
 
+// blockElements end a run of text. Anything here gets a space after it before the
+// tree is flattened; see cleanBlock.
+const blockElements = "address, article, aside, blockquote, br, dd, div, dl, dt, " +
+	"fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, header, " +
+	"hr, li, main, nav, ol, p, pre, section, table, td, th, tr, ul"
+
 // cleanBlock renders a node's prose, dropping structure that is not content.
 func cleanBlock(s *goquery.Selection) string {
 	clone := s.Clone()
 	clone.Find("nav, aside, footer, header, form, button, figure figcaption").Remove()
-	return normalise(clone.Text())
+	return flattenText(clone)
+}
+
+// flattenText renders a subtree as prose with block boundaries preserved.
+//
+// goquery's Text() concatenates descendant text nodes with nothing between them,
+// so <h1>Reserved</h1><p>This page…</p> comes out as "ReservedThis page…". In a
+// corpus that is worse than ugly: the join fabricates a token that appears in no
+// document, and every downstream tokeniser, language detector, and dedupe hash
+// inherits it. Inserting a space after each block element costs one pass and the
+// extra whitespace is collapsed by normalise anyway.
+func flattenText(s *goquery.Selection) string {
+	s.Find(blockElements).AfterHtml(" ")
+	return normalise(s.Text())
 }
 
 // findTitle looks for the heading belonging to the extracted content, preferring

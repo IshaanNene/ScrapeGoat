@@ -1,14 +1,20 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
+
+	"github.com/IshaanNene/ScrapeGoat/internal/extract"
+	"github.com/IshaanNene/ScrapeGoat/internal/provenance"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
@@ -301,6 +307,11 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 		}
 	}
 
+	// A provenance record per response, when a corpus was asked for. Written
+	// before parsing so that a parse failure still leaves the record: what the
+	// source said about reuse does not depend on whether extraction succeeded.
+	s.recordProvenance(ctx, resp)
+
 	// Always run the parser for link discovery and structured data
 	if s.engine.parser != nil {
 		items, links, err := s.engine.parser.Parse(resp, s.engine.cfg.Parser.Rules)
@@ -327,6 +338,73 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 			_ = s.engine.AddRequest(newReq)
 		}
 	}
+}
+
+// recordProvenance writes one corpus record for a response.
+//
+// Failures here are logged, never fatal. A corpus is a by-product of the crawl,
+// and losing the crawl because a record could not be written would be the wrong
+// trade — but losing records silently would be worse, so it is logged loudly
+// enough to notice.
+func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response) {
+	s.engine.mu.RLock()
+	w, crawlID := s.engine.corpus, s.engine.crawlID
+	s.engine.mu.RUnlock()
+
+	if w == nil || resp == nil || resp.Request == nil {
+		return
+	}
+
+	var (
+		doc     *goquery.Document
+		content provenance.Content
+	)
+
+	// Extraction only makes sense for HTML, and only the text needs it. A non-HTML
+	// response still gets a record — it has provenance, just no extracted text.
+	if isHTML(resp) {
+		if d, err := goquery.NewDocumentFromReader(bytes.NewReader(resp.Body)); err == nil {
+			doc = d
+			if r := extract.New().FromDocument(d); r != nil {
+				content = provenance.Content{
+					Text:       r.Text,
+					Title:      r.Title,
+					Confidence: r.Confidence,
+				}
+			}
+		}
+	}
+
+	rec := provenance.Build(provenance.Source{
+		URL:             resp.Request.URLString(),
+		FinalURL:        resp.FinalURL,
+		Body:            resp.Body,
+		StatusCode:      resp.StatusCode,
+		Headers:         resp.Headers,
+		FetchedAt:       resp.FetchedAt,
+		CrawlerIdentity: resp.Request.Headers.Get("User-Agent"),
+		CrawlID:         crawlID,
+
+		// The decision this crawl actually operated under. The request reached a
+		// fetcher, which means the robots check upstream permitted it.
+		RobotsAllowed: true,
+		Robots:        s.engine.robots.Report(ctx, resp.Request.URLString()),
+	}, doc, content)
+
+	if err := w.Write(rec); err != nil {
+		s.engine.logger.Warn("could not record provenance",
+			"url", resp.Request.URLString(), "error", err)
+	}
+}
+
+// isHTML reports whether a response is worth running an HTML extractor over.
+func isHTML(resp *types.Response) bool {
+	ct := resp.ContentType
+	if ct == "" && resp.Headers != nil {
+		ct = resp.Headers.Get("Content-Type")
+	}
+	ct = strings.ToLower(ct)
+	return strings.Contains(ct, "text/html") || strings.Contains(ct, "application/xhtml")
 }
 
 // stampFromResponse dates an item by when its source was fetched.
