@@ -20,6 +20,17 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// Sources a licence can be declared through, in the order they are trusted.
+//
+// Named because these are written at six call sites and read by consumers
+// filtering on provenance: a typo compiles cleanly and silently mislabels where a
+// licence claim came from, which is the sort of error a corpus carries forever.
+const (
+	LicenceSourceLink       = "link"        // <link rel="license">
+	LicenceSourceMeta       = "meta"        // <meta name="license">
+	LicenceSourceLinkHeader = "link-header" // Link: <…>; rel="license"
+)
+
 // PageSignals is what one page said about its own reuse.
 //
 // Every field is a statement the source made, not a judgement this package
@@ -117,7 +128,7 @@ func FromHeaders(h http.Header) PageSignals {
 
 	// A Link header can carry rel="license" just as the HTML element can.
 	if lic := licenceFromLinkHeader(h.Values("Link")); lic != "" {
-		s.Licence, s.LicenceSource = lic, "link-header"
+		s.Licence, s.LicenceSource = lic, LicenceSourceLinkHeader
 	}
 
 	return s
@@ -151,7 +162,7 @@ func FromDocument(doc *goquery.Document) PageSignals {
 			s.TDMPolicy = strings.TrimSpace(content)
 		case "license", "licence", "dcterms.license", "dc.rights":
 			if v := strings.TrimSpace(content); v != "" && s.Licence == "" {
-				s.Licence, s.LicenceSource = v, "meta"
+				s.Licence, s.LicenceSource = v, LicenceSourceMeta
 			}
 		}
 	})
@@ -172,7 +183,7 @@ func FromDocument(doc *goquery.Document) PageSignals {
 	if href, ok := doc.Find(`link[rel~="license"]`).First().Attr("href"); ok {
 		if v := strings.TrimSpace(href); v != "" {
 			// A link element is more explicit than a meta tag, so it wins.
-			s.Licence, s.LicenceSource = v, "link"
+			s.Licence, s.LicenceSource = v, LicenceSourceLink
 		}
 	}
 

@@ -4,8 +4,13 @@ A crawl can record, for every page, where it came from and what the source said
 about how it may be used.
 
 ```bash
-scrapegoat crawl https://example.com --corpus ./corpus.jsonl
+scrapegoat crawl https://example.com --corpus ./corpus.parquet
 ```
+
+The format follows the extension — `.parquet` (or `.pq`) writes Parquet, anything
+else writes JSONL. The extension is what a reader looks at to decide how to open
+the file, so letting it disagree with the contents would be a way to produce a
+`.parquet` full of JSON.
 
 ```
   Corpus:    3 records -> ./corpus.jsonl
@@ -119,13 +124,40 @@ incidental complexity. Instead the duplication carries a guard:
 `TestReportAgreesWithEnforcement` drives the real `RobotsManager` and the report
 over the same files and asserts they see the same groups.
 
+## Parquet
+
+```python
+import duckdb
+duckdb.sql("""
+  SELECT url, licence, ai_agents_blocked
+  FROM 'corpus.parquet'
+  WHERE NOT restrictive AND licence IS NOT NULL
+""")
+```
+
+The Parquet layout is a **flat projection** of the JSON record, not the same shape.
+`WHERE noai` beats `WHERE signals.noai`, and some readers handle nested groups
+poorly enough to be worth avoiding. The JSON form stays canonical; the mapping
+lives in `internal/provenance/parquet.go` rather than in whatever tool loads the
+file.
+
+Nullability is the part that matters. `tdm_reservation` and `robots_present` are
+**optional columns**, so a page that said nothing arrives as `NULL` rather than
+`0` or `false`. A non-nullable column would erase the distinction between silence
+and permission on the way to disk — the one place it would be hardest to notice.
+`TestParquetKeepsSilenceDistinctFromZero` pins it, and the file has been read back
+with `pyarrow` to confirm an independent implementation sees the same `NULL`.
+
+`restrictive` is written as a column even though it is derived. The point of the
+corpus is that someone filters on it, and making every consumer re-derive the rule
+invites each of them to get it slightly different.
+
+Text columns are zstd-compressed and low-cardinality ones (`mime_type`,
+`language`, `licence`, `crawler_identity`) are dictionary-encoded. Row groups hold
+10,000 records, so a query with a predicate can skip most of a large file.
+
 ## Limits
 
-- **JSONL, not Parquet.** Parquet is the right final format and is on the
-  [roadmap](../ROADMAP.md); it brings a schema definition and a column-type
-  mapping to get wrong, and blocking provenance on that would be backwards. JSONL
-  loads into `datasets`, DuckDB, and Polars today, and converting later is a
-  read-and-rewrite rather than a re-crawl.
 - **No language detection.** `language` comes from `<html lang>` or
   `Content-Language`, both of which are frequently a template default nobody
   updated. It is what the page claimed, not what the text is.

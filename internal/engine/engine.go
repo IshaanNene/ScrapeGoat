@@ -155,7 +155,7 @@ type Engine struct {
 	// corpus, when set, receives a provenance record for every response. Nil by
 	// default: most crawls do not want one, and building records costs an
 	// extraction pass over each body.
-	corpus *provenance.CorpusWriter
+	corpus provenance.RecordWriter
 
 	// crawlID identifies this run in the records it emits, so a corpus assembled
 	// from several crawls can still be traced back per record.
@@ -231,7 +231,7 @@ func (e *Engine) SetFetcher(fetcherType string, f Fetcher) {
 
 // SetCorpusWriter attaches a corpus writer. The engine does not close it: the
 // caller opened it and knows when the run is finished.
-func (e *Engine) SetCorpusWriter(w *provenance.CorpusWriter, crawlID string) {
+func (e *Engine) SetCorpusWriter(w provenance.RecordWriter, crawlID string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.corpus = w

@@ -15,6 +15,27 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
 
 ### Added (Phase 3 — provenance)
 
+- **Parquet corpus output.** `--corpus out.parquet` writes Parquet; any other
+  extension writes JSONL. Inferring from the extension rather than adding a
+  `--format` flag, because the extension is what a reader looks at to decide how to
+  open the file — letting the two disagree would be a way to produce a `.parquet`
+  full of JSON.
+
+  The Parquet layout is a flat projection of the JSON record, not the same shape:
+  `WHERE noai` beats `WHERE signals.noai`, and some readers handle nested groups
+  poorly. The JSON form stays canonical and the mapping lives in one place.
+
+  `tdm_reservation` and `robots_present` are **optional columns**. A non-nullable
+  column would turn "the page said nothing" into "the page said 0" on the way to
+  disk, which is permission the source never gave, in the one place it would be
+  hardest to notice. Verified by reading the output back with `pyarrow` — an
+  independent implementation sees the same `NULL`.
+
+  Row groups of 10,000 keep peak memory to one group rather than the corpus, so the
+  streaming property the JSONL writer has is preserved. Text is zstd-compressed and
+  low-cardinality columns are dictionary-encoded.
+
+
 - **`crawl --corpus` writes a provenance record per page**: where it came from,
   what was extracted, and what the source said about reuse — page-level `noai` /
   `noimageai`, the W3C TDM reservation, declared licences, and the AI-specific
