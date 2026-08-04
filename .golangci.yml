@@ -8,9 +8,6 @@ run:
 
 linters:
   enable:
-    # Determinism boundary — see the note under issues.exclude-rules.
-    - forbidigo
-
     # Correctness
     - errorlint    # err.(*T) instead of errors.As — silently broke retry on wrapped errors
     - bodyclose    # unclosed HTTP response bodies
@@ -33,22 +30,24 @@ linters:
     - goconst
     - copyloopvar
 
-linters-settings:
-  forbidigo:
-    analyze-types: true
-    forbid:
-      - p: '^time\.Now$'
-        msg: "use the injected clock.Clock (engine.clock / fetcher clock), not time.Now — see docs/design/0001-deterministic-crawl.md"
-      - p: '^time\.Since$'
-        msg: "use clock.Since"
-      - p: '^time\.(NewTimer|NewTicker|After|Tick|Sleep)$'
-        msg: "use the injected clock.Clock; a simulated clock cannot fire a stdlib timer"
-      - p: '^rand\.(Int|Intn|Int31|Int63|Int64|IntN|Uint32|Uint64|Float32|Float64|Perm|Shuffle)N?$'
-        msg: "use the injected *rand.Rand so a crawl's entropy is part of its identity"
+# The determinism boundary is enforced by scripts/check-determinism.sh, which runs
+# as its own CI step. forbidigo was enabled here too and was the wrong tool for it:
+# it has no notion of *where* the boundary is, so it flagged internal/clock — the
+# package that implements the clock every other package is told to use — along with
+# contrib/, tests/, and cmd/, none of which are in the crawl path. The script knows
+# the boundary, carries an allowlist, and supports a per-line `//determinism:allow`
+# opt-out at the call site. One precise gate beats two, one of which cries wolf.
 
+linters-settings:
   errcheck:
     check-type-assertions: true
-    check-blank: true
+
+    # check-blank stays off. An explicit `_ = f()` is Go's way of saying "I have
+    # considered this error and am discarding it deliberately"; flagging it turns
+    # the acknowledgement into the offence and pushes people toward the bare call,
+    # which errcheck's real check catches. The unchecked returns that motivated
+    # this config were bare calls, not blank assignments.
+    check-blank: false
 
   govet:
     enable-all: true
@@ -57,11 +56,25 @@ linters-settings:
       # more than it helps here; the hot path is network-bound, not cache-bound.
       - fieldalignment
 
+      # shadow fires on `if err := f(); err != nil` inside a function that already
+      # has an err — the single most common shape in Go, and not a bug in any of
+      # the places it fired here. A check that is wrong ~100% of the time trains
+      # people to skim past the output, which costs more than it catches.
+      - shadow
+
   gosec:
     excludes:
       # Covered explicitly: TLSInsecure is driven by operator config and carries
       # its own nolint at the call site.
       - G402
+
+      # Weak RNG. Every use here is jitter, proxy rotation, or fingerprint
+      # variation — none of it is a secret, and none of it is guessed by an
+      # attacker to any advantage. Worse, crypto/rand would defeat the point: the
+      # project's reproducibility guarantee depends on a *seedable* source, so a
+      # crawl's entropy can be part of its identity. See
+      # docs/design/0001-deterministic-crawl.md.
+      - G404
     config:
       G306: "0644"
 
@@ -82,7 +95,14 @@ linters-settings:
     ignore-tests: true
 
   misspell:
-    locale: UK
+    # No locale. misspell's job here is to catch typos — `recieve`, `seperate` —
+    # not to adjudicate British against American spelling. With `locale: UK` it
+    # flagged the CSS property `color` and the value `center`; with `locale: US` it
+    # turned on the prose, which is written in British English throughout. Setting
+    # neither leaves it doing the thing that is actually useful.
+    ignore-words:
+      - cancelled
+      - cancelling
 
 issues:
   # The defaults hide most findings behind a per-linter cap, which turns a clean

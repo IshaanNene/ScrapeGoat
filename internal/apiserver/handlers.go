@@ -152,7 +152,9 @@ func (s *Server) handleCrawl(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) executeCrawl(job *Job, req CrawlRequest) {
-	s.jobManager.UpdateStatus(job.ID, StatusRunning)
+	if err := s.jobManager.UpdateStatus(job.ID, StatusRunning); err != nil {
+		s.logger.Warn("could not mark job running", "job", job.ID, "error", err)
+	}
 	s.BroadcastJobEvent(job.ID, map[string]any{"event": "started", "job_id": job.ID})
 
 	cfg := s.requestConfig()
@@ -282,7 +284,9 @@ func (s *Server) handleBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) executeBatch(job *Job, req BatchRequest) {
-	s.jobManager.UpdateStatus(job.ID, StatusRunning)
+	if err := s.jobManager.UpdateStatus(job.ID, StatusRunning); err != nil {
+		s.logger.Warn("could not mark job running", "job", job.ID, "error", err)
+	}
 
 	totalItems := 0
 	for _, url := range req.URLs {

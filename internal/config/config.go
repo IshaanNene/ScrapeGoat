@@ -159,6 +159,16 @@ type StorageConfig struct {
 	Type       string `mapstructure:"type"        yaml:"type"`
 	OutputPath string `mapstructure:"output_path" yaml:"output_path"`
 	BatchSize  int    `mapstructure:"batch_size"  yaml:"batch_size"`
+
+	// DeterministicOrder writes records in a total order rather than in whatever
+	// order concurrent workers happened to finish, so two runs over identical
+	// responses produce byte-identical files.
+	//
+	// Off by default because it makes the streaming formats buffer every item in
+	// memory. Turn it on when the output is going to be compared or published —
+	// `scrapegoat replay` turns it on for itself, since reproducing a recorded run
+	// is the only thing it does. See docs/REPLAY.md.
+	DeterministicOrder bool `mapstructure:"deterministic_order" yaml:"deterministic_order"`
 }
 
 // AIConfig controls LLM integration.

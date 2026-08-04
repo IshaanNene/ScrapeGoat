@@ -240,8 +240,10 @@ func (ba *BrowserAutomation) HandlePagination(ctx context.Context, cfg Paginatio
 		case PaginationClick:
 			nextBtn, err := ba.page.Element(cfg.NextSelector)
 			if err != nil {
+				// A missing "next" control is how the last page announces itself,
+				// not a failure to paginate.
 				ba.logger.Info("no more pages", "last_page", page)
-				return nil
+				return nil //nolint:nilerr // absence of the control means we are done
 			}
 			if err := nextBtn.Click(proto.InputMouseButtonLeft, 1); err != nil {
 				return err
@@ -259,11 +261,11 @@ func (ba *BrowserAutomation) HandlePagination(ctx context.Context, cfg Paginatio
 		case PaginationURL:
 			nextLink, err := ba.page.Element(cfg.NextSelector)
 			if err != nil {
-				return nil
+				return nil //nolint:nilerr // no next link means the last page
 			}
 			href, err := nextLink.Attribute("href")
 			if err != nil || href == nil || *href == "" {
-				return nil
+				return nil //nolint:nilerr // ditto: nothing left to follow
 			}
 			if err := ba.page.Navigate(*href); err != nil {
 				return err

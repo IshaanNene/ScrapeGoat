@@ -126,7 +126,10 @@ func NewRedisQueue(ctx context.Context, cfg *RedisQueueConfig, logger *slog.Logg
 		closed:        make(chan struct{}),
 	}
 
-	go q.reapLoop()
+	// reapLoop's lifetime is the queue's, not any caller's request: it stops when
+	// Close signals q.stop. A request context would end it at the wrong moment and
+	// leave reclaimed-but-unreturned tasks stuck in the processing list.
+	go q.reapLoop() //nolint:contextcheck // lifecycle is owned by Close, via q.stop
 
 	q.logger.Info("redis queue connected", "key", key, "visibility", visibility)
 	return q, nil

@@ -365,7 +365,6 @@ func TestPipelineOrdering(t *testing.T) {
 
 	// Create tracking middlewares
 	for _, name := range []string{"first", "second", "third"} {
-		name := name
 		p.Use(&trackingMiddleware{name: name, order: &order})
 	}
 

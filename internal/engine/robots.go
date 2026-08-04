@@ -67,7 +67,11 @@ func (rm *RobotsManager) SetFetcher(f Fetcher) {
 }
 
 // IsAllowed checks if a URL is allowed by the domain's robots.txt.
-func (rm *RobotsManager) IsAllowed(rawURL string) bool {
+//
+// Takes a context because answering may require fetching robots.txt, and a crawl
+// that has been cancelled should not sit waiting on a network round trip to learn
+// whether it was allowed to make a request it is no longer going to make.
+func (rm *RobotsManager) IsAllowed(ctx context.Context, rawURL string) bool {
 	if !rm.enabled {
 		return true
 	}
@@ -78,7 +82,7 @@ func (rm *RobotsManager) IsAllowed(rawURL string) bool {
 	}
 
 	domain := u.Scheme + "://" + u.Host
-	data := rm.getRobotsData(domain)
+	data := rm.getRobotsData(ctx, domain)
 	if data == nil {
 		return true // Can't fetch robots.txt = allow
 	}
@@ -130,7 +134,7 @@ func (rm *RobotsManager) GetSitemaps(domain string) []string {
 }
 
 // getRobotsData fetches and caches robots.txt for a domain.
-func (rm *RobotsManager) getRobotsData(domain string) *robotsData {
+func (rm *RobotsManager) getRobotsData(ctx context.Context, domain string) *robotsData {
 	rm.mu.RLock()
 	data, ok := rm.cache[domain]
 	rm.mu.RUnlock()
@@ -140,7 +144,7 @@ func (rm *RobotsManager) getRobotsData(domain string) *robotsData {
 	}
 
 	// Fetch robots.txt
-	data = rm.fetchRobotsTxt(domain)
+	data = rm.fetchRobotsTxt(ctx, domain)
 
 	rm.mu.Lock()
 	rm.cache[domain] = data
@@ -150,7 +154,7 @@ func (rm *RobotsManager) getRobotsData(domain string) *robotsData {
 }
 
 // fetchRobotsTxt downloads and parses robots.txt.
-func (rm *RobotsManager) fetchRobotsTxt(domain string) *robotsData {
+func (rm *RobotsManager) fetchRobotsTxt(ctx context.Context, domain string) *robotsData {
 	robotsURL := domain + "/robots.txt"
 
 	rm.mu.RLock()
@@ -158,10 +162,14 @@ func (rm *RobotsManager) fetchRobotsTxt(domain string) *robotsData {
 	rm.mu.RUnlock()
 
 	if f != nil {
-		return rm.fetchRobotsVia(f, robotsURL)
+		return rm.fetchRobotsVia(ctx, f, robotsURL)
 	}
 
-	resp, err := rm.client.Get(robotsURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, robotsURL, nil)
+	if err != nil {
+		return nil
+	}
+	resp, err := rm.client.Do(req)
 	if err != nil {
 		return nil
 	}
@@ -185,13 +193,13 @@ func (rm *RobotsManager) fetchRobotsTxt(domain string) *robotsData {
 // rules" — the same answer the direct path gives. During a replay that is the
 // right default: a log recorded from a site with no robots.txt should replay as a
 // site with no robots.txt, not as a hard failure.
-func (rm *RobotsManager) fetchRobotsVia(f Fetcher, robotsURL string) *robotsData {
+func (rm *RobotsManager) fetchRobotsVia(ctx context.Context, f Fetcher, robotsURL string) *robotsData {
 	req, err := types.NewRequest(robotsURL)
 	if err != nil {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	resp, err := f.Fetch(ctx, req)
@@ -214,7 +222,7 @@ func parseRobotsTxt(content string) *robotsData {
 
 	lines := strings.Split(content, "\n")
 	inOurSection := false
-	userAgent := ""
+	var userAgent string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)

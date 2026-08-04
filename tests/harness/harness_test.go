@@ -242,7 +242,6 @@ func TestMode5_MalformedHTML(t *testing.T) {
 	variants := []string{"deep_nesting", "unclosed_tags", "mixed_encoding", "null_bytes", "combined"}
 
 	for _, variant := range variants {
-		variant := variant
 		t.Run(variant, func(t *testing.T) {
 			t.Parallel()
 			ts, _ := NewServer(ServerConfig{Mode: ModeMalformedHTML, Variant: variant})
@@ -298,7 +297,6 @@ func TestMode6_DNSFailure(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -456,7 +454,6 @@ func TestMode10_RobotsTxtAdversarial(t *testing.T) {
 	}
 
 	for _, v := range variants {
-		v := v
 		t.Run(v.name, func(t *testing.T) {
 			t.Parallel()
 			ts, _ := NewServer(ServerConfig{Mode: ModeRobotsTxtAdversarial, Variant: v.variant})

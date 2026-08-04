@@ -66,6 +66,7 @@ safety:
 storage:
   type: jsonl
   output_path: %s
+  deterministic_order: true
 metrics:
   enabled: false
 `, outputPath)
@@ -121,6 +122,12 @@ func resetGlobals(t *testing.T) {
 
 // The Tier 1 claim, end to end through the CLI: crawl --record, then replay, and
 // the two produce the same output bytes without the replay touching the network.
+//
+// Run this under -race as well as without. The race detector perturbs worker
+// timing, which is what first exposed that the records were identical but their
+// *order* was not — the third of RFC 0001's three requirements, and the one it is
+// easiest to believe you have. Without `deterministic_order` the comparison below
+// passes or fails depending on how the two runs happened to interleave.
 func TestCrawlRecordThenReplayProducesIdenticalOutput(t *testing.T) {
 	resetGlobals(t)
 

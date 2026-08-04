@@ -19,7 +19,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/IshaanNene/ScrapeGoat/contrib/changedetect"
 	"github.com/IshaanNene/ScrapeGoat/internal/apiserver"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/distributed"
@@ -284,7 +283,8 @@ func wireCrawlPipeline(eng *engine.Engine, cfg *config.Config, logger *slog.Logg
 	pipe.Use(&pipeline.TrimMiddleware{})
 	eng.SetPipeline(pipe)
 
-	store, err := storage.NewFileStorage(cfg.Storage.Type, cfg.Storage.OutputPath, logger)
+	store, err := storage.NewFileStorageOrdered(
+		cfg.Storage.Type, cfg.Storage.OutputPath, logger, cfg.Storage.DeterministicOrder)
 	if err != nil {
 		return fmt.Errorf("create storage: %w", err)
 	}
@@ -756,23 +756,6 @@ Examples:
 	return cmd
 }
 
-// dashboardStatsProvider implements dashboard.StatsProvider for standalone mode.
-type dashboardStatsProvider struct{}
-
-func (p *dashboardStatsProvider) GetStats() map[string]any {
-	return map[string]any{
-		"requests_sent":    int64(0),
-		"items_scraped":    int64(0),
-		"bytes_downloaded": int64(0),
-		"workers_active":   int64(0),
-		"queue_size":       int64(0),
-	}
-}
-
-func (p *dashboardStatsProvider) GetState() string {
-	return "idle"
-}
-
 // scaleCmd creates the "scale" subcommand.
 func scaleCmd() *cobra.Command {
 	var masterAddr string
@@ -1149,37 +1132,4 @@ Examples:
 		"origin permitted by CORS and WebSocket upgrades; repeatable. Empty means same-origin only")
 
 	return cmd
-}
-
-func checkURL(ctx context.Context, monitor *changedetect.Monitor, url string, logger *slog.Logger) {
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
-	if err != nil {
-		logger.Warn("fetch failed", "url", url, "error", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	body := make([]byte, 0, 64*1024)
-	buf := make([]byte, 32*1024)
-	for {
-		n, readErr := resp.Body.Read(buf)
-		if n > 0 {
-			body = append(body, buf[:n]...)
-		}
-		if readErr != nil {
-			break
-		}
-	}
-
-	event, err := monitor.RecordSnapshot(ctx, url, body, resp.StatusCode)
-	if err != nil {
-		logger.Warn("record snapshot failed", "url", url, "error", err)
-		return
-	}
-	if event != nil {
-		fmt.Printf("⚡ Change detected: %s (diff: %.1f%%)\n", url, event.DiffPercent)
-	} else {
-		logger.Debug("no change", "url", url)
-	}
 }

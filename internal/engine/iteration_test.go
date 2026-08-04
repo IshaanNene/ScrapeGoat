@@ -54,7 +54,6 @@ func TestCallbackDispatchIsOrdered(t *testing.T) {
 
 		var order []string
 		for _, name := range []string{"delta", "alpha", "charlie", "bravo", "echo"} {
-			name := name
 			eng.OnResponse(name, func(*types.Response) ([]*types.Item, []*types.Request, error) {
 				order = append(order, name)
 				return nil, nil, nil

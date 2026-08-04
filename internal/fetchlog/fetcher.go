@@ -106,7 +106,7 @@ func (r *Recorder) Fetch(ctx context.Context, req *types.Request) (*types.Respon
 		if _, aerr := r.log.Append(entry); aerr != nil {
 			// A log write failure must not silently drop the record. Surfacing it
 			// alongside the fetch error is better than discarding either.
-			return nil, fmt.Errorf("%w (and recording it failed: %v)", err, aerr)
+			return nil, fmt.Errorf("%w (and recording it failed: %w)", err, aerr)
 		}
 		return nil, err
 	}

@@ -310,8 +310,9 @@ func (g *CrawlGraph) ExportDOT() (string, error) {
 		return "", err
 	}
 
-	var sb fmt.Stringer = &dotBuilder{}
-	b := sb.(*dotBuilder)
+	// Was declared as fmt.Stringer and immediately asserted back to the concrete
+	// type; the interface bought nothing and cost an unchecked assertion.
+	b := &dotBuilder{}
 	b.writef("digraph crawl_graph {\n")
 	b.writef("  rankdir=LR;\n")
 	b.writef("  node [shape=box, style=filled, fillcolor=lightblue];\n\n")

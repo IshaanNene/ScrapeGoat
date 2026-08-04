@@ -75,7 +75,7 @@ func (f *Frontier) Pop(ctx context.Context) *types.Request {
 	for {
 		f.mu.Lock()
 		if f.pq.Len() > 0 {
-			item := heap.Pop(&f.pq).(*pqItem)
+			item := popPQ(&f.pq)
 			remaining := f.pq.Len()
 			f.mu.Unlock()
 
@@ -158,7 +158,7 @@ func (f *Frontier) PopReady(ctx context.Context, gate DomainGate) *types.Request
 		}
 
 		if best != -1 {
-			item := heap.Remove(&f.pq, best).(*pqItem)
+			item := removePQ(&f.pq, best)
 			remaining := f.pq.Len()
 			f.mu.Unlock()
 
@@ -228,7 +228,7 @@ func (f *Frontier) TryPop() *types.Request {
 		return nil
 	}
 
-	item := heap.Pop(&f.pq).(*pqItem)
+	item := popPQ(&f.pq)
 	return item.request
 }
 
@@ -284,7 +284,7 @@ func (f *Frontier) Drain() []*types.Request {
 
 	requests := make([]*types.Request, 0, f.pq.Len())
 	for f.pq.Len() > 0 {
-		item := heap.Pop(&f.pq).(*pqItem)
+		item := popPQ(&f.pq)
 		requests = append(requests, item.request)
 	}
 	return requests
@@ -329,7 +329,11 @@ func (pq priorityQueue) Swap(i, j int) {
 
 func (pq *priorityQueue) Push(x any) {
 	n := len(*pq)
-	item := x.(*pqItem)
+	// heap.Interface hands back `any`; see popPQ for why this is a hard assertion.
+	item, ok := x.(*pqItem)
+	if !ok {
+		panic("frontier: priorityQueue given a non-*pqItem")
+	}
 	item.index = n
 	*pq = append(*pq, item)
 }
@@ -341,5 +345,29 @@ func (pq *priorityQueue) Pop() any {
 	old[n-1] = nil // GC
 	item.index = -1
 	*pq = old[:n-1]
+	return item
+}
+
+// popPQ and removePQ narrow container/heap's `any` back to the only type the
+// queue ever holds.
+//
+// The assertion cannot fail: pq is private and every Push goes through this file.
+// Written as a helper rather than five inline assertions so the invariant is
+// stated once, and left as a hard assertion rather than the comma-ok form because
+// a violation would be a bug in this file — a panic names it, a zero value hides
+// it until something downstream misbehaves for unrelated-looking reasons.
+func popPQ(pq *priorityQueue) *pqItem {
+	item, ok := heap.Pop(pq).(*pqItem)
+	if !ok {
+		panic("frontier: priorityQueue held a non-*pqItem")
+	}
+	return item
+}
+
+func removePQ(pq *priorityQueue, i int) *pqItem {
+	item, ok := heap.Remove(pq, i).(*pqItem)
+	if !ok {
+		panic("frontier: priorityQueue held a non-*pqItem")
+	}
 	return item
 }

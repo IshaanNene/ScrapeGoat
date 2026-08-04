@@ -222,7 +222,6 @@ func TestBrowserProfilesProduceDistinctJA3(t *testing.T) {
 	seen := map[string]string{goHash: "go-crypto-tls"}
 
 	for _, p := range Profiles {
-		p := p
 		t.Run(p.Name, func(t *testing.T) {
 			tr := NewTransport(p, plainDial, true)
 

@@ -185,10 +185,8 @@ func (s *Server) Start(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
 		s.jobManager.Close()
-		return server.Shutdown(shutdownCtx)
+		return shutdownWithGrace(server, 10*time.Second)
 	case err := <-errCh:
 		return err
 	}
@@ -380,4 +378,19 @@ func (s *Server) BroadcastJobEvent(jobID string, event map[string]any) {
 			s.wsMu.Unlock()
 		}
 	}
+}
+
+// shutdownWithGrace stops srv, allowing up to d for in-flight requests to finish.
+//
+// The deadline is built on a fresh context rather than derived from the caller's.
+// That is deliberate and is the whole point: a caller reaches shutdown *because*
+// its context was cancelled, so a derived context would already be dead and
+// Shutdown would return immediately — dropping the connections it was called to
+// drain.
+//
+//nolint:contextcheck // a shutdown deadline must outlive the context that triggered it
+func shutdownWithGrace(srv *http.Server, d time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), d)
+	defer cancel()
+	return srv.Shutdown(ctx)
 }

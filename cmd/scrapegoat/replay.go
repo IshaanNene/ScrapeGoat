@@ -64,6 +64,10 @@ func runReplay(_ *cobra.Command, args []string) error {
 	cfg.Storage.Type = replayFormat
 	cfg.Storage.OutputPath = replayOutput
 
+	// A replay exists to reproduce a run, so a scheduling-dependent record order
+	// would defeat it: the records would be right and the file would still differ.
+	cfg.Storage.DeterministicOrder = true
+
 	player, err := fetchlog.NewPlayer(dir)
 	if err != nil {
 		return fmt.Errorf("open log: %w", err)

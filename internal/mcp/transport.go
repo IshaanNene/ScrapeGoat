@@ -163,9 +163,7 @@ func (t *HTTPTransport) Run(ctx context.Context, handler MessageHandler) error {
 
 	select {
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		return server.Shutdown(shutdownCtx)
+		return shutdownWithGrace(server, 5*time.Second)
 	case err := <-errCh:
 		return err
 	}
@@ -297,4 +295,14 @@ func SSEEvent(eventType string, data any) ([]byte, error) {
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
 	return json.Marshal(payload)
+}
+
+// shutdownWithGrace stops srv, allowing up to d for in-flight requests.
+// See internal/apiserver.shutdownWithGrace for why the context is fresh.
+//
+//nolint:contextcheck // a shutdown deadline must outlive the context that triggered it
+func shutdownWithGrace(srv *http.Server, d time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), d)
+	defer cancel()
+	return srv.Shutdown(ctx)
 }

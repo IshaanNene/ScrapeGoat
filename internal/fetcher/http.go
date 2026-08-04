@@ -149,7 +149,7 @@ func (f *HTTPFetcher) Fetch(ctx context.Context, req *types.Request) (*types.Res
 	// its transport sets a User-Agent matching the ClientHello it just sent, and
 	// overriding it here would produce the browser/UA mismatch that is a louder
 	// signal than no fingerprinting at all.
-	ua := ""
+	var ua string
 	if f.profile == nil {
 		ua = f.nextUserAgent()
 		httpReq.Header.Set("User-Agent", ua)
@@ -360,7 +360,8 @@ func isRetryableError(err error) bool {
 		return true
 	}
 	// Network-level errors
-	if netErr, ok := err.(net.Error); ok {
+	var netErr net.Error
+	if errors.As(err, &netErr) {
 		if netErr.Timeout() {
 			return true
 		}

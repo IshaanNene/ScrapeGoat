@@ -15,10 +15,6 @@ const (
 	// almost certainly not coming back within this crawl.
 	maxBackoff = 60 * time.Second
 
-	// breakerDefaultThreshold is how many consecutive failures open a domain's
-	// circuit.
-	breakerDefaultThreshold = 5
-
 	// breakerDefaultCooldown is how long an open circuit stays open before a
 	// single probe is allowed through.
 	breakerDefaultCooldown = 30 * time.Second

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -42,7 +43,7 @@ Sitemap: https://example.com/sitemap.xml`)); err != nil {
 	rm := NewRobotsManager(true, safety.New(safety.Config{AllowPrivateAddresses: true}), nil)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := rm.IsAllowed(ts.URL + tt.path)
+			got := rm.IsAllowed(context.Background(), ts.URL+tt.path)
 			if got != tt.allowed {
 				t.Errorf("IsAllowed(%s) = %v, want %v", tt.path, got, tt.allowed)
 			}
@@ -60,7 +61,7 @@ func TestRobotsManagerDisabled(t *testing.T) {
 	}
 
 	for _, u := range tests {
-		if !rm.IsAllowed(u) {
+		if !rm.IsAllowed(context.Background(), u) {
 			t.Errorf("should allow %q when disabled", u)
 		}
 	}
@@ -82,7 +83,7 @@ Sitemap: https://example.com/sitemap2.xml`)); err != nil {
 
 	rm := NewRobotsManager(true, safety.New(safety.Config{AllowPrivateAddresses: true}), nil)
 	// Trigger fetch by calling IsAllowed
-	rm.IsAllowed(ts.URL + "/test")
+	rm.IsAllowed(context.Background(), ts.URL+"/test")
 
 	sitemaps := rm.GetSitemaps(ts.URL)
 	if len(sitemaps) != 2 {
@@ -98,7 +99,7 @@ func TestRobotsManager404(t *testing.T) {
 
 	rm := NewRobotsManager(true, safety.New(safety.Config{AllowPrivateAddresses: true}), nil)
 	// If robots.txt returns 404, all URLs should be allowed
-	if !rm.IsAllowed(ts.URL + "/anything") {
+	if !rm.IsAllowed(context.Background(), ts.URL+"/anything") {
 		t.Error("should allow all when robots.txt returns 404")
 	}
 }

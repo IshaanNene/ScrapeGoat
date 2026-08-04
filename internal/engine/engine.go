@@ -277,7 +277,7 @@ func (e *Engine) AddRequest(req *types.Request) error {
 	}
 
 	// Check robots.txt
-	if e.cfg.Engine.RespectRobotsTxt && !e.robots.IsAllowed(urlStr) {
+	if e.cfg.Engine.RespectRobotsTxt && !e.robots.IsAllowed(e.ctx, urlStr) {
 		e.stats.URLsFiltered.Add(1)
 		return types.ErrBlocked
 	}

@@ -239,8 +239,6 @@ func TestCheckRedirectEnforcesLimit(t *testing.T) {
 // bounces it at the metadata address, which is the actual attack rather than a unit
 // of it.
 func TestRedirectToMetadataIsBlockedEndToEnd(t *testing.T) {
-	g := New(Config{AllowPrivateAddresses: false})
-
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "http://169.254.169.254/latest/meta-data/", http.StatusFound)
 	}))
@@ -249,7 +247,7 @@ func TestRedirectToMetadataIsBlockedEndToEnd(t *testing.T) {
 	// The test server itself is on loopback, so exempt it — the point of this test is
 	// the redirect target, not the origin.
 	u := mustParse(t, ts.URL)
-	g = New(Config{AllowedPrivateHosts: []string{u.Hostname()}})
+	g := New(Config{AllowedPrivateHosts: []string{u.Hostname()}})
 
 	client := &http.Client{
 		Transport:     &http.Transport{DialContext: g.DialContext},

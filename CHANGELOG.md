@@ -17,9 +17,10 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
 
 - **`crawl --record`, `scrapegoat replay`, and `scrapegoat verify`.** A crawl can
   write a content-addressed log of everything it fetched and later be re-run from
-  it, opening no sockets. The recorded and replayed runs produce byte-identical
-  output — asserted end to end in `cmd/scrapegoat/replay_test.go` by comparing the
-  SHA-256 of the output files. See [docs/REPLAY.md](docs/REPLAY.md).
+  it, opening no sockets. With `storage.deterministic_order` set, the recorded and
+  replayed runs produce byte-identical output — asserted end to end in
+  `cmd/scrapegoat/replay_test.go` by comparing the SHA-256 of the output files,
+  under `-race` as well as without. See [docs/REPLAY.md](docs/REPLAY.md).
 
   `internal/fetchlog` holds the pieces: a SHA-256-addressed object store with
   crash-safe writes and read-time verification, an append-only JSONL ledger that
@@ -35,6 +36,19 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
   filed under and checks every ledger entry against the store, so tampering and bit
   rot are caught rather than replayed. This is what makes a published dataset
   checkable by someone who does not trust whoever published it.
+
+- **`storage.deterministic_order` puts output records in a total order** — fetch
+  time, then URL, then spider, then a canonical encoding of the fields — instead
+  of the order concurrent workers happened to finish in. Off by default, because
+  it requires buffering every record and streaming is why the JSONL format exists;
+  `scrapegoat replay` sets it for itself, and JSON output was always buffered so
+  it is now always ordered.
+
+  This closes the third of RFC 0001's three requirements for Tier 1. The first
+  version of record/replay had the other two and passed its byte-comparison test
+  anyway, because the two runs happened to interleave identically; it only failed
+  once `-race` perturbed the timing. The records were never wrong — the file was
+  a different permutation of them.
 
 ### Fixed (Phase 2)
 
@@ -60,6 +74,40 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
 - **Closing a `Recorder` twice reported a failure on a clean shutdown.** The engine
   closes the fetchers it holds and the caller closes the log it opened; both are
   correct, so `Close` is now idempotent.
+
+- **`RobotsManager` now takes a context.** A cancelled crawl no longer waits on a
+  robots.txt round trip to learn whether it was allowed to make a request it is
+  not going to make.
+
+- **Dead `checkURL` in `cmd/scrapegoat` removed.** Left over from the change
+  detector's move to `contrib/`, and it carried an unguarded `http.Client` — the
+  same class of SSRF bypass that was fixed in `internal/seo`.
+
+### Changed (lint)
+
+- **The lint configuration was calibrated against the codebase it lints.** It had
+  been written aspirationally and never run to green: 564 findings on the branch
+  before this commit, which is the same as having no gate at all. Four settings
+  were wrong rather than strict —
+
+  - `forbidigo` was policing the determinism boundary repo-wide with no notion of
+    where the boundary is, so it flagged `internal/clock` (the package that
+    *implements* the clock), plus `contrib/`, `tests/`, and `cmd/`. Removed;
+    `scripts/check-determinism.sh` was already the real gate, knows the boundary,
+    and supports a per-line opt-out.
+  - `misspell` under `locale: UK` flagged the CSS property `color` and the value
+    `center`; under `locale: US` it flagged the prose, which is British
+    throughout. Locale removed, leaving it to catch actual typos.
+  - `errcheck`'s `check-blank` flagged `_ = f()`, turning the explicit
+    acknowledgement of a discarded error into the offence.
+  - `govet`'s `shadow` fired on `if err := f(); err != nil` inside functions that
+    already had an `err` — the most common shape in Go, and not a bug in any of
+    the ~44 places it fired.
+
+  The remaining ~150 genuine findings are fixed in code, not silenced: unchecked
+  errors now checked or logged, `errors.As` in place of error type assertions,
+  dead code deleted, unchecked type assertions given explicit invariants, and the
+  graceful-shutdown pattern extracted into a documented helper. Lint is green.
 
 ### Changed (Phase 0)
 

@@ -176,8 +176,10 @@ func (p *AutoscaledPool) Evaluate() ScaleDecision {
 		newCount := max(current-scaleStep(current), p.config.MinConcurrency)
 		decision.Desired = newCount
 		decision.Action = ScaleDown
-		p.desired.Store(int32(newCount))
-		p.current.Store(int32(newCount))
+		// newCount is clamped to [MinConcurrency, MaxConcurrency], both validated
+		// positive ints far below int32's range.
+		p.desired.Store(int32(newCount)) // #nosec G115 -- clamped, see above
+		p.current.Store(int32(newCount)) // #nosec G115 -- clamped, see above
 		p.lastAction = p.clock.Now()
 		p.logger.Info("scaling down",
 			"from", current, "to", newCount,

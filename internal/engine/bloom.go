@@ -242,6 +242,8 @@ func (bd *BloomDeduplicator) IsSeen(rawURL string) bool {
 func (bd *BloomDeduplicator) Count() int {
 	bd.mu.Lock()
 	defer bd.mu.Unlock()
+	// #nosec G115 -- the count cannot exceed the number of URLs added in one
+	// process, which is bounded by memory long before it reaches maxint.
 	return int(bd.bloom.Count())
 }
 

@@ -3,6 +3,7 @@ package fetcher
 import (
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -191,8 +192,8 @@ func TestFetch429(t *testing.T) {
 		t.Fatal("expected error on 429 response")
 	}
 
-	fetchErr, ok := err.(*types.FetchError)
-	if !ok {
+	var fetchErr *types.FetchError
+	if !errors.As(err, &fetchErr) {
 		t.Fatalf("expected *FetchError, got %T", err)
 	}
 	if !fetchErr.Retryable {
@@ -226,8 +227,8 @@ func TestFetch5xx(t *testing.T) {
 		t.Fatal("expected error on 503 response")
 	}
 
-	fetchErr, ok := err.(*types.FetchError)
-	if !ok {
+	var fetchErr *types.FetchError
+	if !errors.As(err, &fetchErr) {
 		t.Fatalf("expected *FetchError, got %T", err)
 	}
 	if !fetchErr.Retryable {

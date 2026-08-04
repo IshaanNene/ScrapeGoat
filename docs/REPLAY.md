@@ -9,7 +9,9 @@ scrapegoat verify ./crawl.log
 scrapegoat replay ./crawl.log -o ./out-again
 ```
 
-`./out` and `./out-again` are byte-identical, and the replay opens no sockets.
+The replay opens no sockets. `./out` and `./out-again` hold the same records —
+and are byte-identical when the crawl was run with `deterministic_order` set
+(see [Record order](#record-order) below; `replay` always sets it for itself).
 
 ## Why this is the interesting part
 
@@ -82,11 +84,11 @@ log is not intact.
 ## What is guaranteed, and what is not
 
 **Tier 1 — reproducible output.** Given a log, the extracted dataset is
-bit-identical. This is what ships today, and it is what the end-to-end test in
-`cmd/scrapegoat/replay_test.go` asserts: record a crawl, replay it, compare the
-SHA-256 of the output files.
+bit-identical. `cmd/scrapegoat/replay_test.go` asserts it end to end: record a
+crawl, replay it, compare the SHA-256 of the output files. Run it under `-race`
+too — see below for why that matters.
 
-Two things had to change to make that true, and both are worth knowing about:
+Three things had to change to make it true, and all three are worth knowing:
 
 - Items are dated from the response's fetch time, not from `time.Now()` at parse
   time. `_timestamp` now means "when this data was observed", which is what a
@@ -94,6 +96,37 @@ Two things had to change to make that true, and both are worth knowing about:
   fetches perfectly and every output line still differed.
 - Replayed responses carry the *recorded* duration and timestamp. A replay that
   reported microsecond fetches would misrepresent the run it claims to reproduce.
+- Records are written in a total order rather than in the order concurrent
+  workers finished. See below.
+
+## Record order
+
+Concurrent workers finish in whatever order the scheduler gives them, so records
+reach storage in a different sequence on every run. The records themselves are
+identical; the file is not. This is the third of RFC 0001's three requirements for
+Tier 1, and the easiest one to believe you already have — the first version of
+this feature passed its byte-comparison test purely because the two runs happened
+to interleave the same way, and only failed once `-race` perturbed the timing.
+
+`storage.deterministic_order` fixes it, sorting records by fetch time, then URL,
+then spider, then a canonical encoding of the fields. The last component is not
+decorative: two items extracted from one response share a timestamp and a URL, and
+without it they would compare equal and fall back to arrival order.
+
+It is **off by default**, because ordering requires holding every record until
+close, and streaming output is the reason the JSONL format exists — a crawl of a
+hundred million pages should not be made to buffer them all. Turn it on when the
+output will be compared or published:
+
+```yaml
+storage:
+  type: jsonl
+  deterministic_order: true
+```
+
+`scrapegoat replay` sets it unconditionally: reproducing a recorded run is the
+only thing it does, and a scheduling-dependent order would defeat that. JSON
+output buffers regardless of the setting, so it is always ordered.
 
 **Tier 2 — reproducible crawl.** The frontier evolving identically, so that the
 crawl visits URLs in the same order, requires a fixed random seed and a controlled
@@ -110,3 +143,5 @@ when one was fixed. Concurrent crawls currently get Tier 1 only; a manifest with
   covered by the log.
 - A log from a crawl that was killed replays the crawl that was killed. The
   manifest's missing `finished_at` is how you tell, and `replay` says so.
+- Byte-identical output needs `deterministic_order`, which trades bounded memory
+  for it. Without the setting you get the same records in an arbitrary order.

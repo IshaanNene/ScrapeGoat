@@ -84,7 +84,7 @@ func (t *Throttler) limiterFor(domain string) *rate.Limiter {
 
 	if el, ok := t.slots[domain]; ok {
 		t.lru.MoveToFront(el)
-		return el.Value.(*throttleSlot).limiter
+		return slotOf(el).limiter
 	}
 
 	// Evicting the least recently used domain loses its rate history, which means
@@ -98,7 +98,7 @@ func (t *Throttler) limiterFor(domain string) *rate.Limiter {
 			break
 		}
 		t.lru.Remove(oldest)
-		delete(t.slots, oldest.Value.(*throttleSlot).domain)
+		delete(t.slots, slotOf(oldest).domain)
 	}
 
 	limiter := rate.NewLimiter(t.limit, t.burst)
@@ -173,4 +173,14 @@ func (t *Throttler) Len() int {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.lru.Len()
+}
+
+// slotOf narrows container/list's `any` to the only type this LRU holds. Private
+// list, single writer; see popPQ in frontier.go for why the assertion is hard.
+func slotOf(el *list.Element) *throttleSlot {
+	slot, ok := el.Value.(*throttleSlot)
+	if !ok {
+		panic("throttle: LRU held a non-*throttleSlot")
+	}
+	return slot
 }

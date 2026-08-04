@@ -1,7 +1,6 @@
 package antibot
 
 import (
-	"fmt"
 	"math/rand"
 )
 
@@ -162,7 +161,7 @@ func edgeWindows() BrowserStealthProfile {
 		Headers: map[string]string{
 			"Accept":             "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
 			"Accept-Language":    "en-US,en;q=0.9",
-			"Sec-Ch-Ua":          fmt.Sprintf(`"Microsoft Edge";v="125", "Chromium";v="125", "Not.A/Brand";v="24"`),
+			"Sec-Ch-Ua":          `"Microsoft Edge";v="125", "Chromium";v="125", "Not.A/Brand";v="24"`,
 			"Sec-Ch-Ua-Mobile":   "?0",
 			"Sec-Ch-Ua-Platform": `"Windows"`,
 		},

@@ -237,14 +237,14 @@ func (cs *CAPTCHASolver) solveAntiCaptcha(ctx context.Context, req *CAPTCHAReque
 	defer resp.Body.Close()
 
 	var createResult struct {
-		ErrorId   int    `json:"errorId"`
-		TaskId    int    `json:"taskId"`
+		ErrorID   int    `json:"errorId"`
+		TaskID    int    `json:"taskId"`
 		ErrorDesc string `json:"errorDescription"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&createResult); err != nil {
 		return nil, err
 	}
-	if createResult.ErrorId != 0 {
+	if createResult.ErrorID != 0 {
 		return nil, fmt.Errorf("anti-captcha error: %s", createResult.ErrorDesc)
 	}
 
@@ -258,7 +258,7 @@ func (cs *CAPTCHASolver) solveAntiCaptcha(ctx context.Context, req *CAPTCHAReque
 
 		pollBody, _ := json.Marshal(map[string]any{
 			"clientKey": cs.apiKey,
-			"taskId":    createResult.TaskId,
+			"taskId":    createResult.TaskID,
 		})
 
 		pollResp, err := cs.client.Post(cs.endpoint+"/getTaskResult", "application/json", strings.NewReader(string(pollBody)))
@@ -287,7 +287,7 @@ func (cs *CAPTCHASolver) solveAntiCaptcha(ctx context.Context, req *CAPTCHAReque
 			}
 			return &CAPTCHAResponse{
 				Solution: solution,
-				TaskID:   fmt.Sprintf("%d", createResult.TaskId),
+				TaskID:   fmt.Sprintf("%d", createResult.TaskID),
 				Duration: time.Since(start),
 			}, nil
 		}
@@ -331,14 +331,14 @@ func (cs *CAPTCHASolver) solveCapsolver(ctx context.Context, req *CAPTCHARequest
 	defer resp.Body.Close()
 
 	var createResult struct {
-		ErrorId   int    `json:"errorId"`
-		TaskId    string `json:"taskId"`
+		ErrorID   int    `json:"errorId"`
+		TaskID    string `json:"taskId"`
 		ErrorDesc string `json:"errorDescription"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&createResult); err != nil {
 		return nil, err
 	}
-	if createResult.ErrorId != 0 {
+	if createResult.ErrorID != 0 {
 		return nil, fmt.Errorf("capsolver error: %s", createResult.ErrorDesc)
 	}
 
@@ -352,7 +352,7 @@ func (cs *CAPTCHASolver) solveCapsolver(ctx context.Context, req *CAPTCHARequest
 
 		pollBody, _ := json.Marshal(map[string]any{
 			"clientKey": cs.apiKey,
-			"taskId":    createResult.TaskId,
+			"taskId":    createResult.TaskID,
 		})
 		pollResp, err := cs.client.Post(cs.endpoint+"/getTaskResult", "application/json", strings.NewReader(string(pollBody)))
 		if err != nil {
@@ -379,7 +379,7 @@ func (cs *CAPTCHASolver) solveCapsolver(ctx context.Context, req *CAPTCHARequest
 			}
 			return &CAPTCHAResponse{
 				Solution: solution,
-				TaskID:   createResult.TaskId,
+				TaskID:   createResult.TaskID,
 				Duration: time.Since(start),
 			}, nil
 		}

@@ -202,10 +202,13 @@ func (m *Monitor) RecordSnapshot(ctx context.Context, url string, content []byte
 	event.Name = name.String
 
 	// Persist change event.
-	m.db.Exec(
+	if _, err := m.db.Exec(
 		`INSERT INTO changes (watch_url, old_hash, new_hash, old_len, new_len, diff_percent, detected_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		url, prevHash, hash, prevLen, len(content), diffPercent, now.Format(time.RFC3339))
+		url, prevHash, hash, prevLen, len(content), diffPercent, now.Format(time.RFC3339),
+	); err != nil {
+		m.logger.Warn("could not record change event", "url", url, "error", err)
+	}
 
 	m.logger.Info("change detected",
 		"url", url,

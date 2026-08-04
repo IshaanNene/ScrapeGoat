@@ -336,9 +336,7 @@ func (ae *AutoExtractor) extractProducts(doc *goquery.Document, result *Extracte
 // See detectRepeatedItems for why guessing class names is not enough on its own.
 func (ae *AutoExtractor) extractProductsStructural(doc *goquery.Document, result *ExtractedData) {
 	items := detectRepeatedItems(doc)
-	for _, item := range items {
-		result.Data = append(result.Data, item)
-	}
+	result.Data = append(result.Data, items...)
 	if len(items) > 0 {
 		ae.logger.Debug("extracted listing by structure", "items", len(items))
 	}
