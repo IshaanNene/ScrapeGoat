@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -156,4 +157,36 @@ func pathOf(t *testing.T, raw string) string {
 		t.Fatalf("parse %q: %v", raw, err)
 	}
 	return u.Path
+}
+
+// Flags with non-empty defaults must not overwrite a config file. Cobra fills
+// every flag with its default whether or not the user typed it, so an
+// unconditional assignment makes the config value unreachable — silently, since
+// the crawl still succeeds, just somewhere else.
+func TestConfigFileOutputSurvivesFlagDefaults(t *testing.T) {
+	resetGlobals(t)
+
+	var hits int32
+	srv := corpusSite(t, &hits)
+	defer srv.Close()
+
+	work := t.TempDir()
+	configured := filepath.Join(work, "configured-output")
+
+	cfgFile = loopbackConfigFile(t, configured)
+
+	// What cobra would have set had the user typed nothing: the flag defaults.
+	outputPath, outputType, depth = "./output", "json", 3
+
+	if err := runCrawl(nil, []string{srv.URL + "/"}); err != nil {
+		t.Fatalf("crawl: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(configured, "results.jsonl")); err != nil {
+		t.Errorf("config output_path was ignored: %v", err)
+	}
+	if _, err := os.Stat("./output"); err == nil {
+		os.RemoveAll("./output")
+		t.Error("the flag default overwrote the config and wrote to ./output")
+	}
 }

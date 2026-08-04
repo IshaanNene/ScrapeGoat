@@ -514,10 +514,14 @@ func applyCLIOverrides(cmd *cobra.Command, cfg *config.Config) {
 	if userAgent != "" {
 		cfg.Engine.UserAgents = []string{userAgent}
 	}
-	if outputPath != "" {
+	// Same trap as depth: these flags have non-empty defaults, so an unconditional
+	// assignment meant `-o`'s default of ./output silently overwrote whatever
+	// output_path a config file set. A crawl configured to write to one place
+	// wrote to another and said so only in a line nobody reads.
+	if flagChanged(cmd, "output") {
 		cfg.Storage.OutputPath = outputPath
 	}
-	if outputType != "" {
+	if flagChanged(cmd, "format") {
 		cfg.Storage.Type = strings.ToLower(outputType)
 	}
 	if maxRequests > 0 {
