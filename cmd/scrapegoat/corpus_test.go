@@ -190,3 +190,74 @@ func TestConfigFileOutputSurvivesFlagDefaults(t *testing.T) {
 		t.Error("the flag default overwrote the config and wrote to ./output")
 	}
 }
+
+// The same crawl written as Parquet must hold the same records as JSONL. If the
+// two diverged, the dataset would mean something different depending on a file
+// extension.
+func TestCrawlWritesParquetCorpus(t *testing.T) {
+	resetGlobals(t)
+
+	var hits int32
+	srv := corpusSite(t, &hits)
+	defer srv.Close()
+
+	work := t.TempDir()
+	parquetFile := filepath.Join(work, "corpus.parquet")
+
+	cfgFile = loopbackConfigFile(t, filepath.Join(work, "out"))
+	corpusPath = parquetFile
+	t.Cleanup(func() { corpusPath = "" })
+
+	if err := runCrawl(nil, []string{srv.URL + "/"}); err != nil {
+		t.Fatalf("crawl: %v", err)
+	}
+
+	records, err := provenance.ReadParquetCorpus(parquetFile)
+	if err != nil {
+		t.Fatalf("ReadParquetCorpus: %v", err)
+	}
+	if len(records) != 3 {
+		t.Fatalf("got %d records, want 3", len(records))
+	}
+
+	byPath := map[string]provenance.Record{}
+	for _, r := range records {
+		if !r.Complete() {
+			t.Errorf("incomplete record reached the parquet corpus: %+v", r)
+		}
+		byPath[pathOf(t, r.URL)] = r
+	}
+
+	root, ok := byPath["/"]
+	if !ok {
+		t.Fatalf("root page missing: %v", byPath)
+	}
+	if root.Signals.Licence != "https://creativecommons.org/licenses/by/4.0/" {
+		t.Errorf("licence did not survive parquet: %q", root.Signals.Licence)
+	}
+	if root.Text == "" {
+		t.Error("extracted text did not survive parquet")
+	}
+	if root.AIDirectives == nil || len(root.AIDirectives.AgentsBlocked) != 2 {
+		t.Errorf("AI directives did not survive parquet: %+v", root.AIDirectives)
+	}
+
+	opted := byPath["/opted-out"]
+	if !opted.Signals.NoAI {
+		t.Error("noai did not survive parquet")
+	}
+	if opted.Signals.TDMReservation == nil || *opted.Signals.TDMReservation != 1 {
+		t.Errorf("TDM reservation = %v", opted.Signals.TDMReservation)
+	}
+
+	// The page that said nothing must come back having said nothing — not 0.
+	plain := byPath["/plain"]
+	if plain.Signals.TDMReservation != nil {
+		t.Errorf("a silent page came back with reservation %d", *plain.Signals.TDMReservation)
+	}
+
+	s := provenance.Summarise(records)
+	if s.Restrictive != 3 {
+		t.Errorf("restrictive = %d, want 3", s.Restrictive)
+	}
+}

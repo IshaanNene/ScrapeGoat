@@ -111,7 +111,7 @@ func crawlCmd() *cobra.Command {
 	cmd.Flags().StringVar(&allowedDomains, "allowed-domains", "", "comma-separated domains to stay within (e.g. en.wikipedia.org)")
 	cmd.Flags().BoolVar(&resumeCrawl, "resume", false, "resume from the last checkpoint instead of starting fresh")
 	cmd.Flags().StringVar(&recordDir, "record", "", "record every fetch to this directory so the crawl can be replayed")
-	cmd.Flags().StringVar(&corpusPath, "corpus", "", "write a provenance record per page to this JSONL file")
+	cmd.Flags().StringVar(&corpusPath, "corpus", "", "write a provenance record per page here (.parquet or .jsonl, by extension)")
 
 	return cmd
 }
@@ -288,12 +288,14 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 // The crawl ID is the fetch log's directory when there is one, so a corpus record
 // points at the log that can prove it. Without a log the records still stand on
 // their own; they just cannot be re-derived.
-func openCorpus(eng *engine.Engine, logDir string) (*provenance.CorpusWriter, error) {
+func openCorpus(eng *engine.Engine, logDir string) (provenance.RecordWriter, error) {
 	if corpusPath == "" {
 		return nil, nil
 	}
 
-	w, err := provenance.NewCorpusWriter(corpusPath)
+	// Format follows the extension. A .parquet full of JSON would be worse than
+	// either, and the extension is what a reader looks at to decide how to open it.
+	w, err := provenance.OpenCorpus(corpusPath)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +311,7 @@ func openCorpus(eng *engine.Engine, logDir string) (*provenance.CorpusWriter, er
 }
 
 // reportCorpus prints what the corpus ended up holding.
-func reportCorpus(w *provenance.CorpusWriter) {
+func reportCorpus(w provenance.RecordWriter) {
 	if w == nil {
 		return
 	}
@@ -324,7 +326,7 @@ func reportCorpus(w *provenance.CorpusWriter) {
 		fmt.Printf("             %d skipped for incomplete provenance\n", skipped)
 	}
 
-	records, err := provenance.ReadCorpus(w.Path())
+	records, err := provenance.ReadAnyCorpus(w.Path())
 	if err != nil {
 		return
 	}

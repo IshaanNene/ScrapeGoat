@@ -12,6 +12,11 @@ import (
 // reported under its own name in Groups anyway, so the log stays complete. What
 // the list buys is the summary — being able to say "this site addressed AI
 // crawlers" without the reader having to know which names count this year.
+//
+// being correct, not a string wanting a name; a constant would just be a second
+// name for the same literal.
+//
+//nolint:goconst // a vendor appearing beside several of its agents is the table
 var aiAgents = map[string]string{
 	"gptbot":             "OpenAI",
 	"chatgpt-user":       "OpenAI",
