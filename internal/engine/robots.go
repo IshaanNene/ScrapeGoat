@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/clock"
+	"github.com/IshaanNene/ScrapeGoat/internal/provenance"
 	"github.com/IshaanNene/ScrapeGoat/internal/safety"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
@@ -38,7 +39,14 @@ type robotsData struct {
 	allowed    []string
 	crawlDelay time.Duration
 	sitemaps   []string
-	fetchedAt  time.Time
+
+	// report is the provenance view of the same file: what the site said to every
+	// agent, not just to us. Built here rather than re-fetched later because
+	// robots.txt changes, and a corpus that re-read it next year would be
+	// recording an answer to a different question from the one that governed the
+	// crawl. Zero-valued (Present false) when there was no robots.txt at all.
+	report    provenance.RobotsReport
+	fetchedAt time.Time
 }
 
 // NewRobotsManager creates a new RobotsManager.
@@ -133,6 +141,23 @@ func (rm *RobotsManager) GetSitemaps(domain string) []string {
 	return data.sitemaps
 }
 
+// Report returns what a domain's robots.txt said to every agent, for the record.
+//
+// Reads the cache the enforcement path already populated, so it costs no extra
+// fetch and — more importantly — reports the same bytes the crawl actually obeyed.
+func (rm *RobotsManager) Report(rawURL string) provenance.RobotsReport {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return provenance.RobotsReport{}
+	}
+	domain := u.Scheme + "://" + u.Host
+
+	if data := rm.getRobotsData(context.Background(), domain); data != nil {
+		return data.report
+	}
+	return provenance.RobotsReport{}
+}
+
 // getRobotsData fetches and caches robots.txt for a domain.
 func (rm *RobotsManager) getRobotsData(ctx context.Context, domain string) *robotsData {
 	rm.mu.RLock()
@@ -184,7 +209,18 @@ func (rm *RobotsManager) fetchRobotsTxt(ctx context.Context, domain string) *rob
 		return nil
 	}
 
-	return rm.parseRobots(string(body))
+	return rm.parseRobotsWithReport(string(body))
+}
+
+// parseRobots builds both views of a robots.txt: the rules this crawler enforces,
+// and the report of what the file said to everyone.
+func (rm *RobotsManager) parseRobotsWithReport(content string) *robotsData {
+	data := rm.parseRobots(content)
+	if data == nil {
+		return nil
+	}
+	data.report = provenance.ParseRobots(content)
+	return data
 }
 
 // fetchRobotsVia fetches robots.txt through an injected fetcher.
@@ -211,7 +247,7 @@ func (rm *RobotsManager) fetchRobotsVia(ctx context.Context, f Fetcher, robotsUR
 	if len(body) > 512*1024 {
 		body = body[:512*1024]
 	}
-	return rm.parseRobots(string(body))
+	return rm.parseRobotsWithReport(string(body))
 }
 
 // parseRobotsTxt parses robots.txt content.
