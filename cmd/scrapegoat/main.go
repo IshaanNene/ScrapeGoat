@@ -25,6 +25,7 @@ import (
 	"github.com/IshaanNene/ScrapeGoat/internal/distributed"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
+	"github.com/IshaanNene/ScrapeGoat/internal/fetchlog"
 	"github.com/IshaanNene/ScrapeGoat/internal/mcp"
 	"github.com/IshaanNene/ScrapeGoat/internal/observability"
 	"github.com/IshaanNene/ScrapeGoat/internal/parser"
@@ -46,6 +47,7 @@ var (
 	maxRetries     int
 	allowedDomains string
 	resumeCrawl    bool
+	recordDir      string
 )
 
 func main() {
@@ -79,6 +81,8 @@ REPL, benchmark harness — live in contrib/ and are built separately.`,
 	rootCmd.AddCommand(scaleCmd())
 	rootCmd.AddCommand(mcpCmd())
 	rootCmd.AddCommand(serveCmd())
+	rootCmd.AddCommand(replayCmd())
+	rootCmd.AddCommand(verifyCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -105,6 +109,7 @@ func crawlCmd() *cobra.Command {
 	cmd.Flags().IntVar(&maxRetries, "max-retries", -1, "max retries per failed request (-1 = use config default of 3)")
 	cmd.Flags().StringVar(&allowedDomains, "allowed-domains", "", "comma-separated domains to stay within (e.g. en.wikipedia.org)")
 	cmd.Flags().BoolVar(&resumeCrawl, "resume", false, "resume from the last checkpoint instead of starting fresh")
+	cmd.Flags().StringVar(&recordDir, "record", "", "record every fetch to this directory so the crawl can be replayed")
 
 	return cmd
 }
@@ -121,7 +126,7 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	}
 
 	// Apply CLI overrides
-	applyCLIOverrides(cfg)
+	applyCLIOverrides(cmd, cfg)
 
 	// Validate config
 	if err := config.Validate(cfg); err != nil {
@@ -151,23 +156,29 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("create fetcher: %w", err)
 	}
-	eng.SetFetcher("http", httpFetcher)
 
-	// Setup parser
-	compositeParser := parser.NewCompositeParser(logger)
-	eng.SetParser(compositeParser)
+	// With --record, the fetcher is wrapped so every response is written to a log
+	// the crawl can later be replayed from. The engine cannot tell the difference,
+	// which is the point: a recorded crawl is the same crawl.
+	var recorder *fetchlog.Recorder
+	if recordDir != "" {
+		recorder, err = fetchlog.NewRecorder(httpFetcher, recordDir, nil)
+		if err != nil {
+			return fmt.Errorf("open fetch log: %w", err)
+		}
+		eng.SetFetcher("http", recorder)
 
-	// Setup pipeline
-	pipe := pipeline.New(logger)
-	pipe.Use(&pipeline.TrimMiddleware{})
-	eng.SetPipeline(pipe)
-
-	// Setup storage
-	store, err := storage.NewFileStorage(cfg.Storage.Type, cfg.Storage.OutputPath, logger)
-	if err != nil {
-		return fmt.Errorf("create storage: %w", err)
+		if err := writeRecordManifest(recordDir, cfg, args); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "  recording to %s\n", recordDir)
+	} else {
+		eng.SetFetcher("http", httpFetcher)
 	}
-	eng.SetStorage(store)
+
+	if err := wireCrawlPipeline(eng, cfg, logger); err != nil {
+		return err
+	}
 
 	// Setup metrics (if enabled). The recorder must be handed to the engine, not
 	// merely served: without SetMetrics the endpoint comes up and reports zeroes
@@ -226,6 +237,15 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	elapsed := time.Since(start)
 	stats := eng.StatsSnapshot()
 
+	// Seal the log before reporting, so the summary cannot claim a recording that
+	// is still buffered.
+	if recorder != nil {
+		if err := finaliseRecording(recorder, recordDir); err != nil {
+			logger.Error("the crawl finished but its log did not close cleanly", "error", err)
+			return err
+		}
+	}
+
 	logger.Info("crawl complete",
 		"elapsed", elapsed,
 		"requests", stats["requests_sent"],
@@ -247,6 +267,88 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		fmt.Println("     scrapegoat ai-crawl <url>    — AI-powered summarize, NER, sentiment")
 		fmt.Println("     scrapegoat crawl <url> -c config.yaml  — use custom parse rules")
 	}
+
+	return nil
+}
+
+// wireCrawlPipeline attaches the parser, pipeline, and storage to an engine.
+//
+// Shared by crawl and replay deliberately. A replay that built its own pipeline
+// would be reproducing the fetches but not the processing, and the first time the
+// two drifted the replay would produce different output from the same responses —
+// which is precisely the failure the fetch log exists to rule out.
+func wireCrawlPipeline(eng *engine.Engine, cfg *config.Config, logger *slog.Logger) error {
+	eng.SetParser(parser.NewCompositeParser(logger))
+
+	pipe := pipeline.New(logger)
+	pipe.Use(&pipeline.TrimMiddleware{})
+	eng.SetPipeline(pipe)
+
+	store, err := storage.NewFileStorage(cfg.Storage.Type, cfg.Storage.OutputPath, logger)
+	if err != nil {
+		return fmt.Errorf("create storage: %w", err)
+	}
+	eng.SetStorage(store)
+
+	return nil
+}
+
+// writeRecordManifest stamps the log with what produced it.
+//
+// Written before the crawl rather than after, so that a run killed halfway still
+// leaves a log that says what it was. FinishedAt is filled in at the end; its
+// absence is how a reader tells a truncated crawl from a complete one.
+func writeRecordManifest(dir string, cfg *config.Config, seeds []string) error {
+	hash, err := fetchlog.HashConfig(cfg)
+	if err != nil {
+		return err
+	}
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("encode config for manifest: %w", err)
+	}
+
+	return fetchlog.WriteManifest(dir, fetchlog.Manifest{
+		Version:    config.Version,
+		Seeds:      seeds,
+		ConfigHash: hash,
+		Config:     raw,
+		StartedAt:  time.Now(),
+	})
+}
+
+// finaliseRecording closes the log and completes its manifest.
+func finaliseRecording(rec *fetchlog.Recorder, dir string) error {
+	stats, err := rec.Store().Stat()
+	if err != nil {
+		return fmt.Errorf("stat fetch log: %w", err)
+	}
+	if err := rec.Close(); err != nil {
+		return fmt.Errorf("close fetch log: %w", err)
+	}
+
+	entries, err := fetchlog.ReadLog(dir)
+	if err != nil {
+		return fmt.Errorf("read back fetch log: %w", err)
+	}
+
+	m, err := fetchlog.ReadManifest(dir)
+	if err != nil {
+		return err
+	}
+	m.FinishedAt = time.Now()
+	m.Entries = int64(len(entries))
+	m.Objects = stats.Objects
+	m.Bytes = stats.Bytes
+
+	if err := fetchlog.WriteManifest(dir, m); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(os.Stderr, "\n  Recorded %d fetches (%d objects, %d bytes) to %s\n",
+		len(entries), stats.Objects, stats.Bytes, dir)
+	fmt.Fprintf(os.Stderr, "   Replay:  scrapegoat replay %s\n", dir)
+	fmt.Fprintf(os.Stderr, "   Verify:  scrapegoat verify %s\n", dir)
 
 	return nil
 }
@@ -316,9 +418,14 @@ func setupLogger() *slog.Logger {
 }
 
 // applyCLIOverrides applies command-line flag values to the config.
-func applyCLIOverrides(cfg *config.Config) {
-	// Always apply depth and concurrency since they have sensible defaults
-	cfg.Engine.MaxDepth = depth
+func applyCLIOverrides(cmd *cobra.Command, cfg *config.Config) {
+	// Only when the flag was actually typed. Assigning unconditionally meant the
+	// flag's own default (3) overwrote whatever the config file said, so
+	// `max_depth: 10` in a config was silently ignored unless -d was also passed —
+	// the config value was unreachable through the CLI.
+	if flagChanged(cmd, "depth") {
+		cfg.Engine.MaxDepth = depth
+	}
 	if concurrent > 0 {
 		cfg.Engine.Concurrency = concurrent
 	}
@@ -352,6 +459,16 @@ func applyCLIOverrides(cfg *config.Config) {
 		}
 		cfg.Engine.AllowedDomains = domains
 	}
+}
+
+// flagChanged reports whether the user actually set a flag, as opposed to cobra
+// filling in its default. A nil command means no flags were parsed at all, which
+// is the case in tests that call a RunE directly.
+func flagChanged(cmd *cobra.Command, name string) bool {
+	if cmd == nil {
+		return false
+	}
+	return cmd.Flags().Changed(name)
 }
 
 // newCmd creates the "new" subcommand for scaffolding spiders.

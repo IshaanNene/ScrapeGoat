@@ -11,13 +11,20 @@
 set -euo pipefail
 
 # Packages inside the determinism boundary.
-GUARDED=(internal/engine internal/clock)
+GUARDED=(internal/engine internal/clock internal/fetchlog)
 
 # clock.go is the one place allowed to call the standard library's time package —
 # it is the implementation the rest of the code depends on. Individual lines can
 # also opt out with a trailing `//determinism:allow <reason>`, which keeps the
 # exception visible at the call site rather than buried in this script.
 ALLOWLIST='internal/clock/clock.go'
+
+# A line whose first non-space character is // is prose. Documenting the rule
+# must not trip the rule — otherwise the only way to explain why time.Now() is
+# banned is to not write it down.
+is_comment() {
+  [[ "${1#*:*:}" =~ ^[[:space:]]*// ]]
+}
 
 fail=0
 
@@ -27,6 +34,7 @@ for pkg in "${GUARDED[@]}"; do
     [[ "$file" == $ALLOWLIST ]] && continue
     [[ "$file" == *_test.go ]] && continue
     [[ "$hit" == *"//determinism:allow"* ]] && continue
+    is_comment "$hit" && continue
     echo "  $hit"
     fail=1
   done < <(grep -rnE '\b(time\.(Now|Since|Sleep|After|Tick|NewTimer|NewTicker))\(' \
@@ -38,6 +46,7 @@ for pkg in "${GUARDED[@]}"; do
     file="${hit%%:*}"
     [[ "$file" == *_test.go ]] && continue
     [[ "$hit" == *"//determinism:allow"* ]] && continue
+    is_comment "$hit" && continue
     # A method call on an injected *rand.Rand is fine; a package-level one is not.
     grep -qE '\b(rng|r|e\.rand|s\.engine\.rand)\.' <<<"$hit" && continue
     echo "  $hit"

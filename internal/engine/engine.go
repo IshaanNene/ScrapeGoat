@@ -206,8 +206,17 @@ func New(cfg *config.Config, logger *slog.Logger, opts ...Option) *Engine {
 // SetFetcher registers a fetcher for a given type.
 func (e *Engine) SetFetcher(fetcherType string, f Fetcher) {
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	e.fetchers[fetcherType] = f
+	e.mu.Unlock()
+
+	// robots.txt goes over the same transport as the pages it governs. Routing it
+	// through the registered fetcher means a recorded crawl records its robots
+	// fetches too, and a replay answers "was this allowed?" from the log instead
+	// of from the live site — without which a replay is neither offline nor a
+	// faithful account of the decisions the original crawl made.
+	if fetcherType == "http" && e.robots != nil {
+		e.robots.SetFetcher(f)
+	}
 }
 
 // SetParser sets the parser implementation.

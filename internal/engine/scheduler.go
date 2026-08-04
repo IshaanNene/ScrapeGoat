@@ -289,6 +289,7 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 		for _, item := range items {
 			item.SpiderName = cbName
 			item.Depth = req.Depth
+			stampFromResponse(item, resp)
 			if !s.emitItem(ctx, item) {
 				return
 			}
@@ -310,6 +311,7 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 		if len(callbacksCopy) == 0 {
 			for _, item := range items {
 				item.Depth = req.Depth
+				stampFromResponse(item, resp)
 				if !s.emitItem(ctx, item) {
 					return
 				}
@@ -325,6 +327,25 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 			_ = s.engine.AddRequest(newReq)
 		}
 	}
+}
+
+// stampFromResponse dates an item by when its source was fetched.
+//
+// types.NewItem stamps time.Now(), which is when the parser happened to run — a
+// value that differs between two runs over identical bytes and lands in the
+// output as _timestamp. Taking it from the response instead makes the field mean
+// "when this data was observed", which is what a consumer of a scraped record
+// actually wants, and makes a replayed crawl produce byte-identical output to the
+// crawl it replays. Without this the log reproduces the fetches perfectly and the
+// dataset still differs on every line.
+//
+// Applied centrally rather than in each parser so that callbacks and third-party
+// parsers get it too, and so there is one place to look when a timestamp is wrong.
+func stampFromResponse(item *types.Item, resp *types.Response) {
+	if item == nil || resp == nil || resp.FetchedAt.IsZero() {
+		return
+	}
+	item.Timestamp = resp.FetchedAt
 }
 
 // emitItem hands an item to the pipeline, giving up if the crawl is shutting down.

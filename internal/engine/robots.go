@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/IshaanNene/ScrapeGoat/internal/clock"
 	"github.com/IshaanNene/ScrapeGoat/internal/safety"
+	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
 // RobotsManager handles robots.txt fetching, parsing, and enforcement.
@@ -20,6 +22,14 @@ type RobotsManager struct {
 	cache   map[string]*robotsData
 	mu      sync.RWMutex
 	client  *http.Client
+
+	// fetcher, when set, replaces the manager's own HTTP client. The engine wires
+	// its registered fetcher in here so that robots.txt travels the same path as
+	// everything else — which is what makes a replay actually offline. A robots
+	// fetch that went straight to the network would reach out mid-replay, and the
+	// crawl's own policy decisions would then depend on what the live site says
+	// today rather than on what it said when the log was recorded.
+	fetcher Fetcher
 }
 
 // robotsData holds parsed robots.txt rules for a domain.
@@ -46,6 +56,14 @@ func NewRobotsManager(enabled bool, guard *safety.URLGuard, clk clock.Clock) *Ro
 		cache:   make(map[string]*robotsData),
 		client:  guard.HTTPClient(10*time.Second, 5),
 	}
+}
+
+// SetFetcher routes robots.txt through the given fetcher instead of the
+// manager's own client. Nil restores the direct client.
+func (rm *RobotsManager) SetFetcher(f Fetcher) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	rm.fetcher = f
 }
 
 // IsAllowed checks if a URL is allowed by the domain's robots.txt.
@@ -135,6 +153,14 @@ func (rm *RobotsManager) getRobotsData(domain string) *robotsData {
 func (rm *RobotsManager) fetchRobotsTxt(domain string) *robotsData {
 	robotsURL := domain + "/robots.txt"
 
+	rm.mu.RLock()
+	f := rm.fetcher
+	rm.mu.RUnlock()
+
+	if f != nil {
+		return rm.fetchRobotsVia(f, robotsURL)
+	}
+
 	resp, err := rm.client.Get(robotsURL)
 	if err != nil {
 		return nil
@@ -150,6 +176,33 @@ func (rm *RobotsManager) fetchRobotsTxt(domain string) *robotsData {
 		return nil
 	}
 
+	return rm.parseRobots(string(body))
+}
+
+// fetchRobotsVia fetches robots.txt through an injected fetcher.
+//
+// A missing or unreadable robots.txt returns nil, which the caller reads as "no
+// rules" — the same answer the direct path gives. During a replay that is the
+// right default: a log recorded from a site with no robots.txt should replay as a
+// site with no robots.txt, not as a hard failure.
+func (rm *RobotsManager) fetchRobotsVia(f Fetcher, robotsURL string) *robotsData {
+	req, err := types.NewRequest(robotsURL)
+	if err != nil {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := f.Fetch(ctx, req)
+	if err != nil || resp == nil || resp.StatusCode != http.StatusOK {
+		return nil
+	}
+
+	body := resp.Body
+	if len(body) > 512*1024 {
+		body = body[:512*1024]
+	}
 	return rm.parseRobots(string(body))
 }
 

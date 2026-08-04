@@ -13,6 +13,54 @@ wired into the running system, and several security properties a crawler needs w
 absent. Both are addressed, and the README now describes only what actually runs —
 everything else moved to [ROADMAP.md](ROADMAP.md).
 
+### Added (Phase 2 — record & replay)
+
+- **`crawl --record`, `scrapegoat replay`, and `scrapegoat verify`.** A crawl can
+  write a content-addressed log of everything it fetched and later be re-run from
+  it, opening no sockets. The recorded and replayed runs produce byte-identical
+  output — asserted end to end in `cmd/scrapegoat/replay_test.go` by comparing the
+  SHA-256 of the output files. See [docs/REPLAY.md](docs/REPLAY.md).
+
+  `internal/fetchlog` holds the pieces: a SHA-256-addressed object store with
+  crash-safe writes and read-time verification, an append-only JSONL ledger that
+  survives a truncated tail, and a `Recorder`/`Player` pair that both satisfy the
+  engine's `Fetcher` interface — so the engine cannot tell whether it is talking to
+  the network or to a log.
+
+  Failures are recorded alongside successes. A crawl that hit three 503s before a
+  200 took a different path through backoff and the circuit breaker, so a log
+  holding only the 200 would replay a crawl that never happened.
+
+- **`scrapegoat verify` re-hashes every stored body** against the address it is
+  filed under and checks every ledger entry against the store, so tampering and bit
+  rot are caught rather than replayed. This is what makes a published dataset
+  checkable by someone who does not trust whoever published it.
+
+### Fixed (Phase 2)
+
+- **Items are dated from the response, not from when the parser ran.**
+  `types.NewItem` stamped `time.Now()`, which reached the output as `_timestamp`
+  and differed on every line between two runs over identical bytes. Items now take
+  their timestamp from the response's fetch time, applied centrally in the
+  scheduler so callbacks and third-party parsers get it too. The field now means
+  "when this data was observed", which is what a consumer of a scraped record
+  wants regardless of replay.
+
+- **robots.txt no longer bypasses the registered fetcher.** `RobotsManager` held
+  its own HTTP client, so a replay reached out to the live site for robots.txt and
+  the replayed crawl's policy decisions depended on what the site said today. It
+  now routes through the engine's fetcher, which also means a recorded crawl
+  records its robots fetches.
+
+- **`max_depth` in a config file was unreachable.** `applyCLIOverrides` assigned
+  `cfg.Engine.MaxDepth = depth` unconditionally, so cobra's flag default (3)
+  overwrote the config value unless `-d` was also passed. It now applies only when
+  the flag was actually set.
+
+- **Closing a `Recorder` twice reported a failure on a clean shutdown.** The engine
+  closes the fetchers it holds and the caller closes the log it opened; both are
+  correct, so `Close` is now idempotent.
+
 ### Changed (Phase 0)
 
 - **The engine takes time and randomness from injected sources.** First step of
