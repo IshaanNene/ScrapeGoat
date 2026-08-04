@@ -15,6 +15,25 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
 
 ### Added (Phase 3 — provenance)
 
+- **`--compliance-report out.json`** writes a machine-readable account of what the
+  crawl respected: totals, every restricted URL with its content hash and the
+  grounds, sites blocking AI crawlers grouped by host, and warnings for anything
+  that should not have happened. This completes roadmap item 4.
+
+  Restricted pages are listed, not just counted — a number can be dismissed, a
+  list can be checked, and the hash joins each entry to the corpus and thence to
+  the fetch log. Every applicable ground is recorded rather than the first, since
+  a page carrying both a `noai` tag and a TDM reservation has said no twice.
+
+  Derived from the corpus, which is why the flag requires `--corpus`: a report
+  tallied independently could disagree with the data it describes, and then
+  neither would be worth anything.
+
+  The report records what happened. No field says "compliant", because that is a
+  judgement about a particular use in a particular jurisdiction and a crawler is
+  not in a position to make it.
+
+
 - **Parquet corpus output.** `--corpus out.parquet` writes Parquet; any other
   extension writes JSONL. Inferring from the extension rather than adding a
   `--format` flag, because the extension is what a reader looks at to decide how to

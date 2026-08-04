@@ -115,32 +115,45 @@ SimHash for cheap fuzzy comparison.
 This is the difference between "a pile of pages" and "a dataset". FineWeb's own
 pipeline spends most of its complexity here.
 
-### 3. Corpus output with provenance
+### 3. Corpus output with provenance — **shipped**
 
-JSON, JSONL, and CSV are fine for scraped records and wrong for a corpus. Needed:
+JSON, JSONL, and CSV are fine for scraped records and wrong for a corpus.
 
-- **Parquet**, so the output is directly loadable by `datasets`, DuckDB, and Polars.
-- **A stable record schema**: URL, canonical URL, fetch timestamp, HTTP status,
-  content hash, extracted text, language, and extraction confidence.
-- **Provenance for every record**: what robots.txt said at fetch time, which AI
-  directives were present, any licence signal found, and the crawler identity used.
+- ✅ **Parquet** — `--corpus out.parquet`, flat columns, zstd, loadable by
+  `datasets`, DuckDB, and Polars. JSONL remains available by extension.
+- ✅ **A stable record schema** — versioned, with URL, canonical URL, fetch
+  timestamp, HTTP status, content hash, extracted text, language, and extraction
+  confidence.
+- ✅ **Provenance for every record** — what robots.txt said at fetch time, which
+  AI directives were present, any licence signal found, and the crawler identity
+  used.
 
 Provenance is not bookkeeping. It is what makes a dataset defensible when someone
 asks where the data came from, and that question is being asked far more often
 than it was two years ago.
 
-### 4. Compliance as a first-class feature
+See [docs/PROVENANCE.md](docs/PROVENANCE.md).
 
-`robots.txt` compliance exists. What does not:
+### 4. Compliance as a first-class feature — **shipped**
 
-- AI-specific directives (`GPTBot`, `CCBot`, `Google-Extended`, and successors),
-  which are now how sites express intent about AI use specifically.
-- Page-level signals: `noai` / `noimageai` meta tags, TDM reservation headers.
-- A machine-readable per-crawl compliance report: what was respected, what was
-  skipped, and why.
+- ✅ **AI-specific directives** — `GPTBot`, `CCBot`, `Google-Extended`,
+  `ClaudeBot`, `Applebot-Extended` and others, recorded per record with the
+  vendor behind each. An agent missing from the known list still appears in the
+  parsed groups, so the record stays complete as the list dates.
+- ✅ **Page-level signals** — `noai` / `noimageai` in both `<meta name="robots">`
+  and `X-Robots-Tag`, plus the W3C TDM reservation in meta and header form.
+- ✅ **A machine-readable per-crawl compliance report** —
+  `--compliance-report out.json`: totals, every restricted URL with its content
+  hash and the grounds, sites blocking AI crawlers grouped by host, and warnings
+  for anything that should not have happened.
 
-Most tools treat this as a checkbox. Treating it as a feature — with an auditable
-report — is a real differentiator for anyone who has to justify their corpus.
+The report records what happened; it does not certify that what happened was
+right. No field says "compliant", because that is a judgement about a particular
+use in a particular jurisdiction and a crawler is not in a position to make it.
+
+Signals are recorded, never enforced. A crawler that silently dropped restricted
+pages would produce a corpus whose gaps are invisible, and a downstream user
+wanting a different policy would have no way to apply it.
 
 ### 5. Incremental recrawl
 
