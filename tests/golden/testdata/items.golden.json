@@ -1,0 +1,918 @@
+[
+  {
+    "url": "https://books.toscrape.com/",
+    "depth": 0,
+    "timestamp": "2026-08-31T14:10:52.166245Z",
+    "fields": {
+      "availability": [
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "catalogue/a-light-in-the-attic_1000/index.html",
+        "catalogue/tipping-the-velvet_999/index.html",
+        "catalogue/soumission_998/index.html",
+        "catalogue/sharp-objects_997/index.html",
+        "catalogue/sapiens-a-brief-history-of-humankind_996/index.html",
+        "catalogue/the-requiem-red_995/index.html",
+        "catalogue/the-dirty-little-secrets-of-getting-your-dream-job_994/index.html",
+        "catalogue/the-coming-woman-a-novel-based-on-the-life-of-the-infamous-feminist-victoria-woodhull_993/index.html",
+        "catalogue/the-boys-in-the-boat-nine-americans-and-their-epic-quest-for-gold-at-the-1936-berlin-olympics_992/index.html",
+        "catalogue/the-black-maria_991/index.html",
+        "catalogue/starving-hearts-triangular-trade-trilogy-1_990/index.html",
+        "catalogue/shakespeares-sonnets_989/index.html",
+        "catalogue/set-me-free_988/index.html",
+        "catalogue/scott-pilgrims-precious-little-life-scott-pilgrim-1_987/index.html",
+        "catalogue/rip-it-up-and-start-again_986/index.html",
+        "catalogue/our-band-could-be-your-life-scenes-from-the-american-indie-underground-1981-1991_985/index.html",
+        "catalogue/olio_984/index.html",
+        "catalogue/mesaerion-the-best-science-fiction-stories-1800-1849_983/index.html",
+        "catalogue/libertarianism-for-beginners_982/index.html",
+        "catalogue/its-only-the-himalayas_981/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "All products"
+      ],
+      "meta_favicon": "static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "All products | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£51.77",
+        "£53.74",
+        "£50.10",
+        "£47.82",
+        "£54.23",
+        "£22.65",
+        "£33.34",
+        "£17.93",
+        "£22.60",
+        "£52.15",
+        "£13.99",
+        "£20.66",
+        "£17.46",
+        "£52.29",
+        "£35.02",
+        "£57.25",
+        "£23.88",
+        "£37.59",
+        "£51.33",
+        "£45.17"
+      ],
+      "title": "All products | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:10:58.990714Z",
+    "fields": {
+      "availability": [
+        "In stock (18 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../the-elephant-tree_968/index.html",
+        "../in-her-wake_980/index.html",
+        "../the-rise-of-theodore-roosevelt-theodore-roosevelt-1_276/index.html",
+        "../benjamin-franklin-an-american-life_460/index.html",
+        "../the-faith-of-christopher-hitchens-the-restless-soul-of-the-worlds-most-notorious-atheist_495/index.html",
+        "../setting-the-world-on-fire-the-brief-astonishing-life-of-st-catherine-of-siena_603/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Thriller",
+        "Behind Closed Doors"
+      ],
+      "meta_description": "\n    The 2016 debut bloggers can't stop raving about. Perfect for fans of The Girl on the Train and The Ice Twins Everyone knows a couple like Jack and Grace.He has looks and wealth, she has charm and elegance. You might not want to like them, but you do. Though, you’d like to get to know Grace better.But it’s difficult, because you realise Jack and Grace are never apart.Some The 2016 debut bloggers can't stop raving about. Perfect for fans of The Girl on the Train and The Ice Twins Everyone knows a couple like Jack and Grace.He has looks and wealth, she has charm and elegance. You might not want to like them, but you do. Though, you’d like to get to know Grace better.But it’s difficult, because you realise Jack and Grace are never apart.Some might call this true love. Others might ask why Grace never answers the phone. Or how she can never meet for coffee, even though she doesn’t work. How she can cook such elaborate meals but remain so slim. And why there are bars on one of the bedroom windows.Sometimes, the perfect marriage is the perfect lie. ...more\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "Behind Closed Doors | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£52.22",
+        "£23.82",
+        "£12.84",
+        "£42.57",
+        "£48.19",
+        "£39.55",
+        "£21.15"
+      ],
+      "product_title": "Behind Closed Doors",
+      "title": "Behind Closed Doors | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:11:00.015099Z",
+    "fields": {
+      "availability": [
+        "In stock (18 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../1000-places-to-see-before-you-die_1/index.html",
+        "../neither-here-nor-there-travels-in-europe_198/index.html",
+        "../the-road-to-little-dribbling-adventures-of-an-american-in-britain-notes-from-a-small-island-2_277/index.html",
+        "../a-year-in-provence-provence-1_421/index.html",
+        "../the-great-railway-bazaar_446/index.html",
+        "../a-summer-in-europe_458/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Mystery",
+        "In a Dark, Dark Wood"
+      ],
+      "meta_description": "\n    In a dark, dark wood Nora hasn't seen Clare for ten years. Not since Nora walked out of school one day and never went back. There was a dark, dark houseUntil, out of the blue, an invitation to Clare’s hen do arrives. Is this a chance for Nora to finally put her past behind her?And in the dark, dark house there was a dark, dark roomBut something goes wrong. Very wrong.And i In a dark, dark wood Nora hasn't seen Clare for ten years. Not since Nora walked out of school one day and never went back. There was a dark, dark houseUntil, out of the blue, an invitation to Clare’s hen do arrives. Is this a chance for Nora to finally put her past behind her?And in the dark, dark house there was a dark, dark roomBut something goes wrong. Very wrong.And in the dark, dark room.... Some things can’t stay secret for ever. ...more\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "In a Dark, Dark Wood | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£19.63",
+        "£26.08",
+        "£38.95",
+        "£23.21",
+        "£56.88",
+        "£30.54",
+        "£44.34"
+      ],
+      "product_title": "In a Dark, Dark Wood",
+      "title": "In a Dark, Dark Wood | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
+    "depth": 1,
+    "timestamp": "2026-08-31T14:10:54.93246Z",
+    "fields": {
+      "availability": [
+        "In stock (19 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../libertarianism-for-beginners_982/index.html",
+        "../mesaerion-the-best-science-fiction-stories-1800-1849_983/index.html",
+        "../olio_984/index.html",
+        "../our-band-could-be-your-life-scenes-from-the-american-indie-underground-1981-1991_985/index.html",
+        "../rip-it-up-and-start-again_986/index.html",
+        "../scott-pilgrims-precious-little-life-scott-pilgrim-1_987/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Travel",
+        "It's Only the Himalayas"
+      ],
+      "meta_description": "\n    “Wherever you go, whatever you do, just . . . don’t do anything stupid.” —My MotherDuring her yearlong adventure backpacking from South Africa to Singapore, S. Bedford definitely did a few things her mother might classify as \"stupid.\" She swam with great white sharks in South Africa, ran from lions in Zimbabwe, climbed a Himalayan mountain without training in Nepal, and wa “Wherever you go, whatever you do, just . . . don’t do anything stupid.” —My MotherDuring her yearlong adventure backpacking from South Africa to Singapore, S. Bedford definitely did a few things her mother might classify as \"stupid.\" She swam with great white sharks in South Africa, ran from lions in Zimbabwe, climbed a Himalayan mountain without training in Nepal, and watched as her friend was attacked by a monkey in Indonesia.But interspersed in those slightly more crazy moments, Sue Bedfored and her friend \"Sara the Stoic\" experienced the sights, sounds, life, and culture of fifteen countries. Joined along the way by a few friends and their aging fathers here and there, Sue and Sara experience the trip of a lifetime. They fall in love with the world, cultivate an appreciation for home, and discover who, or what, they want to become.It's Only the Himalayas is the incredibly funny, sometimes outlandish, always entertaining confession of a young backpacker that will inspire you to take your own adventure. ...more\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "It's Only the Himalayas | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£45.17",
+        "£51.33",
+        "£37.59",
+        "£23.88",
+        "£57.25",
+        "£35.02",
+        "£52.29"
+      ],
+      "product_title": "It's Only the Himalayas",
+      "title": "It's Only the Himalayas | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:11:01.041175Z",
+    "fields": {
+      "availability": [
+        "In stock (18 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../penny-maybe_965/index.html",
+        "../aladdin-and-his-wonderful-lamp_973/index.html",
+        "../americas-cradle-of-quarterbacks-western-pennsylvanias-football-factory-from-johnny-unitas-to-joe-montana_974/index.html",
+        "../forever-rockers-the-rocker-12_19/index.html",
+        "../old-records-never-die-one-mans-quest-for-his-vinyl-and-his-past_39/index.html",
+        "../life_104/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Default",
+        "Maude (1883-1993):She Grew Up with the country"
+      ],
+      "meta_description": "\n    This new edition of Maude (1883-1993) has been updated by Mardo Williams’ daughters, adding historical details their dad wished to make, twice as many photos, and nine appendices not present in the 1996 hardcover (which won an Ohioana Library Award for its author). During her 110-year lifetime, Maude went from a 400-lb. wood-burning stove to a microwave oven, from an outdo This new edition of Maude (1883-1993) has been updated by Mardo Williams’ daughters, adding historical details their dad wished to make, twice as many photos, and nine appendices not present in the 1996 hardcover (which won an Ohioana Library Award for its author). During her 110-year lifetime, Maude went from a 400-lb. wood-burning stove to a microwave oven, from an outdoor privy to indoor plumbing. She got the vote in 1920 and voted in the next 18 Presidential elections.With poetry and human dramas (two murders and a suicide), written by a master journalist, the book shows the impact of the changing times on shy, unassuming Maude, her fun-loving husband Lee, and their four active children. They farmed 100 acres on the banks of Rush Creek in Logan County (Ohio).A favorite with book discussion groups, Maude has been adopted by several colleges for use as a supplemental American history text. ...more\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "Maude (1883-1993):She Grew Up with the country | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£18.02",
+        "£33.29",
+        "£53.13",
+        "£22.50",
+        "£28.80",
+        "£55.66",
+        "£31.58"
+      ],
+      "product_title": "Maude (1883-1993):She Grew Up with the country",
+      "title": "Maude (1883-1993):She Grew Up with the country | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/page-1.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:10:57.28575Z",
+    "fields": {
+      "availability": [
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "a-light-in-the-attic_1000/index.html",
+        "tipping-the-velvet_999/index.html",
+        "soumission_998/index.html",
+        "sharp-objects_997/index.html",
+        "sapiens-a-brief-history-of-humankind_996/index.html",
+        "the-requiem-red_995/index.html",
+        "the-dirty-little-secrets-of-getting-your-dream-job_994/index.html",
+        "the-coming-woman-a-novel-based-on-the-life-of-the-infamous-feminist-victoria-woodhull_993/index.html",
+        "the-boys-in-the-boat-nine-americans-and-their-epic-quest-for-gold-at-the-1936-berlin-olympics_992/index.html",
+        "the-black-maria_991/index.html",
+        "starving-hearts-triangular-trade-trilogy-1_990/index.html",
+        "shakespeares-sonnets_989/index.html",
+        "set-me-free_988/index.html",
+        "scott-pilgrims-precious-little-life-scott-pilgrim-1_987/index.html",
+        "rip-it-up-and-start-again_986/index.html",
+        "our-band-could-be-your-life-scenes-from-the-american-indie-underground-1981-1991_985/index.html",
+        "olio_984/index.html",
+        "mesaerion-the-best-science-fiction-stories-1800-1849_983/index.html",
+        "libertarianism-for-beginners_982/index.html",
+        "its-only-the-himalayas_981/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "All products"
+      ],
+      "meta_favicon": "../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "All products | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£51.77",
+        "£53.74",
+        "£50.10",
+        "£47.82",
+        "£54.23",
+        "£22.65",
+        "£33.34",
+        "£17.93",
+        "£22.60",
+        "£52.15",
+        "£13.99",
+        "£20.66",
+        "£17.46",
+        "£52.29",
+        "£35.02",
+        "£57.25",
+        "£23.88",
+        "£37.59",
+        "£51.33",
+        "£45.17"
+      ],
+      "title": "All products | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/page-2.html",
+    "depth": 1,
+    "timestamp": "2026-08-31T14:10:54.211612Z",
+    "fields": {
+      "availability": [
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "in-her-wake_980/index.html",
+        "how-music-works_979/index.html",
+        "foolproof-preserving-a-guide-to-small-batch-jams-jellies-pickles-condiments-and-more-a-foolproof-guide-to-making-small-batch-jams-jellies-pickles-condiments-and-more_978/index.html",
+        "chase-me-paris-nights-2_977/index.html",
+        "black-dust_976/index.html",
+        "birdsong-a-story-in-pictures_975/index.html",
+        "americas-cradle-of-quarterbacks-western-pennsylvanias-football-factory-from-johnny-unitas-to-joe-montana_974/index.html",
+        "aladdin-and-his-wonderful-lamp_973/index.html",
+        "worlds-elsewhere-journeys-around-shakespeares-globe_972/index.html",
+        "wall-and-piece_971/index.html",
+        "the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
+        "the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
+        "the-elephant-tree_968/index.html",
+        "the-bear-and-the-piano_967/index.html",
+        "sophies-world_966/index.html",
+        "penny-maybe_965/index.html",
+        "maude-1883-1993she-grew-up-with-the-country_964/index.html",
+        "in-a-dark-dark-wood_963/index.html",
+        "behind-closed-doors_962/index.html",
+        "you-cant-bury-them-all-poems_961/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "All products"
+      ],
+      "meta_favicon": "../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "All products | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£12.84",
+        "£37.32",
+        "£30.52",
+        "£25.27",
+        "£34.53",
+        "£54.64",
+        "£22.50",
+        "£53.13",
+        "£40.30",
+        "£44.18",
+        "£17.66",
+        "£31.05",
+        "£23.82",
+        "£36.89",
+        "£15.94",
+        "£33.29",
+        "£18.02",
+        "£19.63",
+        "£52.22",
+        "£33.63"
+      ],
+      "title": "All products | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/page-3.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:10:56.16653Z",
+    "fields": {
+      "availability": [
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "slow-states-of-collapse-poems_960/index.html",
+        "reasons-to-stay-alive_959/index.html",
+        "private-paris-private-10_958/index.html",
+        "higherselfie-wake-up-your-life-free-your-soul-find-your-tribe_957/index.html",
+        "without-borders-wanderlove-1_956/index.html",
+        "when-we-collided_955/index.html",
+        "we-love-you-charlie-freeman_954/index.html",
+        "untitled-collection-sabbath-poems-2014_953/index.html",
+        "unseen-city-the-majesty-of-pigeons-the-discreet-charm-of-snails-other-wonders-of-the-urban-wilderness_952/index.html",
+        "unicorn-tracks_951/index.html",
+        "unbound-how-eight-technologies-made-us-human-transformed-society-and-brought-our-world-to-the-brink_950/index.html",
+        "tsubasa-world-chronicle-2-tsubasa-world-chronicle-2_949/index.html",
+        "throwing-rocks-at-the-google-bus-how-growth-became-the-enemy-of-prosperity_948/index.html",
+        "this-one-summer_947/index.html",
+        "thirst_946/index.html",
+        "the-torch-is-passed-a-harding-family-story_945/index.html",
+        "the-secret-of-dreadwillow-carse_944/index.html",
+        "the-pioneer-woman-cooks-dinnertime-comfort-classics-freezer-food-16-minute-meals-and-other-delicious-ways-to-solve-supper_943/index.html",
+        "the-past-never-ends_942/index.html",
+        "the-natural-history-of-us-the-fine-art-of-pretending-2_941/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "All products"
+      ],
+      "meta_favicon": "../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "All products | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£57.31",
+        "£26.41",
+        "£47.61",
+        "£23.11",
+        "£45.07",
+        "£31.77",
+        "£50.27",
+        "£14.27",
+        "£44.18",
+        "£18.78",
+        "£25.52",
+        "£16.28",
+        "£31.12",
+        "£19.49",
+        "£17.27",
+        "£19.09",
+        "£56.13",
+        "£56.41",
+        "£56.50",
+        "£45.22"
+      ],
+      "title": "All products | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:11:01.961597Z",
+    "fields": {
+      "availability": [
+        "In stock (18 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../aladdin-and-his-wonderful-lamp_973/index.html",
+        "../americas-cradle-of-quarterbacks-western-pennsylvanias-football-factory-from-johnny-unitas-to-joe-montana_974/index.html",
+        "../forever-rockers-the-rocker-12_19/index.html",
+        "../old-records-never-die-one-mans-quest-for-his-vinyl-and-his-past_39/index.html",
+        "../life_104/index.html",
+        "../no-one-here-gets-out-alive_336/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Default",
+        "Penny Maybe"
+      ],
+      "meta_description": "\n    Sent to yet another foster family, Penny decides that the way to claim a sense of self is to swim Lake Ontario. Although this seems impossible, she finds the courage to ask her physics teacher to be her coach, and wins the support of her new foster mother.\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "Penny Maybe | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£33.29",
+        "£53.13",
+        "£22.50",
+        "£28.80",
+        "£55.66",
+        "£31.58",
+        "£20.02"
+      ],
+      "product_title": "Penny Maybe",
+      "title": "Penny Maybe | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:11:02.935069Z",
+    "fields": {
+      "availability": [
+        "In stock (18 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../alice-in-wonderland-alices-adventures-in-wonderland-1_5/index.html",
+        "../emma_17/index.html",
+        "../of-mice-and-men_37/index.html",
+        "../sense-and-sensibility_49/index.html",
+        "../the-little-prince_72/index.html",
+        "../the-story-of-hong-gildong_84/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Philosophy",
+        "Sophie's World"
+      ],
+      "meta_description": "\n    A page-turning novel that is also an exploration of the great philosophical concepts of Western thought, Sophie’s World has fired the imagination of readers all over the world, with more than twenty million copies in print.One day fourteen-year-old Sophie Amundsen comes home from school to find in her mailbox two notes, with one question on each: “Who are you?” and “Where A page-turning novel that is also an exploration of the great philosophical concepts of Western thought, Sophie’s World has fired the imagination of readers all over the world, with more than twenty million copies in print.One day fourteen-year-old Sophie Amundsen comes home from school to find in her mailbox two notes, with one question on each: “Who are you?” and “Where does the world come from?” From that irresistible beginning, Sophie becomes obsessed with questions that take her far beyond what she knows of her Norwegian village. Through those letters, she enrolls in a kind of correspondence course, covering Socrates to Sartre, with a mysterious philosopher, while receiving letters addressed to another girl. Who is Hilde? And why does her mail keep turning up? To unravel this riddle, Sophie must use the philosophy she is learning—but the truth turns out to be far more complicated than she could have imagined. ...more\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "Sophie's World | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£15.94",
+        "£55.53",
+        "£32.93",
+        "£47.11",
+        "£37.46",
+        "£45.42",
+        "£43.19"
+      ],
+      "product_title": "Sophie's World",
+      "title": "Sophie's World | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:11:03.935759Z",
+    "fields": {
+      "availability": [
+        "In stock (18 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../birdsong-a-story-in-pictures_975/index.html",
+        "../eligible-the-austen-project-4_692/index.html",
+        "../i-am-pilgrim-pilgrim-1_703/index.html",
+        "../mr-mercedes-bill-hodges-trilogy-1_717/index.html",
+        "../my-mrs-brown_719/index.html",
+        "../my-name-is-lucy-barton_720/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Childrens",
+        "The Bear and the Piano"
+      ],
+      "meta_description": "\n    One day, a young bear stumbles upon something he has never seen before in the forest. As time passes, he teaches himself how to play the strange instrument, and eventually the beautiful sounds are heard by a father and son who are picnicking in the woods. The bear goes with them on an incredible journey to New York, where his piano playing makes him a huge star. He has fam One day, a young bear stumbles upon something he has never seen before in the forest. As time passes, he teaches himself how to play the strange instrument, and eventually the beautiful sounds are heard by a father and son who are picnicking in the woods. The bear goes with them on an incredible journey to New York, where his piano playing makes him a huge star. He has fame, fortune and all the music in the world, but he misses the friends and family he has left behind. A moving tale of exploration and belonging from an exciting debut author-illustrator. ...more\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "The Bear and the Piano | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£36.89",
+        "£54.64",
+        "£27.09",
+        "£10.60",
+        "£28.90",
+        "£24.48",
+        "£41.56"
+      ],
+      "product_title": "The Bear and the Piano",
+      "title": "The Bear and the Piano | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:11:04.941132Z",
+    "fields": {
+      "availability": [
+        "In stock (18 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../in-her-wake_980/index.html",
+        "../the-rise-of-theodore-roosevelt-theodore-roosevelt-1_276/index.html",
+        "../benjamin-franklin-an-american-life_460/index.html",
+        "../the-faith-of-christopher-hitchens-the-restless-soul-of-the-worlds-most-notorious-atheist_495/index.html",
+        "../setting-the-world-on-fire-the-brief-astonishing-life-of-st-catherine-of-siena_603/index.html",
+        "../louisa-the-extraordinary-life-of-mrs-adams_818/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Thriller",
+        "The Elephant Tree"
+      ],
+      "meta_description": "\n    Mark Fallon is an overworked detective investigating a spate of attacks at a string of high profile city centre nightclubs. Scott is a dejected 24 year old struggling to make ends meet working for his brother and supplementing his income with a small-scale drug dealing operation. Angela is an attractive 23 year old, raised by her father, a career criminal and small time dr Mark Fallon is an overworked detective investigating a spate of attacks at a string of high profile city centre nightclubs. Scott is a dejected 24 year old struggling to make ends meet working for his brother and supplementing his income with a small-scale drug dealing operation. Angela is an attractive 23 year old, raised by her father, a career criminal and small time drug dealer who supplies Scott with cannabis. This is a chilling tale spanning a few months in the lives of Scott and Angela, where realizations about the present combine with shocking revelations from the past leading to an apocalyptic climax where they no longer know whom they can trust. ...more\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "The Elephant Tree | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£23.82",
+        "£12.84",
+        "£42.57",
+        "£48.19",
+        "£39.55",
+        "£21.15",
+        "£16.85"
+      ],
+      "product_title": "The Elephant Tree",
+      "title": "The Elephant Tree | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:11:05.934551Z",
+    "fields": {
+      "availability": [
+        "In stock (18 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../worlds-elsewhere-journeys-around-shakespeares-globe_972/index.html",
+        "../choosing-our-religion-the-spiritual-lives-of-americas-nones_14/index.html",
+        "../the-bhagavad-gita_60/index.html",
+        "../a-history-of-god-the-4000-year-quest-of-judaism-christianity-and-islam_310/index.html",
+        "../the-book-of-mormon_571/index.html",
+        "../god-the-most-unpleasant-character-in-all-fiction_697/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Nonfiction",
+        "The Five Love Languages: How to Express Heartfelt Commitment to Your Mate"
+      ],
+      "meta_description": "\n    Are you and your spouse speaking the same language? While love is a many splendored thing, it is sometimes a very confusing thing, too. And as people come in all varieties, shapes, and sizes, so do their choices of personal expressions of love. But more often than not, the giver and the receiver express love in two different ways. This can lead to misunderstanding, quarrel Are you and your spouse speaking the same language? While love is a many splendored thing, it is sometimes a very confusing thing, too. And as people come in all varieties, shapes, and sizes, so do their choices of personal expressions of love. But more often than not, the giver and the receiver express love in two different ways. This can lead to misunderstanding, quarrels, and even divorce.Quality time, words of affirmation, gifts, acts of service, and physical touch are the five basic love languages. Dr. Gary Chapman identifies these and guides couples towards a better understanding of their unique languages of love. Learn to speak and understand your mate's love language, and in no time you will be able to effectively love and truly feel loved in return. Skillful communication is within your grasp! ...more\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "The Five Love Languages: How to Express Heartfelt Commitment to Your Mate | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£31.05",
+        "£40.30",
+        "£28.42",
+        "£57.49",
+        "£27.62",
+        "£24.57",
+        "£30.03"
+      ],
+      "product_title": "The Five Love Languages: How to Express Heartfelt Commitment to Your Mate",
+      "title": "The Five Love Languages: How to Express Heartfelt Commitment to Your Mate | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:11:06.940628Z",
+    "fields": {
+      "availability": [
+        "In stock (18 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../we-are-all-completely-beside-ourselves_301/index.html",
+        "../someone-like-you-the-harrisons-2_735/index.html",
+        "../when-we-collided_955/index.html",
+        "../the-travelers_285/index.html",
+        "../far-from-true-promise-falls-trilogy-2_320/index.html",
+        "../the-bone-hunters-lexy-vaughan-steven-macaulay-2_343/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Spirituality",
+        "The Four Agreements: A Practical Guide to Personal Freedom"
+      ],
+      "meta_description": "\n    In The Four Agreements, don Miguel Ruiz reveals the source of self-limiting beliefs that rob us of joy and create needless suffering. Based on ancient Toltec wisdom, the Four Agreements offer a powerful code of conduct that can rapidly transform our lives to a new experience of freedom, true happiness, and love. The Four Agreements are: Be Impeccable With Your Word, Don't In The Four Agreements, don Miguel Ruiz reveals the source of self-limiting beliefs that rob us of joy and create needless suffering. Based on ancient Toltec wisdom, the Four Agreements offer a powerful code of conduct that can rapidly transform our lives to a new experience of freedom, true happiness, and love. The Four Agreements are: Be Impeccable With Your Word, Don't Take Anything Personally, Don't Make Assumptions, Always Do Your Best. ...more\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "The Four Agreements: A Practical Guide to Personal Freedom | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£17.66",
+        "£24.04",
+        "£52.79",
+        "£31.77",
+        "£15.77",
+        "£34.93",
+        "£59.71"
+      ],
+      "product_title": "The Four Agreements: A Practical Guide to Personal Freedom",
+      "title": "The Four Agreements: A Practical Guide to Personal Freedom | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
+    "depth": 2,
+    "timestamp": "2026-08-31T14:10:57.967914Z",
+    "fields": {
+      "availability": [
+        "In stock (17 available)",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "../the-selfish-gene_81/index.html",
+        "../seven-brief-lessons-on-physics_219/index.html",
+        "../surely-youre-joking-mr-feynman-adventures-of-a-curious-character_227/index.html",
+        "../the-disappearing-spoon-and-other-true-tales-of-madness-love-and-the-history-of-the-world-from-the-periodic-table-of-the-elements_244/index.html",
+        "../the-elegant-universe-superstrings-hidden-dimensions-and-the-quest-for-the-ultimate-theory_245/index.html",
+        "../peak-secrets-from-the-new-science-of-expertise_389/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "Books",
+        "Poetry",
+        "You can't bury them all: Poems"
+      ],
+      "meta_description": "\n    A poetry that is at once harrowing, angry, and achingly beautiful Patrick Woodcock has spent the past seven years engaging with and being shaped by the people, politics, and landscapes of the Kurdish north of Iraq, Fort Good Hope in the Northwest Territories, and Azerbaijan. His powerful new collection offers a poetry that simultaneously explores hope and horror while doc A poetry that is at once harrowing, angry, and achingly beautiful Patrick Woodcock has spent the past seven years engaging with and being shaped by the people, politics, and landscapes of the Kurdish north of Iraq, Fort Good Hope in the Northwest Territories, and Azerbaijan. His powerful new collection offers a poetry that simultaneously explores hope and horror while documenting the transformative processes of coping. You can’t bury them all follows the narratives we construct to survive the tragic failures of our humanity to their very end: everything that’s buried by snow, dirt, and ash, just like everything that’s buried by politics, homophobia, sexism, racism, religion; and history is resurrected, demanding to be heard and addressed.In Woodcock’s poetry, how we deal with what resurfaces is the key. What do those who suffer really mean to those who have abandoned them to small, conscience-soothing charitable donations or the occasional tweet? How can the poet, or anyone else, sleep at night knowing homosexuals are being thrown off building tops, after one steps into a hole and finds an abandoned corpse in an Azeri cemetery, or after the elders of an Aboriginal community are left helpless against those who only want to exploit them? Still, You can’t bury them all demonstrates that the world is not just the horrific place the media often portrays. In each of the worlds he touches, Woodcock discovers a spirit and strength to celebrate. ...more\n",
+      "meta_favicon": "../../static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "You can't bury them all: Poems | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£33.63",
+        "£29.45",
+        "£30.60",
+        "£25.83",
+        "£57.35",
+        "£13.03",
+        "£16.28"
+      ],
+      "product_title": "You can't bury them all: Poems",
+      "title": "You can't bury them all: Poems | Books to Scrape - Sandbox"
+    }
+  },
+  {
+    "url": "https://books.toscrape.com/index.html",
+    "depth": 1,
+    "timestamp": "2026-08-31T14:10:53.176017Z",
+    "fields": {
+      "availability": [
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock",
+        "In stock"
+      ],
+      "book_links": [
+        "catalogue/a-light-in-the-attic_1000/index.html",
+        "catalogue/tipping-the-velvet_999/index.html",
+        "catalogue/soumission_998/index.html",
+        "catalogue/sharp-objects_997/index.html",
+        "catalogue/sapiens-a-brief-history-of-humankind_996/index.html",
+        "catalogue/the-requiem-red_995/index.html",
+        "catalogue/the-dirty-little-secrets-of-getting-your-dream-job_994/index.html",
+        "catalogue/the-coming-woman-a-novel-based-on-the-life-of-the-infamous-feminist-victoria-woodhull_993/index.html",
+        "catalogue/the-boys-in-the-boat-nine-americans-and-their-epic-quest-for-gold-at-the-1936-berlin-olympics_992/index.html",
+        "catalogue/the-black-maria_991/index.html",
+        "catalogue/starving-hearts-triangular-trade-trilogy-1_990/index.html",
+        "catalogue/shakespeares-sonnets_989/index.html",
+        "catalogue/set-me-free_988/index.html",
+        "catalogue/scott-pilgrims-precious-little-life-scott-pilgrim-1_987/index.html",
+        "catalogue/rip-it-up-and-start-again_986/index.html",
+        "catalogue/our-band-could-be-your-life-scenes-from-the-american-indie-underground-1981-1991_985/index.html",
+        "catalogue/olio_984/index.html",
+        "catalogue/mesaerion-the-best-science-fiction-stories-1800-1849_983/index.html",
+        "catalogue/libertarianism-for-beginners_982/index.html",
+        "catalogue/its-only-the-himalayas_981/index.html"
+      ],
+      "breadcrumb": [
+        "Home",
+        "All products"
+      ],
+      "meta_favicon": "static/oscar/favicon.ico",
+      "meta_robots": "NOARCHIVE,NOCACHE",
+      "meta_title": "All products | Books to Scrape - Sandbox",
+      "meta_viewport": "width=device-width",
+      "price": [
+        "£51.77",
+        "£53.74",
+        "£50.10",
+        "£47.82",
+        "£54.23",
+        "£22.65",
+        "£33.34",
+        "£17.93",
+        "£22.60",
+        "£52.15",
+        "£13.99",
+        "£20.66",
+        "£17.46",
+        "£52.29",
+        "£35.02",
+        "£57.25",
+        "£23.88",
+        "£37.59",
+        "£51.33",
+        "£45.17"
+      ],
+      "title": "All products | Books to Scrape - Sandbox"
+    }
+  }
+]

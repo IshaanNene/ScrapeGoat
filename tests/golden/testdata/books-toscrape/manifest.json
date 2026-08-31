@@ -1,0 +1,118 @@
+{
+  "version": "dev",
+  "seeds": [
+    "https://books.toscrape.com/"
+  ],
+  "config_hash": "e12990324386095e8332fc79c7ec1e4edc5055fc908578e37863d7049c88b589",
+  "config": {
+    "Engine": {
+      "Concurrency": 1,
+      "MaxDepth": 2,
+      "RequestTimeout": 30000000000,
+      "PolitenessDelay": 1000000000,
+      "DedupStrategy": "",
+      "ExpectedURLs": 0,
+      "DedupFPRate": 0,
+      "MaxThrottleSlots": 10000,
+      "RespectRobotsTxt": true,
+      "MaxRetries": 3,
+      "RetryDelay": 2000000000,
+      "CircuitBreakerThreshold": 5,
+      "CircuitBreakerCooldown": 30000000000,
+      "CheckpointInterval": 60000000000,
+      "UserAgents": [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      ],
+      "AllowedDomains": [
+        "books.toscrape.com"
+      ],
+      "DisallowedDomains": null,
+      "AllowedURLPatterns": null,
+      "MaxRequests": 16,
+      "MaxItems": 0
+    },
+    "Fetcher": {
+      "Type": "http",
+      "FollowRedirects": true,
+      "MaxRedirects": 10,
+      "MaxBodySize": 10485760,
+      "TLSInsecure": false,
+      "IdleConnTimeout": 90000000000,
+      "Fingerprint": "",
+      "MaxIdleConns": 100
+    },
+    "Proxy": {
+      "Enabled": false,
+      "Rotation": "round_robin",
+      "URLs": null,
+      "HealthCheck": true,
+      "RotateOnFail": true
+    },
+    "Parser": {
+      "AutoDetect": true,
+      "Rules": null
+    },
+    "Pipeline": {
+      "Middlewares": null
+    },
+    "Storage": {
+      "Type": "json",
+      "OutputPath": "./out2",
+      "BatchSize": 100,
+      "DeterministicOrder": false
+    },
+    "APIServer": {
+      "Enabled": false,
+      "Port": 0,
+      "APIKey": "",
+      "DBPath": "",
+      "CORS": false,
+      "RateRPS": 0,
+      "AllowNoAuth": false,
+      "AllowedOrigins": null
+    },
+    "MCP": {
+      "Transport": "",
+      "Port": 0,
+      "APIKey": ""
+    },
+    "Logging": {
+      "Level": "info",
+      "Format": "text",
+      "Output": "stderr"
+    },
+    "Metrics": {
+      "Enabled": false,
+      "Port": 9090,
+      "Path": "/metrics"
+    },
+    "Browser": {
+      "Render": false,
+      "BrowserType": "chromium",
+      "Headless": true,
+      "WaitTime": 3000000000
+    },
+    "Middleware": {
+      "Request": null
+    },
+    "Project": {
+      "Name": "",
+      "Version": "",
+      "StartURLs": null
+    },
+    "Safety": {
+      "AllowedSchemes": [
+        "http",
+        "https"
+      ],
+      "AllowPrivateAddresses": false,
+      "AllowedPrivateHosts": null
+    }
+  },
+  "started_at": "2026-08-31T19:40:50.939663+05:30",
+  "finished_at": "2026-08-31T19:41:06.960048+05:30",
+  "entries": 17,
+  "objects": 16,
+  "bytes": 410681
+}
