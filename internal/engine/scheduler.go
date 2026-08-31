@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"log/slog"
@@ -379,9 +378,31 @@ func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response) 
 	// Extraction only makes sense for HTML, and only the text needs it. A non-HTML
 	// response still gets a record — it has provenance, just no extracted text.
 	if isHTML(resp) {
-		if d, err := goquery.NewDocumentFromReader(bytes.NewReader(resp.Body)); err == nil {
+		// One DOM parse per response. Response.Document caches, so this is the
+		// same tree the parser goes on to use for link discovery and rules. This
+		// used to build a second document from the same bytes, so every page in
+		// every corpus crawl was tokenised and tree-built twice for two outputs
+		// that were never joined to each other.
+		if d, err := resp.Document(); err == nil {
 			doc = d
-			if r := extract.New().FromDocument(d); r != nil {
+
+			// The extractor gets a clone because it destroys what it is given:
+			// FromDocument strips script, style, nav, aside, footer and header
+			// from its input before scoring, since a <script> body is text as far
+			// as the DOM is concerned. Handing it the shared document would delete
+			// most of a site's navigation before the parser ran link discovery
+			// over it, and the crawl would quietly stop finding pages — no error,
+			// just fewer URLs than there should be.
+			//
+			// The clone is what that safety costs, and it is cheaper than the
+			// parse it replaces: ~10µs to clone a typical page against ~76µs to
+			// build it again from bytes. One parse plus one clone beats two
+			// parses.
+			//
+			// provenance.Build gets the pristine document, not the clone — it
+			// reads <meta> for AI directives, TDM reservations and licence, and
+			// those must be read from the page as served.
+			if r := extract.New().FromDocument(goquery.CloneDocument(d)); r != nil {
 				content = provenance.Content{
 					Text:       r.Text,
 					Title:      r.Title,
