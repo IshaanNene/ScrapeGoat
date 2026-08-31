@@ -8,6 +8,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
+	"github.com/IshaanNene/ScrapeGoat/internal/provenance"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
@@ -23,8 +24,24 @@ func NewCSSParser(logger *slog.Logger) *CSSParser {
 	}
 }
 
-// Parse implements Parser.
+// Parse implements Parser as a view over Derive.
+//
+// One derivation, two ways of looking at it. Parse existed first and is kept for
+// callers that only want items; it must not become a second extraction path.
 func (p *CSSParser) Parse(resp *types.Response, rules []config.ParseRule) ([]*types.Item, []string, error) {
+	assertions, links, err := p.Derive(resp, rules)
+	if err != nil {
+		return nil, nil, err
+	}
+	var items []*types.Item
+	if item := ItemFromAssertions(resp.Request.URLString(), assertions); item != nil {
+		items = append(items, item)
+	}
+	return items, links, nil
+}
+
+// Derive extracts the page's links and one assertion per matched value.
+func (p *CSSParser) Derive(resp *types.Response, rules []config.ParseRule) ([]provenance.Assertion, []string, error) {
 	doc, err := resp.Document()
 	if err != nil {
 		return nil, nil, &types.ParseError{
@@ -32,8 +49,6 @@ func (p *CSSParser) Parse(resp *types.Response, rules []config.ParseRule) ([]*ty
 			Err: err,
 		}
 	}
-
-	var items []*types.Item
 
 	// Extract links from the page
 	links := p.extractLinks(doc, resp.FinalURL)
@@ -43,27 +58,26 @@ func (p *CSSParser) Parse(resp *types.Response, rules []config.ParseRule) ([]*ty
 		return nil, links, nil
 	}
 
-	// Apply extraction rules
-	item := types.NewItem(resp.Request.URLString())
-
+	var assertions []provenance.Assertion
 	for _, rule := range rules {
 		if rule.Type != "css" && rule.Type != "" {
 			continue // Skip non-CSS rules
 		}
-
-		values := p.extractCSS(doc, rule)
-		if len(values) == 1 {
-			item.Set(rule.Name, values[0])
-		} else if len(values) > 1 {
-			item.Set(rule.Name, values)
-		}
+		assertions = append(assertions,
+			valueAssertions(rule.Name, cssMethod(rule), cssVersion, p.extractCSS(doc, rule))...)
 	}
 
-	if len(item.Fields) > 0 {
-		items = append(items, item)
-	}
+	return assertions, links, nil
+}
 
-	return items, links, nil
+// cssMethod names the derivation specifically enough to repeat it. The attribute
+// is part of the identity: the same selector reading href and reading text are two
+// different claims about the same elements.
+func cssMethod(rule config.ParseRule) string {
+	if rule.Attribute != "" && rule.Attribute != "text" {
+		return "css:" + rule.Selector + "@" + rule.Attribute
+	}
+	return "css:" + rule.Selector
 }
 
 // extractCSS applies a single CSS rule and returns matched values.

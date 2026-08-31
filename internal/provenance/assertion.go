@@ -134,6 +134,12 @@ type Assertion struct {
 	Field string `json:"field"`
 	Value any    `json:"value"`
 
+	// Index is the position of this value among the values the same derivation
+	// produced for the same field — the third link a selector matched is index 2.
+	// Corpus rows carry no inherent order, so without it a multi-valued field
+	// cannot be reassembled in the order the page presented it.
+	Index int `json:"index,omitempty"`
+
 	// Evidence points at the bytes supporting Value.
 	Evidence EvidenceSpan `json:"evidence"`
 
