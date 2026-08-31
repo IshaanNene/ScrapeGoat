@@ -13,6 +13,72 @@ wired into the running system, and several security properties a crawler needs w
 absent. Both are addressed, and the README now describes only what actually runs —
 everything else moved to [ROADMAP.md](ROADMAP.md).
 
+### Security (remediation pass)
+
+- **The headless browser is no longer an unguarded SSRF path.** Chromium does its own
+  DNS and opens its own sockets, so `ValidateURL` — which deliberately checks only the
+  scheme and shape, leaving addresses to `DialContext` — was the only thing between an
+  attacker-supplied URL and the connection. No Go code was in the path to enforce
+  anything.
+
+  Reachable from the agent surface: an MCP client whose model had just read a page
+  saying "screenshot `http://169.254.169.254/latest/meta-data/`" passed the scheme
+  check, Chromium fetched cloud metadata, and the credentials came back to the model
+  as page content. The REST screenshot endpoint validated nothing at all.
+
+  Browser egress now goes through a loopback proxy backed by `URLGuard.DialContext`,
+  with `--proxy-bypass-list=<-loopback>` so that Chromium's implicit exemptions for
+  localhost *and link-local* — the destinations that matter most here — do not apply.
+  `NewBrowserFetcher` takes a `*safety.URLGuard` as a required argument, so an
+  unguarded browser is a compile error.
+
+- **Chromium's security boundaries are back on.** `--no-sandbox`,
+  `--disable-setuid-sandbox`, `--disable-web-security` and site isolation were all
+  disabled in a process whose job is rendering pages chosen by someone else.
+  `--no-sandbox` existed to run as root in a container; the Dockerfile has run as an
+  unprivileged user since. A test fails if any of them return, including rod's own
+  default of `--disable-features=site-per-process`.
+
+### Fixed (remediation pass)
+
+- **Politeness was keyed on the hostname, not the registrable domain**, despite the
+  throttler's own documentation. `a.example.com` and `b.example.com` held independent
+  rate limiters and circuit-breaker budgets, so a crawl touching fifty subdomains sent
+  a site fifty times the configured rate. Nothing surfaced it: every limiter was
+  correctly obeying its delay.
+
+- **A data race on the engine's random source.** `backoffFor` drew from a single
+  `*rand.Rand` from every worker goroutine, and `math/rand/v2`'s `*Rand` is not safe
+  for concurrent use. Serialised. Note this does not restore reproducibility of retry
+  delays under concurrency — see ROADMAP.md.
+
+- **Completion is decided from an in-flight counter rather than idle workers.** A
+  worker holding a just-dequeued request was briefly counted as idle, so with an empty
+  queue at that instant the crawl could be declared finished and the frontier closed
+  underneath a fetch about to start.
+
+- **The benchmark CI job ran nothing.** Its path did not exist and the pipe to `tee`
+  swallowed the non-zero status, so it reported success for its entire life.
+
+- **Goroutine leaks fail the build.** `goleak.VerifyTestMain` across the core
+  packages, which immediately found one.
+
+### Removed (remediation pass)
+
+Every subsystem that compiled, passed tests, and was reachable from nothing:
+`internal/distributed` and the master/worker/scale commands, `internal/llmextract`,
+`internal/media`, `internal/api`, `internal/engine/autoscale.go`,
+`internal/observability/tracing.go`, `internal/fetcher/captcha.go`, and
+`contrib/{plugin,dashboard,repl,antibot,automation}`. The `distributed`, `ai` and
+`llm` config sections went with them — they were read by nothing, so an operator
+setting `llm.enabled` with an API key got silence.
+
+The README feature table lost its Distributed and LLM extraction rows. `scrapegoat
+scale N` returns an error instead of printing a success message for the `GET
+/api/scale` it issued without ever sending `N`.
+
+CAPTCHA *detection* stays in `internal/middleware`; only solving was removed.
+
 ### Added (Phase 3 — provenance)
 
 - **`--compliance-report out.json`** writes a machine-readable account of what the
