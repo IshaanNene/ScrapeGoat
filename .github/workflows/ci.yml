@@ -97,6 +97,9 @@ jobs:
 
       # Every parser here consumes bytes chosen by the site being crawled, so
       # "does not panic on hostile input" is a correctness property, not a nicety.
+      # The evidence-span target is here for a different reason: it does not crash
+      # when it is wrong, it writes a citation pointing at the wrong bytes, which is
+      # discoverable only by whoever checks a claim years later.
       # go test runs exactly one -fuzz target at a time, hence the explicit list.
       - name: Fuzz parsers and decoders
         run: |
@@ -125,6 +128,7 @@ jobs:
           run_fuzz ./internal/provenance FuzzFromDocument
           run_fuzz ./internal/provenance FuzzFromHeaders
           run_fuzz ./internal/provenance FuzzBuild
+          run_fuzz ./internal/provenance FuzzValidateSpanIsAlwaysInBounds
 
       # A crashing input is written to testdata/fuzz/<Target>/. Publish it so the
       # failure is reproducible from the run rather than only from the log.
