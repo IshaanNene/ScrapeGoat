@@ -1,4 +1,13 @@
-package ai
+// The LLM client and pipeline processors below used to live in internal/ai. They
+// were imported by this example and by nothing else, which made them part of the
+// module's internal surface — and therefore something to keep compiling and
+// reviewing — for the benefit of one example. Folding them in here removes that
+// obligation without deleting working code.
+//
+// They are also a deliberate statement about where AI belongs: as a processor
+// something opts into, in an example, not as a stage in the crawl path. Deleting
+// every model provider must leave the architecture unchanged and still useful.
+package main
 
 import (
 	"bytes"
