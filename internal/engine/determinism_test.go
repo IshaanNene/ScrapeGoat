@@ -59,7 +59,14 @@ func TestEngineAcceptsInjectedSources(t *testing.T) {
 
 	eng := New(testutil.LoopbackConfig(), concurrencyLogger, WithClock(clk), WithRand(rng))
 
-	if eng.rand != rng {
+	// The engine wraps the injected source in a lock, because a *rand.Rand drawn
+	// from by every worker at once is a data race. The wrapper must still be
+	// carrying the caller's source and not a fresh one.
+	locked, ok := eng.rand.(*lockedRand)
+	if !ok {
+		t.Fatalf("engine rand is %T, want it wrapped in *lockedRand for concurrent use", eng.rand)
+	}
+	if locked.r != rng {
 		t.Error("WithRand was ignored")
 	}
 	if eng.clock != clk {

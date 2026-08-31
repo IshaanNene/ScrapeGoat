@@ -2,7 +2,6 @@ package engine
 
 import (
 	"math"
-	"math/rand/v2"
 
 	"sync"
 	"time"
@@ -34,7 +33,7 @@ const (
 // usually correlated: a hundred workers hit the same 503 in the same second, and
 // without jitter they all come back in the same later second too, reproducing the
 // thundering herd at every step.
-func backoffFor(rng *rand.Rand, base time.Duration, n int) time.Duration {
+func backoffFor(rng randSource, base time.Duration, n int) time.Duration {
 	if base <= 0 || n <= 0 {
 		return 0
 	}

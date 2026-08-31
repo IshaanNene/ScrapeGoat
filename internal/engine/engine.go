@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math/rand/v2"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -150,7 +149,7 @@ type Engine struct {
 	// from the standard library, so that a crawl can be replayed. See
 	// docs/design/0001-deterministic-crawl.md.
 	clock clock.Clock
-	rand  *rand.Rand
+	rand  randSource
 
 	// corpus, when set, receives a provenance record for every response. Nil by
 	// default: most crawls do not want one, and building records costs an
@@ -186,7 +185,7 @@ func New(cfg *config.Config, logger *slog.Logger, opts ...Option) *Engine {
 
 	e := &Engine{
 		clock:    o.clock,
-		rand:     o.rand,
+		rand:     newLockedRand(o.rand),
 		cfg:      cfg,
 		logger:   logger,
 		frontier: NewFrontier(o.clock),
