@@ -28,7 +28,9 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -111,7 +113,7 @@ type goldenRecord struct {
 // must still equal. Nothing about the assertion path needs to exist for the
 // comparison to be written — that is the point of writing it now.
 func TestGoldenItems(t *testing.T) {
-	items, _ := replayCorpus(t)
+	items, _, _ := replayCorpus(t)
 
 	got := make([]goldenItem, 0, len(items))
 	for _, it := range items {
@@ -141,7 +143,7 @@ func TestGoldenItems(t *testing.T) {
 // The two halves are frozen from one run rather than two, so that a change which
 // moves an item and its record together is still visible as one diff.
 func TestGoldenRecords(t *testing.T) {
-	_, records := replayCorpus(t)
+	_, records, _ := replayCorpus(t)
 
 	got := make([]goldenRecord, 0, len(records))
 	for _, r := range records {
@@ -176,6 +178,74 @@ func TestGoldenRecords(t *testing.T) {
 	})
 
 	compareGolden(t, "records.golden.json", got)
+}
+
+// goldenAssertion summarises the claims one derivation made about one field.
+//
+// A summary rather than a row per value, because the values themselves are already
+// pinned by items.golden.json — Item is the projection of these assertions, so
+// duplicating them here would double the size of the fixtures to assert the same
+// thing twice, and make both diffs harder to read. What is only visible on this
+// side is which method produced the field, at what version, how many values it
+// matched, and which observation it attaches to.
+type goldenAssertion struct {
+	SourceURL       string `json:"source_url"`
+	Field           string `json:"field"`
+	Method          string `json:"method"`
+	MethodVersion   string `json:"method_version"`
+	Values          int    `json:"values"`
+	ObservationHash string `json:"observation_hash"`
+	Validated       bool   `json:"validated"`
+	Unsupported     bool   `json:"unsupported,omitempty"`
+}
+
+// TestGoldenAssertions pins the new shape as well as the old one.
+//
+// The projection test proves the item agrees with the assertions; it cannot prove
+// the assertions are right, because it compares them against something derived
+// from the same data. This pins what a claim says about itself — which selector,
+// at what version — so that a change to a method string, which no other test would
+// notice, shows up as a diff.
+func TestGoldenAssertions(t *testing.T) {
+	_, _, assertions := replayCorpus(t)
+
+	type key struct{ url, field string }
+	summary := map[key]*goldenAssertion{}
+	for _, a := range assertions {
+		k := key{a.SourceURL, a.Field}
+		g, ok := summary[k]
+		if !ok {
+			g = &goldenAssertion{
+				SourceURL:       a.SourceURL,
+				Field:           a.Field,
+				Method:          a.Method,
+				MethodVersion:   a.MethodVersion,
+				ObservationHash: a.Evidence.ObservationHash,
+				Validated:       a.Validated,
+				Unsupported:     a.Unsupported,
+			}
+			summary[k] = g
+		}
+		g.Values++
+		// Two methods claiming one field would mean dropShadowed let a collision
+		// through, which is the bug that turns a scalar into a list.
+		if g.Method != a.Method {
+			t.Errorf("%s: field %q claimed by both %q and %q", a.SourceURL, a.Field, g.Method, a.Method)
+		}
+	}
+
+	got := make([]goldenAssertion, 0, len(summary))
+	for _, g := range summary {
+		got = append(got, *g)
+	}
+	sort.SliceStable(got, func(i, j int) bool {
+		if got[i].SourceURL != got[j].SourceURL {
+			return got[i].SourceURL < got[j].SourceURL
+		}
+		return got[i].Field < got[j].Field
+	})
+
+	compareGolden(t, "assertions.golden.json", got)
 }
 
 // TestCorpusIsIntact checks the fixture before anything is concluded from it.
@@ -213,7 +283,7 @@ func TestCorpusIsIntact(t *testing.T) {
 
 // replayCorpus runs the current pipeline over the frozen log and returns what it
 // derived. Offline: the player serves every fetch, robots.txt included.
-func replayCorpus(t *testing.T) ([]*types.Item, []provenance.Record) {
+func replayCorpus(t *testing.T) ([]*types.Item, []provenance.Record, []provenance.Assertion) {
 	t.Helper()
 
 	manifest, err := fetchlog.ReadManifest(corpusDir)
@@ -248,6 +318,9 @@ func replayCorpus(t *testing.T) ([]*types.Item, []provenance.Record) {
 	sink := &recordSink{}
 	eng.SetCorpusWriter(sink, crawlID)
 
+	claims := &assertionSink{}
+	eng.SetAssertionWriter(claims)
+
 	results := eng.ResultsChan()
 
 	for _, seed := range manifest.Seeds {
@@ -274,7 +347,7 @@ func replayCorpus(t *testing.T) ([]*types.Item, []provenance.Record) {
 	if len(items) == 0 {
 		t.Fatal("replay produced no items; the corpus or the pipeline is broken")
 	}
-	return items, sink.all()
+	return items, sink.all(), claims.all()
 }
 
 func compareGolden(t *testing.T, name string, got any) {
@@ -356,4 +429,133 @@ func (s *recordSink) all() []provenance.Record {
 
 func testLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+// assertionSink collects the claims written during a replay.
+type assertionSink struct {
+	mu         sync.Mutex
+	assertions []provenance.Assertion
+}
+
+func (s *assertionSink) Write(a provenance.Assertion) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.assertions = append(s.assertions, a)
+	return nil
+}
+func (s *assertionSink) Stats() (int64, int64) { return int64(len(s.assertions)), 0 }
+func (s *assertionSink) Path() string          { return "" }
+func (s *assertionSink) Close() error          { return nil }
+
+func (s *assertionSink) all() []provenance.Assertion {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]provenance.Assertion, len(s.assertions))
+	copy(out, s.assertions)
+	return out
+}
+
+// TestItemsAreExactlyTheAssertionProjection is the equivalence check the whole
+// migration rests on.
+//
+// Item is supposed to be a view over the assertions, not a second thing produced
+// beside them. If the two ever disagree, the corpus and the extracted data are
+// describing different crawls, and the disagreement would be invisible — both
+// files would look fine on their own.
+//
+// So the assertions are projected back into items here and compared against the
+// items the crawl actually emitted, across every page in the corpus.
+func TestItemsAreExactlyTheAssertionProjection(t *testing.T) {
+	items, _, assertions := replayCorpus(t)
+	if len(assertions) == 0 {
+		t.Fatal("replay produced no assertions; dual-write is not happening")
+	}
+
+	byURL := map[string][]provenance.Assertion{}
+	for _, a := range assertions {
+		byURL[a.SourceURL] = append(byURL[a.SourceURL], a)
+	}
+
+	emitted := map[string]*types.Item{}
+	for _, it := range items {
+		emitted[it.URL] = it
+	}
+
+	for url, item := range emitted {
+		projected := parser.ItemFromAssertions(url, byURL[url])
+		if projected == nil {
+			t.Errorf("%s: emitted an item but its assertions project to nothing", url)
+			continue
+		}
+		if !reflect.DeepEqual(projected.Fields, item.Fields) {
+			t.Errorf("%s: the assertion projection does not match the emitted item\nprojected: %#v\nemitted:   %#v",
+				url, projected.Fields, item.Fields)
+		}
+	}
+
+	for url := range byURL {
+		if _, ok := emitted[url]; !ok {
+			t.Errorf("%s: produced assertions but no item", url)
+		}
+	}
+}
+
+// TestEveryAssertionNamesItsObservation checks the join.
+//
+// An assertion whose evidence names no observation is a value with no stated
+// source, which is precisely what types.Item was and what this model replaces. The
+// hash must also be one the corpus actually contains, or the two tables do not
+// join and the citation points at nothing.
+func TestEveryAssertionNamesItsObservation(t *testing.T) {
+	_, records, assertions := replayCorpus(t)
+
+	known := map[string]bool{}
+	for _, r := range records {
+		known[r.ContentHash] = true
+		// The observation view has to agree with the record it came from, or the
+		// join key means two different things depending on which shape you read.
+		if got := r.Observation().Hash; got != r.ContentHash {
+			t.Errorf("%s: Observation().Hash = %q, record ContentHash = %q", r.URL, got, r.ContentHash)
+		}
+	}
+
+	for _, a := range assertions {
+		if a.Evidence.ObservationHash == "" {
+			t.Errorf("assertion %q on %s names no observation", a.Field, a.SourceURL)
+			continue
+		}
+		if !known[a.Evidence.ObservationHash] {
+			t.Errorf("assertion %q on %s names observation %s, which is not in the corpus",
+				a.Field, a.SourceURL, a.Evidence.ObservationHash)
+		}
+	}
+}
+
+// TestAssertionsCarryTheirMethod checks that a claim says how it was made.
+//
+// Without it an assertion is an Item field wearing a longer struct: the point of
+// the model is that a consumer can tell a CSS selector result from a model's guess
+// and treat them differently.
+func TestAssertionsCarryTheirMethod(t *testing.T) {
+	_, _, assertions := replayCorpus(t)
+
+	methods := map[string]int{}
+	for _, a := range assertions {
+		if a.Method == "" {
+			t.Errorf("assertion %q on %s has no method", a.Field, a.SourceURL)
+		}
+		if a.MethodVersion == "" {
+			t.Errorf("assertion %q on %s has no method version", a.Field, a.SourceURL)
+		}
+		methods[strings.SplitN(a.Method, ":", 2)[0]]++
+	}
+
+	// The corpus exercises selector rules and the page's own declarations; if one
+	// of those stopped producing assertions the projection test above would still
+	// pass, because it compares against an item derived from the same gap.
+	for _, want := range []string{"css", "structured"} {
+		if methods[want] == 0 {
+			t.Errorf("no assertions were produced by %q derivations; got %v", want, methods)
+		}
+	}
 }

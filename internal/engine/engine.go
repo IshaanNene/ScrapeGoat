@@ -104,6 +104,19 @@ type Parser interface {
 	Parse(resp *types.Response, rules []config.ParseRule) ([]*types.Item, []string, error)
 }
 
+// Deriver is a Parser that reports its derivations as assertions rather than only
+// as items.
+//
+// Optional, and checked for at run time: a caller with its own Parser keeps
+// working, it just produces no assertions. When a parser implements this, the
+// scheduler asks for assertions once and projects the item from them, so there is
+// still exactly one extraction pass per response.
+type Deriver interface {
+	Parser
+	Derive(resp *types.Response, rules []config.ParseRule) ([]provenance.Assertion, []string, error)
+	ItemFrom(sourceURL string, assertions []provenance.Assertion) *types.Item
+}
+
 // Pipeline is the interface for the item processing pipeline.
 type Pipeline interface {
 	Process(item *types.Item) (*types.Item, error)
@@ -155,6 +168,11 @@ type Engine struct {
 	// default: most crawls do not want one, and building records costs an
 	// extraction pass over each body.
 	corpus provenance.RecordWriter
+
+	// assertions, when set, receives the derived claims for every response,
+	// joined to the record above by content hash. Set together with corpus in
+	// practice: half a corpus is not useful.
+	assertions provenance.AssertionSink
 
 	// crawlID identifies this run in the records it emits, so a corpus assembled
 	// from several crawls can still be traced back per record.
@@ -235,6 +253,14 @@ func (e *Engine) SetCorpusWriter(w provenance.RecordWriter, crawlID string) {
 	defer e.mu.Unlock()
 	e.corpus = w
 	e.crawlID = crawlID
+}
+
+// SetAssertionWriter attaches the sink for derived claims. Like the corpus writer,
+// the engine does not close it.
+func (e *Engine) SetAssertionWriter(w provenance.AssertionSink) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.assertions = w
 }
 
 // SetParser sets the parser implementation.

@@ -59,7 +59,7 @@ func TestRecordProvenanceDoesNotStripTheSharedDocument(t *testing.T) {
 		t.Fatalf("fixture has %d links, want 5 — the test is not testing what it thinks", before)
 	}
 
-	eng.scheduler.recordProvenance(context.Background(), resp)
+	eng.scheduler.recordProvenance(context.Background(), resp, nil)
 
 	after := doc.Find("a[href]").Length()
 	if after != before {
@@ -101,7 +101,7 @@ func TestResponseDocumentParsedOnce(t *testing.T) {
 		t.Fatal("response arrived with a cached document")
 	}
 
-	eng.scheduler.recordProvenance(context.Background(), resp)
+	eng.scheduler.recordProvenance(context.Background(), resp, nil)
 
 	if resp.Doc == nil {
 		t.Fatal("recordProvenance did not populate the response's document cache, " +

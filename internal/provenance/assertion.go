@@ -130,6 +130,16 @@ func (e EvidenceSpan) Len() int {
 type Assertion struct {
 	SchemaVersion int `json:"schema_version"`
 
+	// SourceURL is the page this claim was derived from.
+	//
+	// Denormalised from the observation on purpose, for the same reason
+	// AIDirectiveSummary is: a row lifted out of the file and shown to someone
+	// asking where a value came from has to answer without a join. It is also not
+	// redundant. Content addressing means two URLs serving identical bytes share
+	// one observation — a site's "/" and "/index.html", say — and the hash alone
+	// then cannot say which request produced the claim.
+	SourceURL string `json:"source_url"`
+
 	// Field is the name of the claim, Value its content.
 	Field string `json:"field"`
 	Value any    `json:"value"`
@@ -290,4 +300,30 @@ func normaliseWithOffsets(b []byte) (norm []byte, offsets []int) {
 
 func isSpaceByte(c byte) bool {
 	return c < unicode.MaxASCII && (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v')
+}
+
+// Observation returns the fetch half of a record as its own value.
+//
+// Record is the flat, storage-facing shape and Observation is the structured one;
+// they describe the same fetch, and this is the single place that says so. It
+// exists so that assertions can be joined to what they are about without a reader
+// having to know that Record.ContentHash and EvidenceSpan.ObservationHash are the
+// same key by convention — here it is the same key by construction.
+func (r Record) Observation() Observation {
+	return Observation{
+		Hash:            r.ContentHash,
+		URL:             r.URL,
+		FinalURL:        r.FinalURL,
+		CanonicalURL:    r.CanonicalURL,
+		FetchedAt:       r.FetchedAt,
+		StatusCode:      r.StatusCode,
+		MIMEType:        r.MIMEType,
+		CrawlerIdentity: r.CrawlerIdentity,
+		CrawlID:         r.CrawlID,
+		Policy: PolicyState{
+			RobotsAllowed: r.RobotsAllowed,
+			AIDirectives:  r.AIDirectives,
+			Signals:       r.Signals,
+		},
+	}
 }

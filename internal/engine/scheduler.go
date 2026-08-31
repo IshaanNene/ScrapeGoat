@@ -322,37 +322,72 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 		}
 	}
 
-	// A provenance record per response, when a corpus was asked for. Written
-	// before parsing so that a parse failure still leaves the record: what the
-	// source said about reuse does not depend on whether extraction succeeded.
-	s.recordProvenance(ctx, resp)
-
-	// Always run the parser for link discovery and structured data
+	// One derivation per response, feeding all three outputs: the claims, the
+	// corpus record they attach to, and the item the pipeline sees.
+	//
+	// The record is still written even when derivation fails, which is why the
+	// error is logged here rather than returned. What the source said about reuse
+	// does not depend on whether extraction succeeded, and a page whose parse
+	// broke is a page a corpus especially wants to have recorded.
+	var (
+		items []*types.Item
+		links []string
+	)
 	if s.engine.parser != nil {
-		items, links, err := s.engine.parser.Parse(resp, s.engine.cfg.Parser.Rules)
+		var assertions []provenance.Assertion
+		assertions, links, items = s.derive(logger, resp)
+		s.recordProvenance(ctx, resp, assertions)
+	} else {
+		s.recordProvenance(ctx, resp, nil)
+	}
+
+	// Only emit parser items if no callbacks produced items (avoid duplicates)
+	if len(callbacksCopy) == 0 {
+		for _, item := range items {
+			item.Depth = req.Depth
+			stampFromResponse(item, resp)
+			if !s.emitItem(ctx, item) {
+				return
+			}
+		}
+	}
+	for _, link := range links {
+		newReq, err := types.NewRequest(link)
+		if err != nil {
+			continue
+		}
+		newReq.Depth = req.Depth + 1
+		newReq.ParentURL = req.URLString()
+		_ = s.engine.AddRequest(newReq)
+	}
+}
+
+// derive runs the parser once and returns both shapes of what it found.
+//
+// A parser that implements Deriver is asked for assertions and the item is
+// projected from them, so the two cannot disagree. One that does not is asked for
+// items as before and contributes no assertions — a caller with its own Parser
+// keeps working, it simply gets no corpus claims.
+func (s *Scheduler) derive(logger *slog.Logger, resp *types.Response) ([]provenance.Assertion, []string, []*types.Item) {
+	rules := s.engine.cfg.Parser.Rules
+
+	if d, ok := s.engine.parser.(Deriver); ok {
+		assertions, links, err := d.Derive(resp, rules)
 		if err != nil {
 			logger.Warn("parse error", "error", err)
 		}
-		// Only emit parser items if no callbacks produced items (avoid duplicates)
-		if len(callbacksCopy) == 0 {
-			for _, item := range items {
-				item.Depth = req.Depth
-				stampFromResponse(item, resp)
-				if !s.emitItem(ctx, item) {
-					return
-				}
-			}
+		var items []*types.Item
+		if item := d.ItemFrom(resp.Request.URLString(), assertions); item != nil {
+			items = append(items, item)
 		}
-		for _, link := range links {
-			newReq, err := types.NewRequest(link)
-			if err != nil {
-				continue
-			}
-			newReq.Depth = req.Depth + 1
-			newReq.ParentURL = req.URLString()
-			_ = s.engine.AddRequest(newReq)
-		}
+		return assertions, links, items
 	}
+
+	items, links, err := s.engine.parser.Parse(resp, rules)
+	if err != nil {
+		logger.Warn("parse error", "error", err)
+	}
+	return nil, links, items
 }
 
 // recordProvenance writes one corpus record for a response.
@@ -361,12 +396,12 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 // and losing the crawl because a record could not be written would be the wrong
 // trade — but losing records silently would be worse, so it is logged loudly
 // enough to notice.
-func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response) {
+func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response, assertions []provenance.Assertion) {
 	s.engine.mu.RLock()
-	w, crawlID := s.engine.corpus, s.engine.crawlID
+	w, sink, crawlID := s.engine.corpus, s.engine.assertions, s.engine.crawlID
 	s.engine.mu.RUnlock()
 
-	if w == nil || resp == nil || resp.Request == nil {
+	if resp == nil || resp.Request == nil || (w == nil && sink == nil) {
 		return
 	}
 
@@ -428,9 +463,32 @@ func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response) 
 		Robots:        s.engine.robots.Report(resp.Request.URLString()),
 	}, doc, content)
 
-	if err := w.Write(rec); err != nil {
-		s.engine.logger.Warn("could not record provenance",
-			"url", resp.Request.URLString(), "error", err)
+	if w != nil {
+		if err := w.Write(rec); err != nil {
+			s.engine.logger.Warn("could not record provenance",
+				"url", resp.Request.URLString(), "error", err)
+		}
+	}
+
+	if sink == nil || len(assertions) == 0 {
+		return
+	}
+
+	// Attach every claim to the bytes it was derived from. The record's content
+	// hash is the join key, so this is the moment the two halves of the corpus
+	// become one thing: without it an assertion is a value with no stated source,
+	// which is what the old Item was and what this whole model exists to replace.
+	//
+	// The evidence range within those bytes is not filled in here. That belongs
+	// with each derivation, which knows what text it matched; see ROADMAP.md.
+	for _, a := range assertions {
+		a.Evidence.ObservationHash = rec.ContentHash
+		a.SourceURL = rec.URL
+		if err := sink.Write(a); err != nil {
+			s.engine.logger.Warn("could not record assertion",
+				"url", resp.Request.URLString(), "field", a.Field, "error", err)
+			break
+		}
 	}
 }
 

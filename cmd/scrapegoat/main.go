@@ -309,11 +309,60 @@ func openCorpus(eng *engine.Engine, logDir string) (provenance.RecordWriter, err
 	eng.SetCorpusWriter(w, crawlID)
 
 	fmt.Fprintf(os.Stderr, "  writing provenance records to %s\n", corpusPath)
+
+	// The claims go alongside the records, under a derived name rather than a flag
+	// of their own. They are one artifact in two tables joined on the content hash,
+	// and an operator holding one without the other has half a corpus — which is
+	// not a state a forgotten flag should be able to produce.
+	assertionsPath := provenance.AssertionPathFor(corpusPath)
+	aw, err := provenance.NewAssertionWriter(assertionsPath)
+	if err != nil {
+		w.Close()
+		return nil, err
+	}
+	eng.SetAssertionWriter(aw)
+	assertionWriter = aw
+
+	fmt.Fprintf(os.Stderr, "  writing derived claims to %s\n", assertionsPath)
 	return w, nil
+}
+
+// assertionWriter is closed and reported alongside the corpus. Package-level for
+// the same reason the corpus flags are: this file threads run state through
+// globals, and inventing a second convention here would be worse than following
+// the one that exists.
+var assertionWriter *provenance.AssertionWriter
+
+// reportAssertions closes the claim file and says what it holds.
+func reportAssertions() {
+	if assertionWriter == nil {
+		return
+	}
+	w := assertionWriter
+	assertionWriter = nil
+
+	if err := w.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "  claims did not close cleanly: %v\n", err)
+		return
+	}
+
+	written, skipped := w.Stats()
+	fmt.Printf("  Claims:    %d -> %s\n", written, w.Path())
+	if skipped > 0 {
+		// Reported rather than hidden: a claim with no observation to attach to is
+		// a derivation bug, and a silent drop is how it would stay one.
+		fmt.Printf("             %d dropped for naming no observation\n", skipped)
+	}
 }
 
 // reportCorpus prints what the corpus ended up holding.
 func reportCorpus(w provenance.RecordWriter) {
+	// Deferred as well as called inline below. The inline call puts the claim
+	// count next to the record count where a reader expects it; this makes sure
+	// the file is still closed when one of the early returns below is taken.
+	// reportAssertions clears its writer, so the second call is a no-op.
+	defer reportAssertions()
+
 	if w == nil {
 		return
 	}
@@ -327,6 +376,7 @@ func reportCorpus(w provenance.RecordWriter) {
 	if skipped > 0 {
 		fmt.Printf("             %d skipped for incomplete provenance\n", skipped)
 	}
+	reportAssertions()
 
 	records, err := provenance.ReadAnyCorpus(w.Path())
 	if err != nil {
