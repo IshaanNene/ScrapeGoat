@@ -31,14 +31,13 @@ type Scheduler struct {
 	pauseMu  sync.RWMutex
 	resumeCh chan struct{}
 
-	throttler   *Throttler
-	breaker     *CircuitBreaker
-	idleWorkers atomic.Int32
+	throttler *Throttler
+	breaker   *CircuitBreaker
 
 	// pendingRetries counts requests waiting out a backoff off-queue. They are
-	// invisible to both the frontier length and the idle-worker count, so
-	// without this the idle monitor would declare the crawl finished and close
-	// the frontier while retries were still due — silently dropping them.
+	// neither queued nor in flight, so without this the idle monitor would declare
+	// the crawl finished and close the frontier while retries were still due —
+	// silently dropping them.
 	pendingRetries atomic.Int32
 	done           chan struct{}
 }
@@ -120,9 +119,24 @@ func (s *Scheduler) resumeGate() <-chan struct{} {
 	return s.resumeCh
 }
 
-// idleMonitor checks if all workers are idle and frontier is empty.
-// When this condition holds for a sustained period, it closes the frontier.
-func (s *Scheduler) idleMonitor(ctx context.Context, concurrency int) {
+// idleMonitor closes the frontier once there is provably no work left.
+//
+// It used to infer that from how many workers looked idle: idleWorkers was
+// incremented before PopReady and decremented after, so a worker holding a
+// just-dequeued request was briefly counted as idle. With an empty queue at that
+// instant, the monitor could see every worker idle and nothing queued while a fetch
+// was about to begin, and end the crawl underneath it. Rare, timing-dependent, and
+// indistinguishable from a crawl that had genuinely finished.
+//
+// Frontier.Outstanding counts queued and in-flight requests together under the
+// frontier's own lock, and the in-flight increment happens at the moment of removal,
+// so there is no window in which a request is invisible. That makes the completion
+// test a fact rather than an inference.
+//
+// The confirmation streak survives, with a narrower job. It no longer papers over
+// the dequeue window; it only covers work that arrives after the crawl looks empty —
+// principally a caller that adds seeds after Start rather than before.
+func (s *Scheduler) idleMonitor(ctx context.Context, _ int) {
 	ticker := s.engine.clock.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 	idleStreak := 0
@@ -135,16 +149,13 @@ func (s *Scheduler) idleMonitor(ctx context.Context, concurrency int) {
 		case <-s.done:
 			return
 		case <-ticker.C:
-			idle := int(s.idleWorkers.Load())
-			queueLen := s.engine.frontier.Len()
-
+			outstanding := s.engine.frontier.Outstanding()
 			pending := int(s.pendingRetries.Load())
 
-			if idle >= concurrency && queueLen == 0 && pending == 0 {
+			if outstanding == 0 && pending == 0 {
 				idleStreak++
-				// Require 3 consecutive idle checks (~600ms) to confirm completion
 				if idleStreak >= 3 {
-					s.logger.Info("all workers idle, frontier empty — crawl complete")
+					s.logger.Info("no queued or in-flight requests — crawl complete")
 					s.engine.frontier.Close()
 					return
 				}
@@ -173,14 +184,12 @@ func (s *Scheduler) worker(ctx context.Context, id int) {
 			}
 		}
 
-		// Mark as idle while parked on the frontier. PopReady blocks until a
-		// request whose domain is off cooldown is available, the frontier closes,
-		// or ctx is cancelled — no polling, and no waiting out one domain's
-		// politeness delay while other domains have work ready.
-		s.idleWorkers.Add(1)
+		// PopReady blocks until a request whose domain is off cooldown is
+		// available, the frontier closes, or ctx is cancelled — no polling, and no
+		// waiting out one domain's politeness delay while other domains have work
+		// ready. A returned request is already counted in flight by the frontier,
+		// so it is never invisible to the completion check.
 		req := s.engine.frontier.PopReady(ctx, s.throttler)
-		s.idleWorkers.Add(-1)
-
 		if req == nil {
 			// Frontier closed or context cancelled: no more work is coming.
 			return
@@ -191,8 +200,12 @@ func (s *Scheduler) worker(ctx context.Context, id int) {
 		s.engine.metrics.SetActiveWorkers(int(active))
 		s.engine.metrics.SetFrontierDepth(s.engine.frontier.Len())
 
-		// Process the request
+		// Process the request, then release it. Done comes after processRequest
+		// returns because links discovered on the page are pushed during it: a
+		// parent that stopped counting before its children were queued would leave
+		// the frontier momentarily empty and end the crawl one level in.
 		s.processRequest(ctx, logger, req)
+		s.engine.frontier.Done()
 
 		active = s.engine.stats.ActiveWorkers.Add(-1)
 		s.engine.metrics.SetActiveWorkers(int(active))
