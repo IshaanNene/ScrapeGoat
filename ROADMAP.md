@@ -67,6 +67,15 @@ What was deleted, and what replacing it would take:
   of diminishing returns — an evasion arms race against funded adversaries is not a position this
   project can hold.
 - **OpenTelemetry**, replacing the deleted hand-rolled tracer, with `traceparent` propagation.
+- **Merge comparably-scoring sibling blocks in `internal/extract`.** An article interrupted by an
+  inline ad or a pull-quote becomes several containers, and taking only the single best one
+  truncates it at the interruption. Code to do this existed and never ran: the lookup was
+  `scores[sib]` against a map keyed by `*goquery.Selection`, and `Siblings()` allocates fresh
+  Selections, so a sibling could not match its own entry even when it had one. It has been removed
+  rather than repaired, because repairing it changes what the extractor returns and the F1 numbers
+  in [docs/EXTRACTION.md](docs/EXTRACTION.md) are measured against what it returns today. Doing it
+  properly means keying candidates by `*html.Node`, re-running the extraction benchmark, updating
+  the published numbers, and regenerating `tests/golden`. `Result.Blocks` is always 1 until then.
 
 ### Longer term
 
