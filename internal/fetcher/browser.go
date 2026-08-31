@@ -12,6 +12,7 @@ import (
 	"github.com/go-rod/stealth"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
+	"github.com/IshaanNene/ScrapeGoat/internal/safety"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
@@ -19,6 +20,8 @@ import (
 type BrowserFetcher struct {
 	browser    *rod.Browser
 	cfg        *config.Config
+	guard      *safety.URLGuard
+	egress     *safety.GuardedProxy
 	stealthCfg *StealthConfig
 	logger     *slog.Logger
 	proxyMgr   *ProxyManager
@@ -45,9 +48,20 @@ func WithMaxPages(n int) BrowserOption {
 }
 
 // NewBrowserFetcher creates a new headless browser fetcher.
-func NewBrowserFetcher(cfg *config.Config, logger *slog.Logger, opts ...BrowserOption) (*BrowserFetcher, error) {
+//
+// guard is required rather than optional. It used to be absent entirely, which is
+// how the browser became the one fetch path with no address checks on it: every
+// caller that forgot to think about SSRF got an unguarded browser, and forgetting
+// looked exactly like not needing one. Making it a parameter means omitting it is
+// a compile error instead of an oversight.
+func NewBrowserFetcher(cfg *config.Config, guard *safety.URLGuard, logger *slog.Logger, opts ...BrowserOption) (*BrowserFetcher, error) {
+	if guard == nil {
+		return nil, fmt.Errorf("browser fetcher requires a *safety.URLGuard")
+	}
+
 	bf := &BrowserFetcher{
 		cfg:      cfg,
+		guard:    guard,
 		logger:   logger.With("component", "browser_fetcher"),
 		maxPages: cfg.Engine.Concurrency,
 	}
@@ -59,12 +73,14 @@ func NewBrowserFetcher(cfg *config.Config, logger *slog.Logger, opts ...BrowserO
 	// Launch browser
 	launchURL, err := bf.launchBrowser()
 	if err != nil {
+		bf.closeEgress()
 		return nil, fmt.Errorf("launch browser: %w", err)
 	}
 
 	// Connect to browser
 	browser := rod.New().ControlURL(launchURL)
 	if err := browser.Connect(); err != nil {
+		bf.closeEgress()
 		return nil, fmt.Errorf("connect browser: %w", err)
 	}
 
@@ -80,23 +96,74 @@ func NewBrowserFetcher(cfg *config.Config, logger *slog.Logger, opts ...BrowserO
 }
 
 // launchBrowser starts a Chromium instance with appropriate flags.
+//
+// Four flags used to be set here and are deliberately gone: no-sandbox,
+// disable-setuid-sandbox, disable-web-security and
+// disable-features=IsolateOrigins,site-per-process. Together they turned off the
+// renderer sandbox, the same-origin policy and site isolation — every containment
+// boundary Chromium has — in a process whose entire job is rendering pages chosen
+// by someone else. A renderer compromise from a crawled page went straight to the
+// host, and any page could read cross-origin responses. no-sandbox was there to
+// let Chromium run as root in a container; the Dockerfile has run as an
+// unprivileged user since, so the reason no longer holds. If Chromium will not
+// start in a sandboxed environment, fix the environment (a writable
+// --user-data-dir, an appropriate seccomp profile) rather than restoring these.
 func (bf *BrowserFetcher) launchBrowser() (string, error) {
+	l, err := bf.newLauncher()
+	if err != nil {
+		return "", err
+	}
+	return l.Launch()
+}
+
+// newLauncher builds the Chromium launcher without starting it, so that the flag
+// set can be asserted on in a test that does not need a browser installed. The
+// flags are a security boundary; a test that has to launch Chromium to check them
+// is a test that gets skipped in CI.
+func (bf *BrowserFetcher) newLauncher() (*launcher.Launcher, error) {
 	l := launcher.New().
 		Headless(true).
 		Set("disable-gpu").
 		Set("disable-dev-shm-usage").
-		Set("no-sandbox").
-		Set("disable-setuid-sandbox").
-		Set("disable-web-security").
-		Set("disable-features", "IsolateOrigins,site-per-process").
 		Set("disable-blink-features", "AutomationControlled")
 
-	// Set proxy if available
+	// rod's own defaults include --disable-features=site-per-process,TranslateUI,
+	// so site isolation is off unless this is overridden — removing our explicit
+	// flag was not enough. Keep the TranslateUI half, which only suppresses a UI
+	// prompt, and drop the half that merges cross-site frames into one renderer
+	// process.
+	l = l.Set("disable-features", "TranslateUI")
+
+	// An operator-configured egress proxy takes precedence, and takes the guard
+	// out of the path along with it — the proxy resolves the target, so we cannot
+	// see the address that gets dialled. That is the same trade documented for
+	// HTTP proxies in SECURITY.md: only use proxies you control.
+	proxied := false
 	if bf.proxyMgr != nil {
-		proxyURL := bf.proxyMgr.Next()
-		if proxyURL != nil {
+		if proxyURL := bf.proxyMgr.Next(); proxyURL != nil {
 			l = l.Proxy(proxyURL.String())
+			proxied = true
+			bf.logger.Warn("browser egress uses a configured proxy; address checks do not apply",
+				"proxy", proxyURL.Redacted(),
+			)
 		}
+	}
+
+	if !proxied {
+		egress, err := safety.StartGuardedProxy(bf.guard)
+		if err != nil {
+			return nil, fmt.Errorf("start guarded egress proxy: %w", err)
+		}
+		bf.egress = egress
+		l = l.Set("proxy-server", egress.Addr())
+
+		// <-loopback> subtracts Chromium's implicit bypass rules, which exempt
+		// localhost AND link-local addresses from the proxy. Without it the two
+		// destinations that matter most here — 127.0.0.1 and 169.254.169.254, the
+		// cloud metadata endpoint — would be dialled directly by Chromium and never
+		// reach the guard at all, leaving the proxy protecting everything except
+		// the targets it was added for.
+		l = l.Set("proxy-bypass-list", "<-loopback>")
 	}
 
 	// Stealth: additional launch flags
@@ -109,7 +176,7 @@ func (bf *BrowserFetcher) launchBrowser() (string, error) {
 		}
 	}
 
-	return l.Launch()
+	return l, nil
 }
 
 // Fetch navigates to a URL and returns the rendered page content.
@@ -246,10 +313,23 @@ func (bf *BrowserFetcher) Close() error {
 	for page := range bf.pagePool {
 		_ = page.Close()
 	}
+	// The egress proxy outlives the browser only long enough for in-flight
+	// tunnels to drain, so close it after the browser, not before.
+	defer bf.closeEgress()
 	if bf.browser != nil {
 		return bf.browser.Close()
 	}
 	return nil
+}
+
+// closeEgress shuts down the guarded proxy if one was started. Safe to call on a
+// partially constructed fetcher, which is what the failure paths in
+// NewBrowserFetcher need.
+func (bf *BrowserFetcher) closeEgress() {
+	if bf.egress != nil {
+		_ = bf.egress.Close()
+		bf.egress = nil
+	}
 }
 
 // Type returns the fetcher type identifier.

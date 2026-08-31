@@ -56,6 +56,28 @@ bug class to look for when adding one.
 the process an SSRF proxy for anything that can hand it a URL. It exists for
 deliberate crawls of an internal network, and it is off by default.
 
+### The headless browser
+
+Chromium resolves its own names and opens its own sockets, so a URL that passed
+`ValidateURL` was still fetched by a process no Go-side check could reach. Pointing a
+headless fetch at `http://169.254.169.254/latest/meta-data/` passed the scheme check
+and returned cloud credentials as page content — on the MCP surface, that is the
+prompt-injection chain the crawler otherwise defends against.
+
+- **Egress goes through a loopback proxy** whose every outbound connection is made by
+  the same `URLGuard.DialContext` as the HTTP fetcher. The browser hands over a
+  hostname; Go resolves it, checks every resolved address, and connects to the
+  address it checked. `CONNECT` is refused before the tunnel exists.
+- **`--proxy-bypass-list=<-loopback>`** subtracts Chromium's implicit bypass rules,
+  which otherwise exempt localhost *and link-local* from the proxy — the two
+  destinations the proxy exists to refuse.
+- **The sandbox stays on.** `--no-sandbox`, `--disable-setuid-sandbox`,
+  `--disable-web-security` and disabling site isolation are all rejected by a test,
+  because each was previously set on a process whose job is rendering pages chosen by
+  someone else.
+- **`NewBrowserFetcher` takes a `*safety.URLGuard` as a required argument**, so an
+  unguarded browser is a compile error rather than an oversight.
+
 ### Inbound requests: the API and MCP servers
 
 - **The REST API fails closed.** It refuses to start without an API key. Running
@@ -92,13 +114,11 @@ Stated plainly, because a security document that only lists strengths is not use
 - **Proxies bypass the address checks.** When `proxy.enabled` is set, the connection
   goes to the proxy and the proxy resolves the target. The guard cannot see the
   final address. Only use proxies you control.
-- **The browser fetcher (go-rod) is not covered by the guard.** Chromium does its
-  own DNS and its own connections. Treat headless-browser fetches as unguarded.
 - **No per-host connection or memory quotas.** A hostile site can still consume
   bandwidth and connections up to the configured concurrency.
-- **`allowed_domains` is exact-match**, so `example.com` does not cover
-  `www.example.com`. Suffix matching is tracked in [ROADMAP.md](ROADMAP.md).
-- **The container runs as root** on an unpinned base image. See ROADMAP.
+- **No sandbox guarantees on a hostile renderer.** The Chromium sandbox and site
+  isolation are enabled, but a sandbox escape is still an escape. The container
+  mitigates the blast radius; it does not eliminate it.
 
 ## Reporting scope
 

@@ -439,7 +439,7 @@ func (r *ToolRegistry) handleScreenshot(ctx context.Context, rawArgs json.RawMes
 	cfg := config.DefaultConfig()
 	cfg.Browser.Headless = true
 
-	browserFetcher, err := fetcher.NewBrowserFetcher(cfg, r.logger)
+	browserFetcher, err := fetcher.NewBrowserFetcher(cfg, r.guard, r.logger)
 	if err != nil {
 		return &ToolCallResult{
 			Content: []ContentBlock{{Type: "text", Text: fmt.Sprintf("Browser not available: %v. Install Chromium to use screenshots.", err)}},

@@ -19,6 +19,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
+	"github.com/IshaanNene/ScrapeGoat/internal/safety"
 )
 
 // Server is the REST/WebSocket API server.
@@ -32,6 +33,7 @@ type Server struct {
 	rateRPS        int
 	allowedOrigins map[string]bool
 	wildcardOrigin bool
+	guard          *safety.URLGuard
 	upgrader       websocket.Upgrader
 	wsClients      map[string]map[*websocket.Conn]bool // jobID -> connections
 	wsMu           sync.RWMutex
@@ -105,6 +107,11 @@ func NewServer(cfg *config.Config, logger *slog.Logger) (*Server, error) {
 		allowedOrigins: allowedOrigins,
 		wildcardOrigin: wildcardOrigin,
 		wsClients:      make(map[string]map[*websocket.Conn]bool),
+		guard: safety.New(safety.Config{
+			AllowedSchemes:        cfg.Safety.AllowedSchemes,
+			AllowPrivateAddresses: cfg.Safety.AllowPrivateAddresses,
+			AllowedPrivateHosts:   cfg.Safety.AllowedPrivateHosts,
+		}),
 	}
 
 	// A WebSocket upgrade is not subject to the same-origin policy, so without this
