@@ -13,6 +13,57 @@ wired into the running system, and several security properties a crawler needs w
 absent. Both are addressed, and the README now describes only what actually runs —
 everything else moved to [ROADMAP.md](ROADMAP.md).
 
+### Added (corpus model)
+
+- **`Observation`, `Assertion`, `EvidenceSpan` and `PolicyState`** in
+  `internal/provenance`. An observation is content-addressed bytes plus how they were
+  obtained; an assertion is one derived claim about an observation carrying the bytes
+  it came from, the method and version that produced it, and whether the evidence
+  checks out. Nothing is wired to them yet — they are the target shape for merging
+  `types.Item` and `provenance.Record`, which are today two parallel models that never
+  meet.
+
+- **Evidence-span validation.** `Assertion.Validate` locates a claimed value in the
+  observed bytes and records one of three outcomes: found verbatim; found after
+  whitespace normalisation and mapped back to real byte offsets; or not found — in
+  which case the assertion is kept, flagged unsupported, and its confidence zeroed
+  rather than silently dropped. Fuzzed, and in CI's fuzz list: an off-by-one here does
+  not crash, it writes a citation pointing at the wrong bytes.
+
+  Text spanning inline markup is a documented, tested limit. `Unsupported` means "could
+  not be grounded by this method", never "false".
+
+- **A golden corpus** at `tests/golden`, frozen from a 17-fetch recording of
+  books.toscrape.com. It pins what both derivation paths produce today, so the
+  Item/Assertion migration has something to be checked against. Replay is offline and
+  deterministic.
+
+### Fixed (corpus model)
+
+- **Extraction was not reproducible.** `internal/extract` held scored candidates in a
+  map. The winner was chosen with a strict `>`, so two containers tying on score handed
+  the article to whichever the runtime visited first — different text on different runs
+  of the same bytes. The confidence denominator was summed by iterating the same map,
+  and floating point addition is not associative, so the value moved in its last bits.
+  Replaying one fetch log twice produced two different corpora, which is a direct
+  failure of the property the project is built around.
+
+- **A dead sibling-merge in the extractor**, which looked up `scores[sib]` in a map
+  keyed by `*goquery.Selection` while `Siblings()` allocates fresh ones. Unreachable for
+  as long as it existed. Removed rather than repaired — repairing it changes extraction
+  output and owes a benchmark re-run; see ROADMAP.md. `Result.Blocks` is always 1.
+
+- **Each response's DOM is parsed once.** The corpus writer built its own document and
+  the parser then built another from the same bytes. The extractor gets a clone, because
+  it strips `nav`, `aside`, `footer` and `header` from its input — sharing the parsed
+  tree directly would have deleted most of a site's navigation before link discovery
+  ran, and the crawl would quietly have stopped finding pages.
+
+- **`RobotsManager.Report` no longer fetches.** Its doc comment promised it read the
+  cache and cost no extra request; it called through to a path that fetches on a miss.
+  With `respect_robots_txt: false` the cache is never populated, so every domain in a
+  corpus crawl took a robots.txt request nothing asked for and no counter recorded.
+
 ### Security (remediation pass)
 
 - **The headless browser is no longer an unguarded SSRF path.** Chromium does its own
