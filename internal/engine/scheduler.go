@@ -404,7 +404,7 @@ func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response) 
 		// The decision this crawl actually operated under. The request reached a
 		// fetcher, which means the robots check upstream permitted it.
 		RobotsAllowed: true,
-		Robots:        s.engine.robots.Report(ctx, resp.Request.URLString()),
+		Robots:        s.engine.robots.Report(resp.Request.URLString()),
 	}, doc, content)
 
 	if err := w.Write(rec); err != nil {
