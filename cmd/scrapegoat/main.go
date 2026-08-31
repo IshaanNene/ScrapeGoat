@@ -20,7 +20,6 @@ import (
 
 	"github.com/IshaanNene/ScrapeGoat/internal/apiserver"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/distributed"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetchlog"
@@ -65,8 +64,8 @@ Crawl a site, extract structured data, or expose either to an AI agent over MCP.
   • Checkpoint pause/resume (--resume)
   • MCP server, REST API, Prometheus metrics
 
-Tools outside the core — SEO audit, change detection, crawl graph, dashboard,
-REPL, benchmark harness — live in contrib/ and are built separately.`,
+Tools outside the core — SEO audit, change detection, crawl graph, benchmark
+harness — live in contrib/ and are built separately.`,
 	}
 
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file path")
@@ -76,10 +75,7 @@ REPL, benchmark harness — live in contrib/ and are built separately.`,
 	rootCmd.AddCommand(newCmd())
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(configCmd())
-	rootCmd.AddCommand(masterCmd())
-	rootCmd.AddCommand(workerCmd())
 	rootCmd.AddCommand(extractCmd())
-	rootCmd.AddCommand(scaleCmd())
 	rootCmd.AddCommand(mcpCmd())
 	rootCmd.AddCommand(serveCmd())
 	rootCmd.AddCommand(replayCmd())
@@ -696,105 +692,6 @@ func main() {
 	return nil
 }
 
-// masterCmd creates the "master" subcommand for starting the distributed coordinator.
-func masterCmd() *cobra.Command {
-	var (
-		addr string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "master",
-		Short: "Start the distributed crawl coordinator",
-		Long:  "Start the master node that coordinates distributed workers, assigns tasks, and monitors cluster health.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := setupLogger()
-
-			master := distributed.NewMaster(logger)
-			api := distributed.NewMasterAPI(master, logger)
-
-			if err := api.Start(addr); err != nil {
-				return fmt.Errorf("start master API: %w", err)
-			}
-
-			fmt.Printf("🐐 ScrapeGoat Master running at %s\n", addr)
-			fmt.Printf("\nEndpoints:\n")
-			fmt.Printf("  POST   %s/api/register    — Register worker\n", addr)
-			fmt.Printf("  POST   %s/api/submit      — Submit crawl task\n", addr)
-			fmt.Printf("  GET    %s/api/status       — Cluster status\n", addr)
-			fmt.Printf("  GET    %s/api/tasks/:id    — Get tasks for worker\n", addr)
-			fmt.Printf("\nPress Ctrl+C to stop.\n")
-
-			// Wait for shutdown signal
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-			<-sigCh
-
-			fmt.Println("\nMaster shutting down...")
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&addr, "addr", ":8081", "master API listen address")
-	return cmd
-}
-
-// workerCmd creates the "worker" subcommand for starting a distributed worker.
-func workerCmd() *cobra.Command {
-	var (
-		masterAddr string
-		capacity   int
-		workerID   string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "worker",
-		Short: "Start a distributed crawl worker",
-		Long:  "Start a worker node that connects to a master, pulls crawl tasks, and executes them.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := setupLogger()
-
-			wcfg := &distributed.WorkerConfig{
-				ID:         workerID,
-				MasterAddr: masterAddr,
-				Capacity:   capacity,
-			}
-
-			worker := distributed.NewWorker(wcfg, logger)
-			worker.SetCrawlFunc(func(task *distributed.Task) error {
-				logger.Info("executing crawl task",
-					"task_id", task.ID,
-					"urls", len(task.URLs),
-				)
-				return nil
-			})
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			if err := worker.Start(ctx); err != nil {
-				return fmt.Errorf("start worker: %w", err)
-			}
-
-			fmt.Printf("🐐 ScrapeGoat Worker %s connected to %s\n", workerID, masterAddr)
-			fmt.Printf("   Capacity: %d concurrent tasks\n", capacity)
-			fmt.Printf("\nPress Ctrl+C to stop.\n")
-
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-			<-sigCh
-
-			worker.Stop()
-			fmt.Println("\nWorker stopped.")
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&masterAddr, "master", "http://localhost:8081", "master node address")
-	cmd.Flags().IntVar(&capacity, "capacity", 10, "max concurrent tasks")
-	cmd.Flags().StringVar(&workerID, "id", fmt.Sprintf("worker-%d", time.Now().UnixMilli()), "worker ID")
-	return cmd
-}
-
 // extractCmd creates the "extract" subcommand for auto-extracting data.
 func extractCmd() *cobra.Command {
 	var (
@@ -873,34 +770,6 @@ Examples:
 	return cmd
 }
 
-// scaleCmd creates the "scale" subcommand.
-func scaleCmd() *cobra.Command {
-	var masterAddr string
-
-	cmd := &cobra.Command{
-		Use:   "scale [workers]",
-		Short: "Scale worker count up or down",
-		Long:  "Adjust the number of distributed crawl workers in the cluster.",
-		Args:  cobra.ExactArgs(1),
-		// This command did not scale anything. It issued GET /api/scale without
-		// ever sending the requested worker count, then printed "Scale request
-		// sent" — reporting success for a request it had not made. A command that
-		// lies about what it did is worse than one that is missing, because the
-		// operator stops looking.
-		//
-		// Failing loudly rather than being deleted outright because the whole
-		// distributed path is under review; see ROADMAP.md.
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("scale is not implemented: the worker count %q cannot be "+
-				"changed at runtime, and the distributed workers share no crawl state "+
-				"in any case — see ROADMAP.md", args[0])
-		},
-	}
-
-	cmd.Flags().StringVar(&masterAddr, "master", "http://localhost:8081", "master node address")
-	return cmd
-}
-
 // generateProject creates a new project directory with config and spider scaffold.
 func generateProject(name string) error {
 	dir := name
@@ -960,11 +829,6 @@ storage:
   type: json
   output_path: ./output/%s
   batch_size: 100
-
-distributed:
-  enabled: false
-  master_addr: ":8081"
-  redis_addr: "localhost:6379"
 
 metrics:
   enabled: true

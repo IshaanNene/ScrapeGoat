@@ -229,53 +229,6 @@ func TestBloomDeduplicator_ZeroFalseNegatives(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Autoscaler Tests
-// ---------------------------------------------------------------------------
-
-func TestAutoscalerScalesUpAndDown(t *testing.T) {
-	t.Parallel()
-
-	queueSize := 100 // visible queue
-	cfg := &AutoscaleConfig{
-		MinConcurrency:     2,
-		MaxConcurrency:     20,
-		ScaleUpThreshold:   0.3, // Scale up when load < 30%
-		ScaleDownThreshold: 0.9, // Scale down when load > 90%
-		CooldownPeriod:     100 * time.Millisecond,
-		CheckInterval:      50 * time.Millisecond,
-	}
-	pool := NewAutoscaledPool(cfg, func() int { return queueSize }, exhaustiveLogger, nil)
-
-	// Set worker counts to simulate low utilization (should trigger scale up)
-	pool.SetWorkerCounts(1, 9) // 1 active, 9 idle → util = 10%
-	pool.Evaluate()
-	conc1 := pool.CurrentConcurrency()
-	t.Logf("after low-util eval: concurrency=%d (queueSize=%d)", conc1, queueSize)
-
-	// Wait for cooldown
-	time.Sleep(150 * time.Millisecond)
-
-	// Simulate idle: queue empty, all workers idle
-	queueSize = 0
-	pool.SetWorkerCounts(0, 10) // all idle → should want scale down
-	pool.Evaluate()
-	conc2 := pool.CurrentConcurrency()
-	t.Logf("after idle eval: concurrency=%d", conc2)
-
-	// Should never exceed max
-	queueSize = 10000
-	for i := 0; i < 20; i++ {
-		pool.SetWorkerCounts(1, 9)
-		pool.Evaluate()
-		time.Sleep(110 * time.Millisecond)
-	}
-	if pool.CurrentConcurrency() > cfg.MaxConcurrency {
-		t.Errorf("exceeded max concurrency: got %d, max=%d", pool.CurrentConcurrency(), cfg.MaxConcurrency)
-	}
-	t.Logf("final concurrency: %d (max=%d)", pool.CurrentConcurrency(), cfg.MaxConcurrency)
-}
-
-// ---------------------------------------------------------------------------
 // Checkpoint: mid-crawl save + restore
 // ---------------------------------------------------------------------------
 

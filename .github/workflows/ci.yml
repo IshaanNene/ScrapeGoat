@@ -72,18 +72,10 @@ jobs:
   race:
     name: Race
     runs-on: ubuntu-latest
-    # The Redis queue tests are real integration tests against a real server.
-    # They skip when none is reachable, which is the right local default but
-    # would mean the distributed queue is never actually exercised in CI.
-    services:
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
+    # The Redis service container and the step that proved the queue tests really
+    # ran are gone with internal/distributed. Keep the shape in mind if a real
+    # integration dependency comes back: a test that silently skips in CI is worse
+    # than no test, because it reports as coverage.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -91,20 +83,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Run race tests
-        env:
-          SCRAPEGOAT_TEST_REDIS: 127.0.0.1:6379
         run: go test ./... -race -count=1 -timeout 300s
-      - name: Confirm the Redis queue tests actually ran
-        env:
-          SCRAPEGOAT_TEST_REDIS: 127.0.0.1:6379
-        run: |
-          set -euo pipefail
-          out="$(go test ./internal/distributed/ -run TestRedisQueue -v -count=1)"
-          echo "$out"
-          if grep -q "SKIP" <<<"$out"; then
-            echo "Redis queue tests skipped — the service container is not reachable"
-            exit 1
-          fi
 
   fuzz:
     name: Fuzz

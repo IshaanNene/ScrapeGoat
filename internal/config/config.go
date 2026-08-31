@@ -9,23 +9,20 @@ var Version = "dev"
 
 // Config is the root configuration for ScrapeGoat.
 type Config struct {
-	Engine      EngineConfig          `mapstructure:"engine"      yaml:"engine"`
-	Fetcher     FetcherConfig         `mapstructure:"fetcher"     yaml:"fetcher"`
-	Proxy       ProxyConfig           `mapstructure:"proxy"       yaml:"proxy"`
-	Parser      ParserConfig          `mapstructure:"parser"      yaml:"parser"`
-	Pipeline    PipelineConfig        `mapstructure:"pipeline"    yaml:"pipeline"`
-	Storage     StorageConfig         `mapstructure:"storage"     yaml:"storage"`
-	AI          AIConfig              `mapstructure:"ai"          yaml:"ai"`
-	LLM         LLMConfig             `mapstructure:"llm"         yaml:"llm"`
-	APIServer   APIServerConfig       `mapstructure:"api_server"  yaml:"api_server"`
-	MCP         MCPConfig             `mapstructure:"mcp"         yaml:"mcp"`
-	Logging     LoggingConfig         `mapstructure:"logging"     yaml:"logging"`
-	Metrics     MetricsConfig         `mapstructure:"metrics"     yaml:"metrics"`
-	Browser     BrowserConfig         `mapstructure:"browser"     yaml:"browser"`
-	Distributed DistributedConfig     `mapstructure:"distributed" yaml:"distributed"`
-	Middleware  MiddlewareGroupConfig `mapstructure:"middleware" yaml:"middleware"`
-	Project     ProjectConfig         `mapstructure:"project"     yaml:"project"`
-	Safety      SafetyConfig          `mapstructure:"safety"      yaml:"safety"`
+	Engine     EngineConfig          `mapstructure:"engine"      yaml:"engine"`
+	Fetcher    FetcherConfig         `mapstructure:"fetcher"     yaml:"fetcher"`
+	Proxy      ProxyConfig           `mapstructure:"proxy"       yaml:"proxy"`
+	Parser     ParserConfig          `mapstructure:"parser"      yaml:"parser"`
+	Pipeline   PipelineConfig        `mapstructure:"pipeline"    yaml:"pipeline"`
+	Storage    StorageConfig         `mapstructure:"storage"     yaml:"storage"`
+	APIServer  APIServerConfig       `mapstructure:"api_server"  yaml:"api_server"`
+	MCP        MCPConfig             `mapstructure:"mcp"         yaml:"mcp"`
+	Logging    LoggingConfig         `mapstructure:"logging"     yaml:"logging"`
+	Metrics    MetricsConfig         `mapstructure:"metrics"     yaml:"metrics"`
+	Browser    BrowserConfig         `mapstructure:"browser"     yaml:"browser"`
+	Middleware MiddlewareGroupConfig `mapstructure:"middleware" yaml:"middleware"`
+	Project    ProjectConfig         `mapstructure:"project"     yaml:"project"`
+	Safety     SafetyConfig          `mapstructure:"safety"      yaml:"safety"`
 }
 
 // SafetyConfig controls the outbound network trust boundary — which URLs the
@@ -171,14 +168,6 @@ type StorageConfig struct {
 	DeterministicOrder bool `mapstructure:"deterministic_order" yaml:"deterministic_order"`
 }
 
-// AIConfig controls LLM integration.
-type AIConfig struct {
-	Enabled  bool   `mapstructure:"enabled"   yaml:"enabled"`
-	Provider string `mapstructure:"provider"  yaml:"provider"`
-	Model    string `mapstructure:"model"     yaml:"model"`
-	Endpoint string `mapstructure:"endpoint"  yaml:"endpoint"`
-}
-
 // LoggingConfig controls logging behavior.
 type LoggingConfig struct {
 	Level  string `mapstructure:"level"  yaml:"level"`
@@ -255,11 +244,6 @@ func DefaultConfig() *Config {
 			Headless:    true,
 			WaitTime:    3 * time.Second,
 		},
-		Distributed: DistributedConfig{
-			Enabled:    false,
-			MasterAddr: ":8081",
-			RedisAddr:  "localhost:6379",
-		},
 	}
 }
 
@@ -269,15 +253,6 @@ type BrowserConfig struct {
 	BrowserType string        `mapstructure:"browser_type" yaml:"browser_type"`
 	Headless    bool          `mapstructure:"headless"     yaml:"headless"`
 	WaitTime    time.Duration `mapstructure:"wait_time"    yaml:"wait_time"`
-}
-
-// DistributedConfig controls distributed crawling.
-type DistributedConfig struct {
-	Enabled    bool   `mapstructure:"enabled"     yaml:"enabled"`
-	MasterAddr string `mapstructure:"master_addr" yaml:"master_addr"`
-	RedisAddr  string `mapstructure:"redis_addr"  yaml:"redis_addr"`
-	RedisDB    int    `mapstructure:"redis_db"    yaml:"redis_db"`
-	RedisKey   string `mapstructure:"redis_key"   yaml:"redis_key"`
 }
 
 // MiddlewareGroupConfig groups request and pipeline middleware configs.
@@ -297,18 +272,6 @@ type ProjectConfig struct {
 	Name      string   `mapstructure:"name"       yaml:"name"`
 	Version   string   `mapstructure:"version"    yaml:"version"`
 	StartURLs []string `mapstructure:"start_urls" yaml:"start_urls"`
-}
-
-// LLMConfig configures the LLM extraction engine.
-type LLMConfig struct {
-	Enabled   bool          `mapstructure:"enabled"      yaml:"enabled"`
-	Provider  string        `mapstructure:"provider"     yaml:"provider"` // openai, anthropic, ollama
-	Model     string        `mapstructure:"model"        yaml:"model"`
-	APIKey    string        `mapstructure:"api_key"      yaml:"api_key"`
-	Endpoint  string        `mapstructure:"endpoint"     yaml:"endpoint"`
-	CachePath string        `mapstructure:"cache_path"   yaml:"cache_path"`
-	CacheTTL  time.Duration `mapstructure:"cache_ttl"    yaml:"cache_ttl"`
-	MaxTokens int           `mapstructure:"max_tokens"   yaml:"max_tokens"`
 }
 
 // APIServerConfig configures the REST/WebSocket API server.

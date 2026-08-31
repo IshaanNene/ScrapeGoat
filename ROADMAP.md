@@ -1,53 +1,40 @@
 # ScrapeGoat Roadmap
 
-This file tracks work that is **designed but not yet integrated**, and work that is planned but not
-yet written. The rule for the README is simple: if a capability is listed in the feature table, it
-runs in the crawl path. If it is on this page, it does not — however complete the code behind it may
-look.
+This file tracks work that is planned but not yet written. The rule for the README is simple: if a
+capability is listed in the feature table, it runs in the crawl path. If it is on this page, it does
+not exist yet.
 
----
+There used to be a section above this one called "Designed, not yet integrated", listing subsystems
+that compiled and had unit tests and were reachable from nothing. It is gone, and so are they.
+Code that looks finished and does nothing is worse than absent code: it survives review because it
+passes its tests, it appears in the dependency graph, and every reader has to work out for
+themselves that it is inert.
 
-## Designed, not yet integrated
+What was deleted, and what replacing it would take:
 
-These subsystems exist in the tree, compile, and have unit tests. None of them is reachable from a
-running crawl. They are listed here so that reading `internal/engine/` does not mislead you about
-what the product actually does.
-
-### Autoscaled worker pool — `internal/engine/autoscale.go`
-
-`AutoscaledPool.Evaluate()` returns a `ScaleDecision` based on queue depth and system load, modelled
-on Crawlee's autoscaled pool. Nothing consumes the decision. `Scheduler.Start()` launches exactly
-`config.Engine.Concurrency` goroutines and that number never changes for the life of the crawl.
-
-**To integrate:** have the scheduler own a resizable worker set — spawn on scale-up, and signal
-individual workers to exit via a per-worker quit channel on scale-down — then drive it from
-`Evaluate()` on a ticker. This must land *after* the frontier is event-driven, because a poll-loop
-worker cannot be cheaply parked.
-
-### Distributed tracing — `internal/observability/tracing.go`
-
-A hand-rolled `Tracer`/`Span`/`SpanExporter`. `go.mod` contains no OpenTelemetry dependency, so this
-cannot export OTLP and cannot reach Jaeger, Tempo, or Honeycomb. It also does not propagate W3C
-`traceparent`, including across the master/worker HTTP boundary where a trace would be most useful.
-
-**To integrate:** replace with `go.opentelemetry.io/otel` + OTLP exporter, and inject/extract
-`traceparent` on the distributed HTTP hop.
-
-### Distributed master/worker — `internal/distributed/`
-
-A Redis-backed task queue with at-least-once delivery and recovery of tasks abandoned by dead
-workers. What it does not have is a crawl: `cmd/scrapegoat/main.go` sets the worker's crawl function
-to a body that logs the task and returns `nil`. `internal/distributed` imports `internal/engine`
-zero times, so there is no shared frontier, no shared dedup set, and no shared politeness state —
-two workers pointed at one site would each enforce the delay against their own half of the traffic.
-
-`scrapegoat scale N` is worse than unwired: it issues `GET /api/scale` without ever sending `N`, and
-then prints a success message naming the count it did not change.
-
-**To integrate:** the coordination has to be over crawl *state*, not over URL batches. That means an
-event ledger the workers append to and read membership from, which is the same substrate resume
-needs. Until that exists, distribution divides a crawl into pieces that cannot be polite to each
-other.
+- **Autoscaled worker pool** (`internal/engine/autoscale.go`). `Evaluate()` returned a decision
+  nothing consumed; `Scheduler.Start()` launched exactly `Engine.Concurrency` goroutines and never
+  changed the number. Doing this properly needs a scheduler that owns a resizable worker set —
+  spawn on scale-up, per-worker quit channel on scale-down — and it must land after the frontier
+  work below, because the same frontier restructuring decides how cheaply a worker can be parked.
+- **Distributed tracing** (`internal/observability/tracing.go`). A hand-rolled `Tracer`/`Span`/
+  `SpanExporter` with no OpenTelemetry dependency, so it could not export OTLP or reach Jaeger,
+  Tempo or Honeycomb, and did not propagate W3C `traceparent`. Replace with `go.opentelemetry.io/otel`
+  and an OTLP exporter rather than reviving it.
+- **Distributed master/worker** (`internal/distributed/`). A Redis-backed queue with at-least-once
+  delivery, recovery of tasks abandoned by dead workers, and no crawl: the worker's crawl function
+  logged its task and returned `nil`, and the package imported `internal/engine` zero times. Workers
+  shared no frontier, no dedup set and no politeness state, so two of them pointed at one site would
+  each enforce the delay against their own half of the traffic. Coordination has to be over crawl
+  *state*, not URL batches — an event ledger workers append to and read membership from, which is
+  the same substrate resume needs. Not before a real user hits a real single-node ceiling.
+- **CAPTCHA solving** (`internal/fetcher/captcha.go`). Not planned at all, at any point. An evasion
+  arms race against funded adversaries is not a position a single maintainer can hold, and it
+  contradicts being a crawler that is legible about who it is. CAPTCHA *detection* stays in
+  `internal/middleware` — knowing you have been blocked is not the same as pretending you have not.
+- **LLM extraction** (`internal/llmextract/`) and the `ai`/`llm` config sections. Deleted; see the
+  note on derivation in the corpus section below. AI belongs as a derivation tier that carries its
+  own evidence, never as a pipeline stage.
 
 ---
 
@@ -68,17 +55,18 @@ other.
 
 ### Medium term
 
-- **Deterministic termination.** The idle monitor is a 600 ms heuristic; replace with an in-flight
-  counter incremented before dequeue. `idleWorkers.Add(1)` also currently precedes `PopReady` and
-  `Add(-1)` follows it, so a worker holding a just-dequeued request is briefly counted as idle.
-- **HTTP caching** — ETag / If-Modified-Since / Cache-Control.
+- **HTTP caching** — ETag / If-Modified-Since / Cache-Control. Cloudflare reports that over half of
+  AI-crawler traffic re-fetches unchanged pages, which makes this the highest value-to-effort item
+  on this page. Store the validators on the record, send `If-None-Match` / `If-Modified-Since` on
+  recrawl, and treat a 304 as a free freshness confirmation that updates the timestamp without
+  re-deriving anything. Then publish the number no competitor publishes: the cost, in requests, of
+  keeping a 100,000-page corpus fresh for thirty days.
 - **Browser-accurate HTTP/2 SETTINGS and header ordering.** uTLS-driven JA3/JA4 matching the
   advertised User-Agent has shipped, and the README is honest that it closes one signal and nothing
   more. These are the next two tells. Note the explicit decision not to pursue this past the point
   of diminishing returns — an evasion arms race against funded adversaries is not a position this
   project can hold.
-- **Plugin system** via WASM or real Go plugins, replacing the current stubs.
-- **`goleak` in `TestMain`** across packages.
+- **OpenTelemetry**, replacing the deleted hand-rolled tracer, with `traceparent` propagation.
 
 ### Longer term
 

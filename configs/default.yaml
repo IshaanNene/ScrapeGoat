@@ -76,29 +76,6 @@ storage:
   output_path: ./output
   batch_size: 100
 
-distributed:
-  enabled: false
-  master_addr: ":8081"
-  redis_addr: "localhost:6379"
-  redis_db: 0
-  redis_key: "scrapegoat:tasks"
-
-ai:
-  enabled: false
-  provider: "openai"
-  model: "gpt-4"
-
-# LLM extraction engine configuration.
-llm:
-  enabled: false
-  provider: "openai"        # openai, anthropic, ollama
-  model: "gpt-4o"
-  api_key: ""               # Or set OPENAI_API_KEY / ANTHROPIC_API_KEY env var
-  endpoint: ""              # Custom endpoint (e.g. for Ollama: http://localhost:11434)
-  cache_path: "./llm_cache.db"
-  cache_ttl: 24h
-  max_tokens: 4096
-
 # REST/WebSocket API server.
 api_server:
   enabled: false
