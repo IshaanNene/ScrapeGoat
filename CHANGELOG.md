@@ -15,6 +15,18 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
 
 ### Added (corpus model)
 
+- **Dual-write.** A crawl with `--corpus` now emits both shapes from one derivation:
+  the records file as before, plus a sibling `.assertions.jsonl` of derived claims,
+  joined to it by content hash. Two flat tables rather than one nested one — a page
+  yields zero to hundreds of claims, and the Parquet projection is deliberately flat.
+  The name is derived from the corpus path rather than taken from a second flag,
+  because holding one file without the other is half a corpus.
+
+- **`Item` is now a view over `Assertion`**, not a second thing produced beside it.
+  All four parsers derive assertions and implement `Parse` in terms of `Derive`, so
+  it cannot drift back into a parallel path. Each claim carries the method that
+  produced it and that method's version.
+
 - **`Observation`, `Assertion`, `EvidenceSpan` and `PolicyState`** in
   `internal/provenance`. An observation is content-addressed bytes plus how they were
   obtained; an assertion is one derived claim about an observation carrying the bytes
@@ -34,8 +46,8 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
   not be grounded by this method", never "false".
 
 - **A golden corpus** at `tests/golden`, frozen from a 17-fetch recording of
-  books.toscrape.com. It pins what both derivation paths produce today, so the
-  Item/Assertion migration has something to be checked against. Replay is offline and
+  books.toscrape.com. It pins the items, the records, and the claims, and asserts that
+  items are exactly the assertion projection across every page. Replay is offline and
   deterministic.
 
 ### Fixed (corpus model)
