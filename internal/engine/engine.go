@@ -394,7 +394,13 @@ func (e *Engine) Wait() {
 	<-e.shutdownDone
 }
 
-// Stop gracefully stops the engine.
+// Stop gracefully stops the engine. It signals; it does not join.
+//
+// Callers must still call Wait. The item and result processors range over channels
+// that only Wait closes, and it closes them there rather than here for a reason:
+// itemChan can only be closed once every worker has returned from scheduler.Wait(),
+// or a worker still mid-send panics on a closed channel. Stopping without waiting
+// leaves those two goroutines parked for the life of the process.
 func (e *Engine) Stop() {
 	if !e.state.CompareAndSwap(int32(StateRunning), int32(StateStopping)) {
 		return

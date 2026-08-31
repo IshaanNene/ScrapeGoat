@@ -25,7 +25,12 @@ var bannedFlags = []flags.Flag{
 }
 
 func TestLauncherKeepsChromiumSandboxEnabled(t *testing.T) {
-	l, err := testFetcher(t).newLauncher()
+	// newLauncher starts the guarded egress proxy as a side effect, so it has to
+	// be closed even when the test only cares about the flags.
+	bf := testFetcher(t)
+	t.Cleanup(bf.closeEgress)
+
+	l, err := bf.newLauncher()
 	if err != nil {
 		t.Fatalf("newLauncher: %v", err)
 	}

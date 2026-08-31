@@ -413,6 +413,11 @@ func TestEngineStopGoroutineCleanup(t *testing.T) {
 	_ = eng.Start()
 	time.Sleep(100 * time.Millisecond)
 	eng.Stop()
+	// Stop signals; Wait joins. The item and result processors range over channels
+	// that only Wait closes, so a test that stopped without waiting left them
+	// parked forever — which this test, named for goroutine cleanup, did not catch
+	// because its tolerance is a delta of 30.
+	eng.Wait()
 
 	// Poll for the count to settle rather than sleeping a fixed second and hoping.
 	// Shutdown is asynchronous — idle HTTP connections in particular linger — so a
