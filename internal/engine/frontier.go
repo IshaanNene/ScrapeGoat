@@ -145,7 +145,7 @@ func (f *Frontier) PopReady(ctx context.Context, gate DomainGate) *types.Request
 		haveSoonest := false
 
 		for i, item := range f.pq {
-			domain := item.request.Domain()
+			domain := item.request.RegistrableDomain()
 			if gate.Ready(domain) {
 				if best == -1 || f.pq[i].priority < f.pq[best].priority {
 					best = i
@@ -164,7 +164,7 @@ func (f *Frontier) PopReady(ctx context.Context, gate DomainGate) *types.Request
 
 			// Claim can still fail if another worker took the same domain's
 			// token between the scan and here; put the request back and retry.
-			if !gate.Claim(item.request.Domain()) {
+			if !gate.Claim(item.request.RegistrableDomain()) {
 				f.Push(item.request)
 				continue
 			}

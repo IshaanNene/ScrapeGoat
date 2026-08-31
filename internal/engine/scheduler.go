@@ -235,7 +235,10 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 	fetchCtx, fetchCancel := context.WithTimeout(ctx, timeout)
 	defer fetchCancel()
 
-	domain := req.Domain()
+	// The registrable domain, not the hostname: a site that fails on one subdomain
+	// is a site that is failing, and fifty subdomains must not each get their own
+	// full failure budget before the breaker notices.
+	domain := req.RegistrableDomain()
 
 	// A domain that has failed consistently is skipped rather than retried into
 	// the ground. Without this, a site that goes down absorbs the entire request
@@ -469,7 +472,10 @@ func (s *Scheduler) handleFetchError(logger *slog.Logger, req *types.Request, er
 			)
 		}
 
-		s.engine.metrics.RecordRequest(req.Domain(), "retry")
+		// Same key as the other RecordRequest calls, so retries line up with the
+		// successes and failures for the domain rather than landing on a separate
+		// per-subdomain series.
+		s.engine.metrics.RecordRequest(req.RegistrableDomain(), "retry")
 
 		// Re-queued on a timer rather than by sleeping here: sleeping inside the
 		// worker is what the politeness throttle used to do, and it holds a
