@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -883,22 +882,18 @@ func scaleCmd() *cobra.Command {
 		Short: "Scale worker count up or down",
 		Long:  "Adjust the number of distributed crawl workers in the cluster.",
 		Args:  cobra.ExactArgs(1),
+		// This command did not scale anything. It issued GET /api/scale without
+		// ever sending the requested worker count, then printed "Scale request
+		// sent" — reporting success for a request it had not made. A command that
+		// lies about what it did is worse than one that is missing, because the
+		// operator stops looking.
+		//
+		// Failing loudly rather than being deleted outright because the whole
+		// distributed path is under review; see ROADMAP.md.
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("📊 Requesting scale to %s workers at %s...\n", args[0], masterAddr)
-
-			resp, err := http.Get(masterAddr + "/api/scale")
-			if err != nil {
-				return fmt.Errorf("contact master: %w", err)
-			}
-			defer resp.Body.Close()
-
-			var status map[string]any
-			if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-				return fmt.Errorf("decode scale response: %w", err)
-			}
-
-			fmt.Printf("✅ Scale request sent. Current workers: %v\n", status["current_workers"])
-			return nil
+			return fmt.Errorf("scale is not implemented: the worker count %q cannot be "+
+				"changed at runtime, and the distributed workers share no crawl state "+
+				"in any case — see ROADMAP.md", args[0])
 		},
 	}
 

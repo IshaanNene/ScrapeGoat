@@ -33,31 +33,61 @@ cannot export OTLP and cannot reach Jaeger, Tempo, or Honeycomb. It also does no
 **To integrate:** replace with `go.opentelemetry.io/otel` + OTLP exporter, and inject/extract
 `traceparent` on the distributed HTTP hop.
 
+### Distributed master/worker — `internal/distributed/`
+
+A Redis-backed task queue with at-least-once delivery and recovery of tasks abandoned by dead
+workers. What it does not have is a crawl: `cmd/scrapegoat/main.go` sets the worker's crawl function
+to a body that logs the task and returns `nil`. `internal/distributed` imports `internal/engine`
+zero times, so there is no shared frontier, no shared dedup set, and no shared politeness state —
+two workers pointed at one site would each enforce the delay against their own half of the traffic.
+
+`scrapegoat scale N` is worse than unwired: it issues `GET /api/scale` without ever sending `N`, and
+then prints a success message naming the count it did not change.
+
+**To integrate:** the coordination has to be over crawl *state*, not over URL batches. That means an
+event ledger the workers append to and read membership from, which is the same substrate resume
+needs. Until that exists, distribution divides a crawl into pieces that cannot be polite to each
+other.
+
+### LLM extraction — `internal/llmextract/`
+
+Schema-based extraction against OpenAI, Anthropic and Ollama, with a SQLite cache. It is imported by
+zero non-test files. `ExtractRequest.LLM` in `internal/apiserver/handlers.go` is declared and never
+read, and there is no CLI flag. Nothing can reach it.
+
+**To integrate:** not as a pipeline stage. A model-produced value has to carry the same evidence a
+selector-produced value does — the bytes it came from, the method and version that produced it, and
+whether the claimed source text actually appears in those bytes. Until extraction has that shape,
+wiring a model in adds a value nobody can verify.
+
 ---
 
 ## Planned
 
 ### Near term
 
-- **Per-domain rate-limiter slots.** Politeness delay is currently enforced with `time.Sleep` while
-  holding the per-domain mutex, *after* a worker has already dequeued. One slow domain parks the
-  whole pool and starves every other domain. Replace with `golang.org/x/time/rate` limiters per
-  domain and a frontier partitioned so workers only dequeue from domains that have a token.
-- **Exponential backoff with jitter, and a circuit breaker** on the retry path.
-- **`AllowedDomains` suffix matching.** Today the check is exact-match, so `example.com` rejects
-  `www.example.com`. Needs public-suffix awareness.
-- **HTTP/2.** The custom `TLSClientConfig`/`DialContext` silently disables it. Re-enabling costs
-  nothing and removes an obvious bot fingerprint.
-- **`testdata/` corpus and golden files** for the parser, captured from real pages.
+- **`PopReady` is O(n) per dequeue.** The scan over `f.pq` has no `break`, so it walks every queued
+  entry on every dequeue while holding `f.mu` — and the readiness probe calls through to
+  `limiterFor`, which takes the throttler's lock and moves the domain to the front of the LRU. A
+  supposedly non-consuming probe therefore mutates eviction order, and on a wide crawl can evict the
+  slots it is only inspecting. Replace with domain-bucketed ready-sets and a heap of domains keyed
+  by earliest-ready time, plus a read-only `Ready` path that does not touch the LRU.
+- **Deterministic retry jitter.** `backoffFor` draws from the engine's shared random source under a
+  lock, so delays are handed out in worker-arrival order. A replay with the same seed reproduces the
+  same multiset of delays but not the same assignment of delays to requests. Derive each delay from
+  the request's own identity instead, and the lock becomes unnecessary too.
 
 ### Medium term
 
 - **Deterministic termination.** The idle monitor is a 600 ms heuristic; replace with an in-flight
-  counter incremented before dequeue.
+  counter incremented before dequeue. `idleWorkers.Add(1)` also currently precedes `PopReady` and
+  `Add(-1)` follows it, so a worker holding a just-dequeued request is briefly counted as idle.
 - **HTTP caching** — ETag / If-Modified-Since / Cache-Control.
-- **Real anti-bot fingerprinting** — uTLS-driven JA3/JA4 matching the advertised User-Agent, and
-  browser-accurate HTTP/2 SETTINGS and header ordering. This is what would make the anti-bot claim
-  in the README true rather than aspirational.
+- **Browser-accurate HTTP/2 SETTINGS and header ordering.** uTLS-driven JA3/JA4 matching the
+  advertised User-Agent has shipped, and the README is honest that it closes one signal and nothing
+  more. These are the next two tells. Note the explicit decision not to pursue this past the point
+  of diminishing returns — an evasion arms race against funded adversaries is not a position this
+  project can hold.
 - **Plugin system** via WASM or real Go plugins, replacing the current stubs.
 - **`goleak` in `TestMain`** across packages.
 
@@ -91,19 +121,16 @@ something people reach for rather than something that competes with Colly.
 
 ### 1. Content extraction that survives the real web
 
-The single largest gap. `AutoExtractor.extractArticles` matches CSS selectors —
-`article`, `.post`, `.entry-content` — which works on well-marked-up sites and
-fails on most of the web, returning navigation, cookie banners, and footers as
-article text.
+**Largely shipped.** `internal/extract` replaced the CSS-selector list with text-density
+and link-density scoring per DOM node, so extraction no longer depends on what anyone
+named a class. It runs in the crawl path.
 
-What is needed is algorithmic main-content detection: text-density and link-density
-scoring per DOM node, boilerplate removal, and a confidence signal so downstream
-consumers can filter. Python has trafilatura and resiliparse; Go has nothing
-comparable, which makes this both the highest-leverage internal fix and a
-genuinely reusable package in its own right.
-
-Everything downstream depends on this. Deduplication, quality filtering, and
-embedding are all garbage-in-garbage-out on bad extraction.
+What remains is the evaluation. `docs/EXTRACTION.md` still lists a real-page comparison
+against trafilatura and resiliparse as outstanding, and an extractor's quality claim is
+only as good as its evaluation — publish the results including the cases where this
+loses. Extracting the package as a standalone Go module is the natural occasion: Go has
+no trafilatura-equivalent, it is independently useful and citable, and it is the best
+available funnel into the rest of the project.
 
 ### 2. Near-duplicate detection
 
