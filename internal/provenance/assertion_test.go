@@ -1,6 +1,7 @@
 package provenance
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -218,10 +219,155 @@ func FuzzValidateSpanIsAlwaysInBounds(f *testing.F) {
 		if s < 0 || e < s || e > len(body) {
 			t.Fatalf("span [%d,%d) is out of bounds for a %d-byte body", s, e, len(body))
 		}
-		// The span has to cut text that means the same thing as the claim, or the
+		// The span has to cut source text that renders to the claim, or the
 		// citation is worse than none.
-		if got := normalise(body[s:e]); got != normalise(claimed) {
-			t.Fatalf("span cuts %q, which normalises to %q, want %q", body[s:e], got, normalise(claimed))
+		//
+		// Compared through the projection rather than raw, because that is what
+		// the span means: `It&#39;s` in the source is the evidence for `It's`, and
+		// a byte-for-byte comparison would call that a mismatch. The projection is
+		// the definition of "renders to".
+		// Rendered through the projection rather than compared raw, because that
+		// is what the span means: `It&#39;s` in the source is the evidence for
+		// `It's`. Either projection may have produced the match — prose is found
+		// only with tags dropped — so the span is correct if it renders to the
+		// claim under one of them.
+		want := normaliseSpace([]byte(claimed))
+		cut := []byte(body[s:e])
+		withMarkup := buildProjection(cut, keepTags).norm
+		withoutMarkup := buildProjection(cut, stripTags).norm
+		if !bytes.Equal(withMarkup, want) && !bytes.Equal(withoutMarkup, want) {
+			t.Fatalf("span cuts %q, which renders to %q (tags kept) or %q (tags dropped), want %q",
+				cut, withMarkup, withoutMarkup, want)
 		}
 	})
+}
+
+// TestLocateThroughRealMarkup covers the transformations that stand between an
+// extracted value and its source. Each case here was a page that would not ground
+// before it was handled, found against a real corpus rather than imagined.
+func TestLocateThroughRealMarkup(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		claimed string
+	}{
+		{
+			// The single most common one: apostrophes are encoded everywhere.
+			name:    "character reference",
+			body:    "<title>\n  It&#39;s Only the Himalayas\n</title>",
+			claimed: "It's Only the Himalayas",
+		},
+		{
+			name:    "named reference",
+			body:    "<p>Marks &amp; Spencer</p>",
+			claimed: "Marks & Spencer",
+		},
+		{
+			// The extractor collapses U+00A0 like any other space; a byte-wise
+			// projection kept it and the value stopped matching its own page.
+			name:    "non-breaking space",
+			body:    "<p>In stock (19 available)&nbsp; Warning!</p>",
+			claimed: "In stock (19 available) Warning!",
+		},
+		{
+			name:    "prose across elements",
+			body:    "<div><p>First paragraph.</p><p>Second paragraph.</p></div>",
+			claimed: "First paragraph. Second paragraph.",
+		},
+		{
+			// skipTag stopped at the '>' inside "-->", leaving commented-out
+			// markup in the projection as though a reader had seen it.
+			name:    "html comment",
+			body:    "<p>Before</p><!-- 0 reviews --><p>After</p>",
+			claimed: "Before After",
+		},
+		{
+			// The extractor drops these elements entirely, so a projection that
+			// keeps their text cannot match what it returned.
+			name:    "button label",
+			body:    "<div><p>Price £10</p><form><button>Add to basket</button></form><p>In stock</p></div>",
+			claimed: "Price £10 In stock",
+		},
+		{
+			name:    "script body",
+			body:    "<div><p>Real text</p><script>var x = 'not text';</script><p>More text</p></div>",
+			claimed: "Real text More text",
+		},
+		{
+			name:    "attribute value keeps its markup",
+			body:    `<a href="../book_981/index.html">Title</a>`,
+			claimed: "../book_981/index.html",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ix := NewEvidenceIndex("h", []byte(tt.body))
+			s, e, ok := ix.Locate(tt.claimed)
+			if !ok {
+				t.Fatalf("Locate(%q) found nothing in %q", tt.claimed, tt.body)
+			}
+			cut := []byte(tt.body)[s:e]
+			if !SpanSupports(cut, tt.claimed) {
+				t.Errorf("span cuts %q, which does not render to %q", cut, tt.claimed)
+			}
+		})
+	}
+}
+
+// TestPartialEntityDecodeIsRejected pins the fuzz finding.
+//
+// HTML allows a few references without their semicolon, so unescaping "&gt0;"
+// yields ">0;" — one reference and a literal tail. Treating that as a single
+// reference mapped three rendered bytes onto five source bytes and produced a span
+// covering characters nobody claimed.
+func TestPartialEntityDecodeIsRejected(t *testing.T) {
+	// No tags in the fixture: they contain literal '>' characters, which would
+	// ground the claim for a reason that has nothing to do with the reference.
+	body := []byte("&gt0;")
+	ix := NewEvidenceIndex("h", body)
+
+	if s, e, ok := ix.Locate(">"); ok {
+		t.Errorf("Locate(%q) matched [%d,%d) = %q; a partial decode must not ground",
+			">", s, e, body[s:e])
+	}
+}
+
+// TestMatchesRespectCharacterBoundaries pins the other fuzz finding: the search is
+// over bytes, and without an alignment check a claim could match the interior of a
+// multi-byte character.
+func TestMatchesRespectCharacterBoundaries(t *testing.T) {
+	// "∾" is three bytes; its middle byte alone must not match.
+	body := []byte("&ac;")
+	ix := NewEvidenceIndex("h", body)
+
+	middle := string([]byte{0x88})
+	if s, e, ok := ix.Locate(middle); ok {
+		t.Errorf("a fragment of a character matched [%d,%d) = %q", s, e, body[s:e])
+	}
+
+	// The whole character still grounds.
+	if _, _, ok := ix.Locate("∾"); !ok {
+		t.Error("the decoded character itself did not ground")
+	}
+}
+
+// TestEvidenceIndexReusesItsProjection checks the reason the index exists: a page
+// with many claims must not rebuild the rendering per claim.
+func TestEvidenceIndexReusesItsProjection(t *testing.T) {
+	body := []byte(strings.Repeat("<p>Some prose with &amp; in it, repeated.</p>", 200))
+	ix := NewEvidenceIndex("h", body)
+
+	for i := 0; i < 50; i++ {
+		if _, _, ok := ix.Locate("Some prose with & in it, repeated."); !ok {
+			t.Fatalf("iteration %d did not ground", i)
+		}
+	}
+	if len(ix.markup.norm) == 0 {
+		t.Error("the markup projection was never built")
+	}
+	if len(ix.markup.norm) != len(ix.markup.starts) || len(ix.markup.norm) != len(ix.markup.ends) {
+		t.Errorf("projection is inconsistent: %d bytes, %d starts, %d ends",
+			len(ix.markup.norm), len(ix.markup.starts), len(ix.markup.ends))
+	}
 }

@@ -408,6 +408,10 @@ func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response, 
 	var (
 		doc     *goquery.Document
 		content provenance.Content
+
+		// extracted holds the claims the main-content extractor makes, kept apart
+		// from the parser's until both are written.
+		extracted []provenance.Assertion
 	)
 
 	// Extraction only makes sense for HTML, and only the text needs it. A non-HTML
@@ -443,6 +447,15 @@ func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response, 
 					Title:      r.Title,
 					Confidence: r.Confidence,
 				}
+				// The main content is a derivation like any other and gets claims
+				// of its own, so the corpus can say which region of the page the
+				// text came from rather than only that some extractor produced it.
+				//
+				// These do not reach the item: the record has carried text and
+				// title in their own columns since before assertions existed, and
+				// adding them to the extracted fields would change every consumer's
+				// output to say something the record already said.
+				extracted = append(extracted, densityAssertions(r)...)
 			}
 		}
 	}
@@ -474,22 +487,82 @@ func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response, 
 		return
 	}
 
-	// Attach every claim to the bytes it was derived from. The record's content
-	// hash is the join key, so this is the moment the two halves of the corpus
-	// become one thing: without it an assertion is a value with no stated source,
-	// which is what the old Item was and what this whole model exists to replace.
+	// Attach every claim to the bytes it was derived from, and to the range within
+	// them that supports it. The record's content hash is the join key, so this is
+	// the moment the two halves of the corpus become one thing: without it an
+	// assertion is a value with no stated source, which is what the old Item was
+	// and what this whole model exists to replace.
 	//
-	// The evidence range within those bytes is not filled in here. That belongs
-	// with each derivation, which knows what text it matched; see ROADMAP.md.
-	for _, a := range assertions {
-		a.Evidence.ObservationHash = rec.ContentHash
+	// Grounding happens here rather than in each parser for two reasons. The
+	// content hash is computed in provenance.Build, so this is the first point at
+	// which an assertion can name the observation it belongs to. And the index is
+	// built once for the page and reused across every claim on it, where a parser
+	// doing its own lookups would rebuild the normalised projection of the body per
+	// value.
+	index := provenance.NewEvidenceIndex(rec.ContentHash, resp.Body)
+
+	for _, a := range append(assertions, extracted...) {
 		a.SourceURL = rec.URL
+		groundAssertion(index, &a)
 		if err := sink.Write(a); err != nil {
 			s.engine.logger.Warn("could not record assertion",
 				"url", resp.Request.URLString(), "field", a.Field, "error", err)
 			break
 		}
 	}
+}
+
+// groundAssertion locates the claim's value in the observed bytes.
+//
+// Only string values are attempted. A structured value — a JSON-LD graph, an
+// OpenGraph set — is a parsed object with no single run of source text behind it,
+// and running it through a text search would mark every one of them unsupported.
+// That would be worse than leaving them alone: "unsupported" is a finding about a
+// derivation, and a signal that fires on a whole category of values for structural
+// reasons stops being a signal.
+//
+// So an unattempted assertion keeps Validated and Unsupported both false, which is
+// the honest third state: nobody claimed this was checked. Its confidence is left
+// as the derivation reported it, since nothing has been learned that would change
+// it either way.
+// densityAssertions turns the main-content extraction into claims.
+//
+// The extractor's own confidence is carried rather than replaced with certainty.
+// Unlike a selector, density scoring is a judgement about which block of a page is
+// the article, and it is routinely wrong on pages that have no article at all —
+// which is exactly why internal/extract reports a confidence in the first place.
+func densityAssertions(r *extract.Result) []provenance.Assertion {
+	var out []provenance.Assertion
+	add := func(field, method string, value string) {
+		if value == "" {
+			return
+		}
+		out = append(out, provenance.Assertion{
+			SchemaVersion: provenance.SchemaVersion,
+			Field:         field,
+			Value:         value,
+			Method:        method,
+			MethodVersion: densityVersion,
+			Confidence:    r.Confidence,
+		})
+	}
+	add("content_text", "density:main", r.Text)
+	add("content_title", "density:title", r.Title)
+	return out
+}
+
+// densityVersion is the version of the main-content extraction. Bump it when the
+// scoring would select a different block or return different text for the same
+// page, so a corpus spanning the change can tell its rows apart.
+const densityVersion = "1"
+
+func groundAssertion(index *provenance.EvidenceIndex, a *provenance.Assertion) {
+	text, ok := a.Value.(string)
+	if !ok {
+		a.Evidence.ObservationHash = index.Hash()
+		return
+	}
+	index.Ground(a, text)
 }
 
 // isHTML reports whether a response is worth running an HTML extractor over.

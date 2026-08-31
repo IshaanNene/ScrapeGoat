@@ -2,8 +2,12 @@ package provenance
 
 import (
 	"bytes"
+	"html"
+	"strings"
+	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Observation is an immutable, content-addressed fetch: some bytes, and everything
@@ -201,9 +205,139 @@ type Assertion struct {
 // of them, and the honest reading of Unsupported is "this value could not be
 // grounded by this method", not "this value is false".
 func (a *Assertion) Validate(observationHash string, body []byte, claimed string) {
-	a.Evidence.ObservationHash = observationHash
+	NewEvidenceIndex(observationHash, body).Ground(a, claimed)
+}
 
-	start, end, ok := locate(body, claimed)
+// EvidenceIndex grounds many claims against one observation.
+//
+// A page yields as many claims as the operator configured selectors, and each has
+// to be located in the same bytes. Doing that independently would rebuild the
+// normalised projection of the body once per value — two allocations the size of
+// the page each time, on a path that runs for every page in the crawl.
+//
+// The projection is built lazily and at most once, because most selector results
+// are found by the exact search and never need it.
+type EvidenceIndex struct {
+	hash string
+	body []byte
+
+	// Two projections, built lazily and at most once each.
+	//
+	// markup keeps tags, because an attribute value lives inside one: the href a
+	// selector read is only present in the source as part of `<a href="...">`.
+	// text drops them, because prose does not survive them: an article extracted
+	// from a page is a join of text across dozens of elements and appears nowhere
+	// in the source as a contiguous run.
+	markupOnce sync.Once
+	markup     projection
+
+	textOnce sync.Once
+	text     projection
+}
+
+// projection is a rendering of the body plus, for each rendered byte, the source
+// range it came from.
+type projection struct {
+	norm   []byte
+	starts []int
+	ends   []int
+}
+
+// NewEvidenceIndex prepares body for grounding. Cheap: the expensive part is
+// deferred until a lookup actually needs it.
+func NewEvidenceIndex(hash string, body []byte) *EvidenceIndex {
+	return &EvidenceIndex{hash: hash, body: body}
+}
+
+// Hash is the observation the index grounds against.
+func (ix *EvidenceIndex) Hash() string { return ix.hash }
+
+// Locate finds claimed within the body and returns its byte range.
+//
+// Tries the exact bytes first, since a hit there needs no explanation. Falls back
+// to a whitespace-normalised search that still reports true offsets into the
+// original, by mapping each normalised byte back to the source byte it came from
+// rather than searching a copy and losing the correspondence.
+func (ix *EvidenceIndex) Locate(claimed string) (start, end int, ok bool) {
+	if ix == nil || len(ix.body) == 0 || claimed == "" {
+		return 0, 0, false
+	}
+
+	if i := indexAligned(ix.body, []byte(claimed)); i >= 0 {
+		return i, i + len(claimed), true
+	}
+
+	needle := normaliseSpace([]byte(claimed))
+	if len(needle) == 0 {
+		return 0, 0, false
+	}
+
+	// Markup-preserving first. It is the stricter of the two — a hit there means
+	// the value appears as one run of source text — and it is the one that can
+	// match an attribute value at all.
+	ix.markupOnce.Do(func() { ix.markup = buildProjection(ix.body, keepTags) })
+	if i := indexAligned(ix.markup.norm, needle); i >= 0 {
+		return ix.markup.starts[i], ix.markup.ends[i+len(needle)-1], true
+	}
+
+	// Then without tags, which is the only way prose can be found. The span this
+	// yields covers the markup between the first and last matched characters, and
+	// that is the right citation: the claim is that this region of the document is
+	// where the text came from, not that the text sits in it contiguously.
+	ix.textOnce.Do(func() { ix.text = buildProjection(ix.body, stripTags) })
+	if i := indexAligned(ix.text.norm, needle); i >= 0 {
+		return ix.text.starts[i], ix.text.ends[i+len(needle)-1], true
+	}
+
+	return 0, 0, false
+}
+
+// indexAligned is bytes.Index restricted to matches that begin and end on a
+// character boundary.
+//
+// The search is over bytes, and without this a needle could match the interior of
+// a multi-byte character: decoding `&ac;` yields ∾, three bytes, and a claim
+// consisting of that character's second byte alone would "match" it. The resulting
+// span would be well-formed, in bounds, and would cut a fragment of a character
+// nobody claimed — a citation that is wrong in a way no bounds check would notice.
+//
+// Found by the fuzz target, on an input no real extractor would produce and every
+// hostile one could.
+func indexAligned(haystack, needle []byte) int {
+	for from := 0; from <= len(haystack)-len(needle); {
+		j := bytes.Index(haystack[from:], needle)
+		if j < 0 {
+			return -1
+		}
+		i := from + j
+		if runeAligned(haystack, i, len(needle)) {
+			return i
+		}
+		from = i + 1
+	}
+	return -1
+}
+
+// runeAligned reports whether [i, i+n) begins and ends on a character boundary.
+func runeAligned(b []byte, i, n int) bool {
+	if !utf8.RuneStart(b[i]) {
+		return false
+	}
+	end := i + n
+	return end >= len(b) || utf8.RuneStart(b[end])
+}
+
+// Ground records on a whether claimed can be found in the observation.
+//
+// The three outcomes are the ones described on Validate, which is this with a
+// single-use index.
+func (ix *EvidenceIndex) Ground(a *Assertion, claimed string) {
+	if a == nil || ix == nil {
+		return
+	}
+	a.Evidence.ObservationHash = ix.hash
+
+	start, end, ok := ix.Locate(claimed)
 	if !ok {
 		a.Evidence.ByteStart, a.Evidence.ByteEnd = 0, 0
 		a.Validated = false
@@ -217,85 +351,308 @@ func (a *Assertion) Validate(observationHash string, body []byte, claimed string
 	a.Unsupported = false
 }
 
-// locate finds claimed within body and returns its byte range.
-//
-// Tries the exact bytes first, since a hit there needs no explanation. Falls back to
-// a whitespace-normalised search that still reports true offsets into body, by
-// walking the original while matching the normalised form rather than searching a
-// normalised copy and losing the mapping.
-func locate(body []byte, claimed string) (start, end int, ok bool) {
-	if len(body) == 0 || claimed == "" {
-		return 0, 0, false
-	}
-
-	if i := bytes.Index(body, []byte(claimed)); i >= 0 {
-		return i, i + len(claimed), true
-	}
-
-	needle := normaliseSpace([]byte(claimed))
-	if len(needle) == 0 {
-		return 0, 0, false
-	}
-
-	// norm holds the normalised body; offsets maps each normalised byte back to the
-	// index in body it came from, which is what makes the result a real span rather
-	// than a position in a temporary string.
-	norm, offsets := normaliseWithOffsets(body)
-	i := bytes.Index(norm, needle)
-	if i < 0 {
-		return 0, 0, false
-	}
-
-	start = offsets[i]
-	// The end offset is one past the source byte the last matched byte came from.
-	last := offsets[i+len(needle)-1]
-	return start, last + 1, true
-}
-
 // normaliseSpace collapses every run of whitespace to a single space and trims the
 // ends.
 func normaliseSpace(b []byte) []byte {
 	out := make([]byte, 0, len(b))
 	inSpace := true // leading whitespace is trimmed by starting in the space state
-	for _, c := range b {
-		if isSpaceByte(c) {
+
+	// Decoded explicitly rather than with `range` over a string, because that
+	// substitutes U+FFFD for every invalid byte. buildProjection passes those
+	// bytes through — a span has to index the bytes that are actually there — so
+	// substituting here would give the needle a three-byte replacement character
+	// where the haystack still had the original, and the two would never match.
+	// Pages with a mis-declared encoding are common enough that this is a real
+	// case rather than a fuzzer's invention.
+	for i := 0; i < len(b); {
+		r, size := utf8.DecodeRune(b[i:])
+		if r == utf8.RuneError && size <= 1 {
+			out = append(out, b[i])
+			inSpace = false
+			i++
+			continue
+		}
+		if unicode.IsSpace(r) {
 			if !inSpace {
 				out = append(out, ' ')
 				inSpace = true
 			}
+			i += size
 			continue
 		}
-		out = append(out, c)
+		out = append(out, b[i:i+size]...)
 		inSpace = false
+		i += size
 	}
 	return bytes.TrimRight(out, " ")
 }
 
-// normaliseWithOffsets is normaliseSpace that also reports, for each output byte,
-// which input byte produced it.
-func normaliseWithOffsets(b []byte) (norm []byte, offsets []int) {
-	norm = make([]byte, 0, len(b))
-	offsets = make([]int, 0, len(b))
-	inSpace := true
-	for i, c := range b {
-		if isSpaceByte(c) {
-			if !inSpace {
-				norm = append(norm, ' ')
-				offsets = append(offsets, i)
-				inSpace = true
+// tagMode says whether a projection keeps markup or drops it.
+type tagMode bool
+
+const (
+	keepTags  tagMode = false
+	stripTags tagMode = true
+)
+
+// buildProjection renders body the way an extractor sees it, while remembering
+// where every rendered byte came from.
+//
+// Three transformations, because each stands between a value and the bytes that
+// produced it, and any one alone leaves most of the web unmatched:
+//
+//   - Whitespace is collapsed. Source HTML is indented; extracted text is not.
+//   - Character references are decoded. `It&#39;s` in the source is `It's` once
+//     any DOM library has read it, and an apostrophe is not an exotic character —
+//     requiring a literal match would fail on ampersands, quotes, dashes and
+//     non-breaking spaces, which is a large fraction of real prose.
+//   - Tags are dropped, when asked. Main-content extraction returns text joined
+//     across dozens of elements, which appears nowhere in the source as one run.
+//     Each tag renders as a space, matching how the extractor joins the blocks it
+//     selected, so `<p>a</p><p>b</p>` renders as `a b` rather than `ab`.
+//
+// starts and ends give each rendered byte its source range rather than a single
+// offset, because a decoded reference is one rendered character from five source
+// bytes. Recording only the start and adding one would cut a span off mid-entity
+// and produce a citation that does not parse.
+//
+// The tag-as-space rule has a known cost: markup inside a word, `co<b>de</b>`,
+// renders as `co de` and will not match the extractor's `code`. Prose does not
+// usually do that, and the failure is a value that cannot be grounded rather than
+// one grounded wrongly.
+func buildProjection(body []byte, mode tagMode) projection {
+	p := projection{
+		norm:   make([]byte, 0, len(body)),
+		starts: make([]int, 0, len(body)),
+		ends:   make([]int, 0, len(body)),
+	}
+
+	inSpace := true // leading whitespace is trimmed by starting in the space state
+
+	// Whitespace is judged per rune, not per byte. A page that writes &nbsp; or a
+	// thin space is writing whitespace, and every DOM-based extractor collapses it
+	// — so a byte-wise projection keeps a character the claim does not have, and
+	// the value stops matching a page it plainly came from. U+00A0 in particular
+	// is everywhere in real markup.
+	emitRune := func(r rune, from, to int) {
+		if unicode.IsSpace(r) {
+			if inSpace {
+				return
 			}
-			continue
+			p.norm = append(p.norm, ' ')
+			p.starts = append(p.starts, from)
+			p.ends = append(p.ends, to)
+			inSpace = true
+			return
 		}
-		norm = append(norm, c)
-		offsets = append(offsets, i)
+		var buf [utf8.UTFMax]byte
+		n := utf8.EncodeRune(buf[:], r)
+		for k := 0; k < n; k++ {
+			p.norm = append(p.norm, buf[k])
+			p.starts = append(p.starts, from)
+			p.ends = append(p.ends, to)
+		}
 		inSpace = false
 	}
-	// Trailing spaces are dropped from both, keeping them the same length.
-	for len(norm) > 0 && norm[len(norm)-1] == ' ' {
-		norm = norm[:len(norm)-1]
-		offsets = offsets[:len(offsets)-1]
+
+	emitByte := func(c byte, from, to int) {
+		p.norm = append(p.norm, c)
+		p.starts = append(p.starts, from)
+		p.ends = append(p.ends, to)
+		inSpace = false
 	}
-	return norm, offsets
+
+	for i := 0; i < len(body); {
+		c := body[i]
+
+		if mode == stripTags && c == '<' {
+			// Some elements contain characters that are not page text: script and
+			// style bodies, the label on a submit button, the fallback inside an
+			// iframe. Every extractor drops them, so keeping their contents here
+			// would interleave JavaScript and button labels with the prose and
+			// stop an article matching a page it plainly came from.
+			if end, ok := skipElement(body, i, nonTextElements...); ok {
+				emitRune(' ', i, end)
+				i = end
+				continue
+			}
+			if end, ok := skipTag(body, i); ok {
+				emitRune(' ', i, end)
+				i = end
+				continue
+			}
+		}
+
+		if c == '&' {
+			if decoded, end, ok := decodeEntity(body, i); ok {
+				for _, r := range string(decoded) {
+					emitRune(r, i, end)
+				}
+				i = end
+				continue
+			}
+		}
+
+		r, size := utf8.DecodeRune(body[i:])
+		if r == utf8.RuneError && size <= 1 {
+			// Not valid UTF-8. Pass the byte through rather than replacing it:
+			// the span has to index the bytes that are actually there.
+			emitByte(c, i, i+1)
+			i++
+			continue
+		}
+
+		if unicode.IsSpace(r) {
+			j := i
+			for j < len(body) {
+				rr, sz := utf8.DecodeRune(body[j:])
+				if sz == 0 || !unicode.IsSpace(rr) || (rr == utf8.RuneError && sz <= 1) {
+					break
+				}
+				j += sz
+			}
+			emitRune(' ', i, j)
+			i = j
+			continue
+		}
+
+		emitRune(r, i, i+size)
+		i += size
+	}
+
+	for len(p.norm) > 0 && p.norm[len(p.norm)-1] == ' ' {
+		p.norm = p.norm[:len(p.norm)-1]
+		p.starts = p.starts[:len(p.starts)-1]
+		p.ends = p.ends[:len(p.ends)-1]
+	}
+	return p
+}
+
+// skipElement returns the index just past the whole element starting at body[i],
+// contents included, when it opens one of the named tags.
+//
+// An unclosed element is not skipped at all rather than swallowing the remainder
+// of the document: a projection that silently discarded half a page would ground
+// nothing and explain nothing.
+func skipElement(body []byte, i int, names ...string) (end int, ok bool) {
+	for _, name := range names {
+		open := "<" + name
+		if len(body)-i < len(open) || !strings.EqualFold(string(body[i:i+len(open)]), open) {
+			continue
+		}
+		// The next character must end the name, or "<scriptish" would match.
+		if n := i + len(open); n < len(body) && !isSpaceByte(body[n]) && body[n] != '>' && body[n] != '/' {
+			continue
+		}
+		closing := []byte("</" + name)
+		rest := body[i:]
+		idx := bytes.Index(bytes.ToLower(rest), closing)
+		if idx < 0 {
+			return 0, false
+		}
+		after := i + idx + len(closing)
+		if gt := bytes.IndexByte(body[after:], '>'); gt >= 0 {
+			return after + gt + 1, true
+		}
+		return 0, false
+	}
+	return 0, false
+}
+
+// skipTag returns the index just past the tag starting at body[i], which must be
+// '<'. Quoted attribute values may contain '>', so the scan tracks quoting rather
+// than stopping at the first one.
+func skipTag(body []byte, i int) (end int, ok bool) {
+	// Comments end at "-->" and not at the first '>', which is part of it. Getting
+	// this wrong leaves the comment's body in the projection as though it were
+	// page text — and pages comment out whole blocks of markup, so the text a
+	// reader never sees ends up interleaved with the text they do.
+	if bytes.HasPrefix(body[i:], []byte("<!--")) {
+		if j := bytes.Index(body[i+4:], []byte("-->")); j >= 0 {
+			return i + 4 + j + 3, true
+		}
+		return 0, false
+	}
+
+	var quote byte
+	for j := i + 1; j < len(body); j++ {
+		c := body[j]
+		switch {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			}
+		case c == '"' || c == '\'':
+			quote = c
+		case c == '>':
+			return j + 1, true
+		}
+	}
+	// An unterminated tag is malformed input; treat the '<' as ordinary text
+	// rather than swallowing the rest of the document.
+	return 0, false
+}
+
+// nonTextElements have their contents dropped, not just their tags.
+//
+// This mirrors the first line of Extractor.strip in internal/extract, and has to:
+// a projection that keeps what the extractor threw away cannot match what the
+// extractor returned. The two lists are not shared because provenance has no
+// business depending on an extractor, and a corpus should be groundable against
+// text produced by any of them. The golden corpus is what keeps them honest — if
+// they drift, density claims stop grounding and the frozen output says so.
+//
+// Deliberately excludes nav, aside, footer and header, which the extractor also
+// removes. Those hold real text; the extractor drops them as boilerplate rather
+// than as non-text, and dropping them here would make the projection an opinion
+// about what matters rather than a rendering of what is there.
+var nonTextElements = []string{
+	"script", "style", "noscript", "svg", "iframe", "form", "button", "template",
+}
+
+// maxEntityLen bounds the search for a reference's closing semicolon. The longest
+// named reference in the HTML standard is well under this; the cap is what stops a
+// stray ampersand in prose from scanning the rest of the document.
+const maxEntityLen = 34
+
+// decodeEntity decodes the character reference starting at body[i], which must be
+// '&'. It reports the decoded bytes and the index just past the reference.
+//
+// Only terminated references are recognised. HTML permits a few without the
+// semicolon, but accepting those here would let "AT&T" consume the T, and a wrong
+// span is worse than a missing one.
+func decodeEntity(body []byte, i int) (decoded []byte, end int, ok bool) {
+	limit := min(i+maxEntityLen, len(body))
+	for j := i + 1; j < limit; j++ {
+		if body[j] == ';' {
+			raw := string(body[i : j+1])
+			out := html.UnescapeString(raw)
+			if out == raw {
+				return nil, 0, false // not a reference this library knows
+			}
+			// A result still carrying the terminator means only a prefix decoded.
+			// HTML allows a few references without their semicolon, so
+			// UnescapeString reads "&gt0;" as "&gt" followed by the literal "0;"
+			// and returns ">0;". Treating that as one reference would map three
+			// rendered bytes onto five source bytes and hand back a span covering
+			// characters nobody claimed.
+			//
+			// This also rejects "&semi;" and "&#59;", which legitimately decode to
+			// a semicolon. That is the safe direction to be wrong in: the cost is
+			// a value that cannot be grounded, against a citation that points at
+			// the wrong text.
+			if strings.HasSuffix(out, ";") {
+				return nil, 0, false
+			}
+			return []byte(out), j + 1, true
+		}
+		// A reference contains no whitespace and no second ampersand; either means
+		// this one was never a reference.
+		if isSpaceByte(body[j]) || body[j] == '&' {
+			return nil, 0, false
+		}
+	}
+	return nil, 0, false
 }
 
 func isSpaceByte(c byte) bool {
@@ -326,4 +683,25 @@ func (r Record) Observation() Observation {
 			Signals:       r.Signals,
 		},
 	}
+}
+
+// SpanSupports reports whether source renders to claimed.
+//
+// The check an evidence span exists to make possible: cut the bytes the span names
+// and ask whether they say what the assertion says they say. Both projections are
+// tried, because prose is only found with markup dropped while an attribute value
+// is only present with it kept, and a span is legitimate if either renders to the
+// claim.
+//
+// Exported because verification is the point. A corpus whose spans can only be
+// checked by the code that wrote them is not evidence, it is a second assertion.
+func SpanSupports(source []byte, claimed string) bool {
+	want := normaliseSpace([]byte(claimed))
+	if len(want) == 0 {
+		return false
+	}
+	if bytes.Equal(buildProjection(source, keepTags).norm, want) {
+		return true
+	}
+	return bytes.Equal(buildProjection(source, stripTags).norm, want)
 }

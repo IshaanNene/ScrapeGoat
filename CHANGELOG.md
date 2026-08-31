@@ -22,6 +22,10 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
   The name is derived from the corpus path rather than taken from a second flag,
   because holding one file without the other is half a corpus.
 
+- **`--corpus` claims now carry evidence.** Each row in the assertions file names the
+  observation it came from and the byte range within it, so a value can be re-checked
+  years later against the fetch log alone.
+
 - **`Item` is now a view over `Assertion`**, not a second thing produced beside it.
   All four parsers derive assertions and implement `Parse` in terms of `Derive`, so
   it cannot drift back into a parallel path. Each claim carries the method that
@@ -35,15 +39,25 @@ everything else moved to [ROADMAP.md](ROADMAP.md).
   `types.Item` and `provenance.Record`, which are today two parallel models that never
   meet.
 
-- **Evidence-span validation.** `Assertion.Validate` locates a claimed value in the
-  observed bytes and records one of three outcomes: found verbatim; found after
-  whitespace normalisation and mapped back to real byte offsets; or not found — in
-  which case the assertion is kept, flagged unsupported, and its confidence zeroed
-  rather than silently dropped. Fuzzed, and in CI's fuzz list: an off-by-one here does
-  not crash, it writes a citation pointing at the wrong bytes.
+- **Evidence spans on every derivation.** CSS, XPath, regex, structured data and
+  main-content extraction all produce claims carrying the byte range of the source that
+  supports them, the method and version that produced them, and a confidence. Across
+  the golden corpus every claim grounds, and `TestEvidenceSpansReVerifyOffline` reads
+  each stored body back by hash and checks that the span renders to the value — 698 of
+  them, verified without the extractor, the network, or anything but the bytes.
 
-  Text spanning inline markup is a documented, tested limit. `Unsupported` means "could
-  not be grounded by this method", never "false".
+  `Assertion.Validate` records one of three outcomes: grounded; attempted and not
+  found, in which case the claim is kept, flagged unsupported and its confidence
+  zeroed; or not attempted, for values like a JSON-LD graph that are parsed objects
+  rather than a run of source text. That third state matters — marking a whole category
+  unsupported for structural reasons would stop the flag meaning anything.
+
+  Matching goes through a rendering of the page that collapses whitespace per Unicode
+  rune, decodes character references, and optionally drops markup and the contents of
+  non-text elements, while remembering the source range behind every rendered byte.
+  Each of those was a page that would not ground without it. Fuzzed at 13.7M
+  executions and in CI's fuzz list: an off-by-one here does not crash, it writes a
+  citation pointing at the wrong bytes.
 
 - **A golden corpus** at `tests/golden`, frozen from a 17-fetch recording of
   books.toscrape.com. It pins the items, the records, and the claims, and asserts that

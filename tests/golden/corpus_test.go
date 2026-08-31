@@ -471,8 +471,17 @@ func TestItemsAreExactlyTheAssertionProjection(t *testing.T) {
 		t.Fatal("replay produced no assertions; dual-write is not happening")
 	}
 
+	// Only the rule-based derivations. The main-content extractor also makes
+	// claims, but they describe the record's own text and title columns rather
+	// than the item's extracted fields, and the item has never carried them —
+	// projecting them in would assert that every consumer's output should suddenly
+	// gain the article body. The distinction goes away in the cutover, when the
+	// item does.
 	byURL := map[string][]provenance.Assertion{}
 	for _, a := range assertions {
+		if strings.HasPrefix(a.Method, "density:") {
+			continue
+		}
 		byURL[a.SourceURL] = append(byURL[a.SourceURL], a)
 	}
 
@@ -558,4 +567,103 @@ func TestAssertionsCarryTheirMethod(t *testing.T) {
 			t.Errorf("no assertions were produced by %q derivations; got %v", want, methods)
 		}
 	}
+}
+
+// TestEvidenceSpansReVerifyOffline is the promise the model is sold on.
+//
+// A corpus row says "this value, from these bytes, at this range". The claim is
+// that anyone holding the fetch log can check that years later without the
+// extractor, the model, or the network. So this does exactly that: for every
+// grounded claim in the corpus, it reads the stored body by hash, cuts the span,
+// and checks the cut renders to the value.
+//
+// A span that does not is worse than no span. It is a citation that looks like
+// evidence and points at the wrong text, and nothing downstream could tell.
+func TestEvidenceSpansReVerifyOffline(t *testing.T) {
+	_, _, assertions := replayCorpus(t)
+
+	store, err := fetchlog.NewStore(corpusDir)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+
+	checked := 0
+	for _, a := range assertions {
+		if !a.Validated {
+			continue
+		}
+		value, ok := a.Value.(string)
+		if !ok {
+			t.Errorf("%s: %q is validated but its value is %T, not a string", a.SourceURL, a.Field, a.Value)
+			continue
+		}
+
+		body, err := store.Get(a.Evidence.ObservationHash)
+		if err != nil {
+			t.Errorf("%s: %q names observation %s, which the store does not hold: %v",
+				a.SourceURL, a.Field, a.Evidence.ObservationHash, err)
+			continue
+		}
+
+		s, e := a.Evidence.ByteStart, a.Evidence.ByteEnd
+		if s < 0 || e <= s || e > len(body) {
+			t.Errorf("%s: %q has span [%d,%d) against a %d-byte body", a.SourceURL, a.Field, s, e, len(body))
+			continue
+		}
+
+		if !provenance.SpanSupports(body[s:e], value) {
+			t.Errorf("%s: %q claims %q but its span cuts %q, which does not render to it",
+				a.SourceURL, a.Field, truncate(value, 60), truncate(string(body[s:e]), 90))
+			continue
+		}
+		checked++
+	}
+
+	if checked == 0 {
+		t.Fatal("no grounded claims to verify; evidence spans are not being written")
+	}
+	t.Logf("re-verified %d evidence spans against the stored bodies", checked)
+}
+
+// TestEveryDerivationPathIsGrounded guards the property step by step: it is not
+// enough that most claims carry evidence, because the ones that quietly stopped
+// would be exactly the ones nobody looks at.
+func TestEveryDerivationPathIsGrounded(t *testing.T) {
+	_, _, assertions := replayCorpus(t)
+
+	type stat struct{ grounded, total int }
+	byFamily := map[string]*stat{}
+	for _, a := range assertions {
+		family := strings.SplitN(a.Method, ":", 2)[0]
+		s, ok := byFamily[family]
+		if !ok {
+			s = &stat{}
+			byFamily[family] = s
+		}
+		s.total++
+		if a.Validated {
+			s.grounded++
+		}
+	}
+
+	// Every derivation the corpus exercises. A selector result is as traceable as
+	// anything else, which is the whole point of doing this for all of them rather
+	// than only the ones a model touched.
+	for _, family := range []string{"css", "structured", "density"} {
+		s := byFamily[family]
+		if s == nil || s.total == 0 {
+			t.Errorf("no %q derivations in the corpus; this path is untested", family)
+			continue
+		}
+		if s.grounded != s.total {
+			t.Errorf("%s: %d of %d claims carry evidence", family, s.grounded, s.total)
+		}
+	}
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }

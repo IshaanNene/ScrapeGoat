@@ -14,6 +14,17 @@ import (
 // two kinds of row in it with no way to tell them apart, which is the thing method
 // versioning exists to prevent — the values are not wrong, they are answers to
 // slightly different questions.
+// deterministicConfidence is what a selector, an XPath expression or a regex
+// reports.
+//
+// It says the method has no uncertainty about what it matched: run the same
+// selector over the same bytes and you get the same string, every time. It is not
+// a claim that the selector was pointed at the right thing — no extractor can know
+// that, and reading it as an accuracy score would be reading it as something it
+// cannot be. Grounding is what turns it into a number worth anything: a value the
+// evidence cannot support has its confidence zeroed regardless of what produced it.
+const deterministicConfidence = 1.0
+
 const (
 	cssVersion        = "1"
 	xpathVersion      = "1"
@@ -43,6 +54,7 @@ func valueAssertions(field, method, version string, values []string) []provenanc
 			Index:         i,
 			Method:        method,
 			MethodVersion: version,
+			Confidence:    deterministicConfidence,
 		})
 	}
 	return out
@@ -59,6 +71,7 @@ func singleAssertion(field, method, version string, value any) provenance.Assert
 		Value:         value,
 		Method:        method,
 		MethodVersion: version,
+		Confidence:    deterministicConfidence,
 	}
 }
 

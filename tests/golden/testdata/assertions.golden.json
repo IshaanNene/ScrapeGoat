@@ -6,7 +6,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/",
@@ -15,7 +15,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/",
@@ -24,7 +24,7 @@
     "method_version": "1",
     "values": 2,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/",
@@ -33,7 +33,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/",
@@ -42,7 +42,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/",
@@ -51,7 +51,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/",
@@ -60,7 +60,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/",
@@ -69,7 +69,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/",
@@ -78,7 +78,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -87,7 +87,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -96,7 +96,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -105,7 +105,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -114,7 +132,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -123,7 +141,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -132,7 +150,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -141,7 +159,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -150,7 +168,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -159,7 +177,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -168,7 +186,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/behind-closed-doors_962/index.html",
@@ -177,7 +195,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b415a8f9f84a797da42647935413bf235a7df6b58433916e005523a89d73e80d",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -186,7 +204,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -195,7 +213,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -204,7 +222,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -213,7 +249,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -222,7 +258,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -231,7 +267,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -240,7 +276,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -249,7 +285,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -258,7 +294,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -267,7 +303,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/in-a-dark-dark-wood_963/index.html",
@@ -276,7 +312,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "2352cb85b7997a5c8c449c4aa6eee8f20a3d7546b1c910dd7b6ea5902807e1e9",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -285,7 +321,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -294,7 +330,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -303,7 +339,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -312,7 +366,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -321,7 +375,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -330,7 +384,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -339,7 +393,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -348,7 +402,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -357,7 +411,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -366,7 +420,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
@@ -375,7 +429,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "497c688e0b97a2754f4bc7fb5575838054c50d6fc149961d64ec1f49197ec3dc",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -384,7 +438,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -393,7 +447,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -402,7 +456,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -411,7 +483,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -420,7 +492,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -429,7 +501,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -438,7 +510,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -447,7 +519,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -456,7 +528,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -465,7 +537,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/maude-1883-1993she-grew-up-with-the-country_964/index.html",
@@ -474,7 +546,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "c3c084e91bde0f2dfb2d531cc9c87790fd7688f2a2e625fba144bfa2c89b2186",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-1.html",
@@ -483,7 +555,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "badda4a626611ba216a36120a8a333e484031dbc4d3aa72599b1d9e75bd2cf64",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-1.html",
@@ -492,7 +564,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "badda4a626611ba216a36120a8a333e484031dbc4d3aa72599b1d9e75bd2cf64",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-1.html",
@@ -501,7 +573,7 @@
     "method_version": "1",
     "values": 2,
     "observation_hash": "badda4a626611ba216a36120a8a333e484031dbc4d3aa72599b1d9e75bd2cf64",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-1.html",
@@ -510,7 +582,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "badda4a626611ba216a36120a8a333e484031dbc4d3aa72599b1d9e75bd2cf64",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-1.html",
@@ -519,7 +591,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "badda4a626611ba216a36120a8a333e484031dbc4d3aa72599b1d9e75bd2cf64",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-1.html",
@@ -528,7 +600,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "badda4a626611ba216a36120a8a333e484031dbc4d3aa72599b1d9e75bd2cf64",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-1.html",
@@ -537,7 +609,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "badda4a626611ba216a36120a8a333e484031dbc4d3aa72599b1d9e75bd2cf64",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-1.html",
@@ -546,7 +618,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "badda4a626611ba216a36120a8a333e484031dbc4d3aa72599b1d9e75bd2cf64",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-1.html",
@@ -555,7 +627,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "badda4a626611ba216a36120a8a333e484031dbc4d3aa72599b1d9e75bd2cf64",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-2.html",
@@ -564,7 +636,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "0965cf9b09b490d30cf971167528ddf31cfebf2ae543027a7632958fc745b57a",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-2.html",
@@ -573,7 +645,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "0965cf9b09b490d30cf971167528ddf31cfebf2ae543027a7632958fc745b57a",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-2.html",
@@ -582,7 +654,7 @@
     "method_version": "1",
     "values": 2,
     "observation_hash": "0965cf9b09b490d30cf971167528ddf31cfebf2ae543027a7632958fc745b57a",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-2.html",
@@ -591,7 +663,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "0965cf9b09b490d30cf971167528ddf31cfebf2ae543027a7632958fc745b57a",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-2.html",
@@ -600,7 +672,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "0965cf9b09b490d30cf971167528ddf31cfebf2ae543027a7632958fc745b57a",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-2.html",
@@ -609,7 +681,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "0965cf9b09b490d30cf971167528ddf31cfebf2ae543027a7632958fc745b57a",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-2.html",
@@ -618,7 +690,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "0965cf9b09b490d30cf971167528ddf31cfebf2ae543027a7632958fc745b57a",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-2.html",
@@ -627,7 +699,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "0965cf9b09b490d30cf971167528ddf31cfebf2ae543027a7632958fc745b57a",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-2.html",
@@ -636,7 +708,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "0965cf9b09b490d30cf971167528ddf31cfebf2ae543027a7632958fc745b57a",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-3.html",
@@ -645,7 +717,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "6885e18a8811d240372d1d7d6dbb7d518c546f15bd347cb6c45bfa6f139678fa",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-3.html",
@@ -654,7 +726,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "6885e18a8811d240372d1d7d6dbb7d518c546f15bd347cb6c45bfa6f139678fa",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-3.html",
@@ -663,7 +735,7 @@
     "method_version": "1",
     "values": 2,
     "observation_hash": "6885e18a8811d240372d1d7d6dbb7d518c546f15bd347cb6c45bfa6f139678fa",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-3.html",
@@ -672,7 +744,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "6885e18a8811d240372d1d7d6dbb7d518c546f15bd347cb6c45bfa6f139678fa",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-3.html",
@@ -681,7 +753,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "6885e18a8811d240372d1d7d6dbb7d518c546f15bd347cb6c45bfa6f139678fa",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-3.html",
@@ -690,7 +762,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "6885e18a8811d240372d1d7d6dbb7d518c546f15bd347cb6c45bfa6f139678fa",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-3.html",
@@ -699,7 +771,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "6885e18a8811d240372d1d7d6dbb7d518c546f15bd347cb6c45bfa6f139678fa",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-3.html",
@@ -708,7 +780,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "6885e18a8811d240372d1d7d6dbb7d518c546f15bd347cb6c45bfa6f139678fa",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/page-3.html",
@@ -717,7 +789,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "6885e18a8811d240372d1d7d6dbb7d518c546f15bd347cb6c45bfa6f139678fa",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -726,7 +798,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -735,7 +807,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -744,7 +816,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -753,7 +843,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -762,7 +852,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -771,7 +861,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -780,7 +870,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -789,7 +879,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -798,7 +888,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -807,7 +897,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/penny-maybe_965/index.html",
@@ -816,7 +906,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "11dfe617bf39a4d257905e87f2f85e35ddff48ea875bcc08ceaa51a1f17bb025",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -825,7 +915,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -834,7 +924,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -843,7 +933,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -852,7 +960,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -861,7 +969,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -870,7 +978,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -879,7 +987,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -888,7 +996,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -897,7 +1005,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -906,7 +1014,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/sophies-world_966/index.html",
@@ -915,7 +1023,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "992f524e105cd4291932798130b2e49885d81c1cb0d26b2c97b89fc8804188ad",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -924,7 +1032,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -933,7 +1041,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -942,7 +1050,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -951,7 +1077,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -960,7 +1086,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -969,7 +1095,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -978,7 +1104,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -987,7 +1113,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -996,7 +1122,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -1005,7 +1131,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-bear-and-the-piano_967/index.html",
@@ -1014,7 +1140,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "d954f1bdbb6b40f368df41e2191db405ed3657d343b733beef803a1aa72f1709",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1023,7 +1149,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1032,7 +1158,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1041,7 +1167,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1050,7 +1194,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1059,7 +1203,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1068,7 +1212,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1077,7 +1221,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1086,7 +1230,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1095,7 +1239,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1104,7 +1248,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-elephant-tree_968/index.html",
@@ -1113,7 +1257,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "f494921fc3c87f843a64769ba81c7b232f0636a4592b4c496f8a0207b7e47cc0",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1122,7 +1266,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1131,7 +1275,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1140,7 +1284,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1149,7 +1311,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1158,7 +1320,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1167,7 +1329,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1176,7 +1338,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1185,7 +1347,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1194,7 +1356,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1203,7 +1365,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-five-love-languages-how-to-express-heartfelt-commitment-to-your-mate_969/index.html",
@@ -1212,7 +1374,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "b6b2fdc90920c579eb0322a015baae3a050d3f272f2371bae7ef2d4401cc6245",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1221,7 +1383,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1230,7 +1392,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1239,7 +1401,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1248,7 +1428,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1257,7 +1437,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1266,7 +1446,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1275,7 +1455,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1284,7 +1464,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1293,7 +1473,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1302,7 +1482,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/the-four-agreements-a-practical-guide-to-personal-freedom_970/index.html",
@@ -1311,7 +1491,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "44216dafc452636d3198cdd42593db875dd066068f1247c78a24611e9f52f185",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1320,7 +1500,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1329,7 +1509,7 @@
     "method_version": "1",
     "values": 6,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1338,7 +1518,25 @@
     "method_version": "1",
     "values": 4,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
+    "field": "content_text",
+    "method": "density:main",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
+    "validated": true
+  },
+  {
+    "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
+    "field": "content_title",
+    "method": "density:title",
+    "method_version": "1",
+    "values": 1,
+    "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1347,7 +1545,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1356,7 +1554,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1365,7 +1563,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1374,7 +1572,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1383,7 +1581,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1392,7 +1590,7 @@
     "method_version": "1",
     "values": 7,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1401,7 +1599,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/catalogue/you-cant-bury-them-all-poems_961/index.html",
@@ -1410,7 +1608,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "dd8dbcb0c66b89a3da3404fbfa60ade987f8a05a0df9b21a1d50839573e6ce38",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/index.html",
@@ -1419,7 +1617,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/index.html",
@@ -1428,7 +1626,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/index.html",
@@ -1437,7 +1635,7 @@
     "method_version": "1",
     "values": 2,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/index.html",
@@ -1446,7 +1644,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/index.html",
@@ -1455,7 +1653,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/index.html",
@@ -1464,7 +1662,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/index.html",
@@ -1473,7 +1671,7 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/index.html",
@@ -1482,7 +1680,7 @@
     "method_version": "1",
     "values": 20,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   },
   {
     "source_url": "https://books.toscrape.com/index.html",
@@ -1491,6 +1689,6 @@
     "method_version": "1",
     "values": 1,
     "observation_hash": "9fdd63da34161ebd13408d7a85105f83ec3c9f351c5d77cd0aa578790e121c1e",
-    "validated": false
+    "validated": true
   }
 ]
