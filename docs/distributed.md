@@ -1,6 +1,18 @@
 # Distributed Crawling
 
-ScrapeGoat supports distributed crawling via a master/worker HTTP coordinator and an in-memory task queue.
+> **This does not work yet.** The document below describes the coordination layer that
+> exists in `internal/distributed/`, which is real: a task queue with at-least-once
+> delivery and recovery of tasks abandoned by dead workers. What it does not have is a
+> crawl. The worker's crawl function logs the task and returns `nil`, and
+> `internal/distributed` imports `internal/engine` zero times — so workers share no
+> frontier, no dedup set, and no politeness state. Two workers pointed at one site
+> would each enforce the delay against their own half of the traffic.
+>
+> `scrapegoat scale N` now returns an error rather than printing a success message for
+> the request it never sent. See [ROADMAP.md](../ROADMAP.md) for what integrating this
+> would actually require.
+
+ScrapeGoat coordinates distributed work via a master/worker HTTP coordinator and an in-memory task queue.
 
 ## Architecture
 
