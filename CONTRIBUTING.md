@@ -84,7 +84,10 @@ internal/
   pipeline/          → Middleware chain for item processing
   storage/           → JSON/JSONL/CSV output writers
   config/            → YAML + env config loading
-  ai/                → LLM integration
+  provenance/        → Corpus records: content hashes, reuse signals, policy state
+  extract/           → Density-based main-content extraction
+  safety/            → SSRF guard: URL validation and the guarded dialer
+  fetchlog/          → Record and replay of fetches
   observability/     → Prometheus metrics
 examples/            → Ready-to-run scraper examples
 tests/               → Integration tests

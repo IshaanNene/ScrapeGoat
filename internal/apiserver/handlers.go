@@ -41,10 +41,6 @@ type ExtractRequest struct {
 			Description string `json:"description"`
 		} `json:"fields"`
 	} `json:"schema"`
-	LLM *struct {
-		Provider string `json:"provider"` // openai, anthropic, ollama
-		Model    string `json:"model"`
-	} `json:"llm,omitempty"`
 }
 
 // BatchRequest is the payload for POST /v1/batch.

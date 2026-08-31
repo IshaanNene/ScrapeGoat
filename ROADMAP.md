@@ -49,17 +49,6 @@ event ledger the workers append to and read membership from, which is the same s
 needs. Until that exists, distribution divides a crawl into pieces that cannot be polite to each
 other.
 
-### LLM extraction — `internal/llmextract/`
-
-Schema-based extraction against OpenAI, Anthropic and Ollama, with a SQLite cache. It is imported by
-zero non-test files. `ExtractRequest.LLM` in `internal/apiserver/handlers.go` is declared and never
-read, and there is no CLI flag. Nothing can reach it.
-
-**To integrate:** not as a pipeline stage. A model-produced value has to carry the same evidence a
-selector-produced value does — the bytes it came from, the method and version that produced it, and
-whether the claimed source text actually appears in those bytes. Until extraction has that shape,
-wiring a model in adds a value nobody can verify.
-
 ---
 
 ## Planned
