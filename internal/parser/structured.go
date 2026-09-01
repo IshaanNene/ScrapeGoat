@@ -3,10 +3,12 @@ package parser
 import (
 	"encoding/json"
 	"log/slog"
+	"sort"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 
+	"github.com/IshaanNene/ScrapeGoat/internal/provenance"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
@@ -256,30 +258,57 @@ func (sde *StructuredDataExtractor) extractMetaTags(doc *goquery.Document) Struc
 	return StructuredData{Type: MetaTags, Data: data}
 }
 
-// ToItem converts structured data results into a types.Item.
+// StructuredDataToItem converts structured data results into a types.Item, as a
+// view over StructuredDataToAssertions.
 func StructuredDataToItem(results []StructuredData, sourceURL string) *types.Item {
+	return ItemFromAssertions(sourceURL, StructuredDataToAssertions(results))
+}
+
+// StructuredDataToAssertions records what the page declared about itself.
+//
+// One assertion per field, not per occurrence. A page carrying two JSON-LD blocks
+// yielded one json_ld field with the last block's data, and that is preserved
+// rather than turned into a list: the collapse happens here, where the derivation
+// knows it is choosing, instead of in the projection, where it would look like an
+// accident of how many blocks the page happened to have.
+func StructuredDataToAssertions(results []StructuredData) []provenance.Assertion {
 	if len(results) == 0 {
 		return nil
 	}
 
-	item := types.NewItem(sourceURL)
+	byField := map[string]provenance.Assertion{}
+	set := func(field, method string, value any) {
+		byField[field] = singleAssertion(field, method, structuredVersion, value)
+	}
 
 	for _, sd := range results {
 		switch sd.Type {
 		case JSONLD:
-			item.Set("json_ld", sd.Data)
+			set("json_ld", "structured:jsonld", sd.Data)
 		case OpenGraph:
-			item.Set("opengraph", sd.Data)
+			set("opengraph", "structured:opengraph", sd.Data)
 		case TwitterCard:
-			item.Set("twitter_card", sd.Data)
+			set("twitter_card", "structured:twitter_card", sd.Data)
 		case Microdata:
-			item.Set("microdata", sd.Data)
+			set("microdata", "structured:microdata", sd.Data)
 		case MetaTags:
 			for k, v := range sd.Data {
-				item.Set("meta_"+k, v)
+				set("meta_"+k, "structured:meta@"+k, v)
 			}
 		}
 	}
 
-	return item
+	// Sorted by field so the corpus rows come out in the same order every run.
+	// The map above is keyed for last-wins, not for iteration.
+	fields := make([]string, 0, len(byField))
+	for f := range byField {
+		fields = append(fields, f)
+	}
+	sort.Strings(fields)
+
+	out := make([]provenance.Assertion, 0, len(fields))
+	for _, f := range fields {
+		out = append(out, byField[f])
+	}
+	return out
 }

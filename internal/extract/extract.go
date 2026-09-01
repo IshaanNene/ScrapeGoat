@@ -26,11 +26,6 @@ const (
 	// a comment thread, say — cannot outscore the article on volume alone.
 	lengthScoreCap = 3.0
 
-	// siblingScoreRatio is how good a sibling must be, relative to the winner, to
-	// be included with it. Articles are often split across several containers by
-	// ad insertion, so taking only the single best node loses real text.
-	siblingScoreRatio = 0.2
-
 	// uniformityPenalty is applied to containers whose children are many, short,
 	// and similar in length — the shape of a comment thread or a link list, not
 	// of an article.
@@ -102,43 +97,50 @@ func (e *Extractor) FromHTML(htmlStr string) (*Result, error) {
 func (e *Extractor) FromDocument(doc *goquery.Document) *Result {
 	e.strip(doc)
 
-	scores := e.scoreCandidates(doc)
-	if len(scores) == 0 {
+	candidates := e.scoreCandidates(doc)
+	if len(candidates) == 0 {
 		return &Result{}
 	}
 
+	// Both loops below walk candidates in document order rather than iterating a
+	// map, and both used to iterate one.
+	//
+	// Go randomises map iteration, and neither of these operations is indifferent
+	// to order. The winner was chosen with a strict >, so two containers tying on
+	// score handed the article to whichever the runtime visited first — a
+	// different block of text on different runs of the same input. And floating
+	// point addition is not associative, so summing the same scores in a different
+	// order moved the total in its last bits, which moved every confidence value
+	// derived from it.
+	//
+	// Neither showed up as a crash or a failing test. They showed up as a corpus
+	// that could not be reproduced from its own fetch log, which is the one
+	// property this project is built around.
 	var bestNode *goquery.Selection
 	bestScore := 0.0
-	for node, s := range scores {
-		if s > bestScore {
-			bestScore, bestNode = s, node
+	total := 0.0
+	for _, c := range candidates {
+		total += c.score
+		if c.score > bestScore {
+			bestScore, bestNode = c.score, c.sel
 		}
 	}
 	if bestNode == nil {
 		return &Result{}
 	}
 
-	// Total score across candidates, for a relative confidence signal.
-	total := 0.0
-	for _, s := range scores {
-		total += s
-	}
-
+	// One block. Merging in comparably-scoring siblings — so that an article
+	// interrupted by an inline ad or a pull-quote is not silently truncated at the
+	// first container — was attempted here and never worked: the lookup was
+	// `scores[sib]` against a map keyed by *goquery.Selection, and Siblings()
+	// allocates fresh Selections, so a sibling could not match its own entry even
+	// when it had one. The code was unreachable for as long as it existed.
+	//
+	// Removed rather than repaired, because repairing it changes what the extractor
+	// returns and the numbers in docs/EXTRACTION.md are measured against what it
+	// returns today. See ROADMAP.md.
 	blocks := []*goquery.Selection{bestNode}
 	text := []string{cleanBlock(bestNode)}
-
-	// Include siblings that score comparably. An article interrupted by an inline
-	// ad or a pull-quote becomes several containers, and taking only the best one
-	// silently truncates it.
-	threshold := bestScore * siblingScoreRatio
-	bestNode.Siblings().Each(func(_ int, sib *goquery.Selection) {
-		if s, ok := scores[sib]; ok && s >= threshold {
-			if t := cleanBlock(sib); t != "" {
-				blocks = append(blocks, sib)
-				text = append(text, t)
-			}
-		}
-	})
 
 	joined := normalise(strings.Join(text, " "))
 
@@ -191,7 +193,15 @@ func (e *Extractor) strip(doc *goquery.Document) {
 // The scoring is readability-style: each paragraph contributes to its parent and,
 // at half weight, to its grandparent — because the container that holds the most
 // prose is usually the article, and its parent is usually the page wrapper.
-func (e *Extractor) scoreCandidates(doc *goquery.Document) map[*goquery.Selection]float64 {
+// scoredBlock is one scored container. Carried as a slice rather than a map so that
+// iteration order is the document's, and therefore the same on every run.
+type scoredBlock struct {
+	sel   *goquery.Selection
+	node  *html.Node
+	score float64
+}
+
+func (e *Extractor) scoreCandidates(doc *goquery.Document) []scoredBlock {
 	minLen := e.MinTextLen
 	if minLen <= 0 {
 		minLen = minTextLen
@@ -208,6 +218,18 @@ func (e *Extractor) scoreCandidates(doc *goquery.Document) map[*goquery.Selectio
 	byNode := map[*html.Node]float64{}
 	selFor := map[*html.Node]*goquery.Selection{}
 
+	// order records each node the first time it is scored. Find visits in document
+	// order, so this is a stable ordering derived from the page itself rather than
+	// from map internals.
+	var order []*html.Node
+	seen := map[*html.Node]bool{}
+	note := func(n *html.Node) {
+		if !seen[n] {
+			seen[n] = true
+			order = append(order, n)
+		}
+	}
+
 	doc.Find("p, pre, blockquote, li, td").Each(func(_ int, s *goquery.Selection) {
 		text := flattenText(s.Clone())
 		if len(text) < minLen {
@@ -223,16 +245,19 @@ func (e *Extractor) scoreCandidates(doc *goquery.Document) map[*goquery.Selectio
 		pn := parent.Nodes[0]
 		byNode[pn] += score
 		selFor[pn] = parent
+		note(pn)
 
 		if gp := parent.Parent(); gp.Length() > 0 && len(gp.Nodes) > 0 {
 			gn := gp.Nodes[0]
 			byNode[gn] += score / 2
 			selFor[gn] = gp
+			note(gn)
 		}
 	})
 
-	out := make(map[*goquery.Selection]float64, len(byNode))
-	for node, raw := range byNode {
+	out := make([]scoredBlock, 0, len(order))
+	for _, node := range order {
+		raw := byNode[node]
 		sel := selFor[node]
 
 		// Link density: a container that is mostly anchor text is a menu.
@@ -253,7 +278,7 @@ func (e *Extractor) scoreCandidates(doc *goquery.Document) map[*goquery.Selectio
 		}
 
 		if adjusted > 0 {
-			out[sel] = adjusted
+			out = append(out, scoredBlock{sel: sel, node: node, score: adjusted})
 		}
 	}
 	return out

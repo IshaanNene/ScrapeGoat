@@ -145,17 +145,30 @@ func (rm *RobotsManager) GetSitemaps(domain string) []string {
 //
 // Reads the cache the enforcement path already populated, so it costs no extra
 // fetch and — more importantly — reports the same bytes the crawl actually obeyed.
-func (rm *RobotsManager) Report(ctx context.Context, rawURL string) provenance.RobotsReport {
+//
+// It used to say that while calling getRobotsData, which fetches on a cache miss.
+// With robots enforcement off, IsAllowed returns before ever populating the cache,
+// so every domain in a corpus crawl took a robots.txt request that no configuration
+// asked for, that the politeness gate never saw, and that appeared in no counter.
+// An operator who sets respect_robots_txt: false has said not to fetch it.
+//
+// A miss now yields an empty report, which is the honest answer: the crawl did not
+// consult robots.txt for this domain, so it has nothing to report about it.
+func (rm *RobotsManager) Report(rawURL string) provenance.RobotsReport {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return provenance.RobotsReport{}
 	}
 	domain := u.Scheme + "://" + u.Host
 
-	if data := rm.getRobotsData(ctx, domain); data != nil {
-		return data.report
+	rm.mu.RLock()
+	data, ok := rm.cache[domain]
+	rm.mu.RUnlock()
+
+	if !ok || data == nil {
+		return provenance.RobotsReport{}
 	}
-	return provenance.RobotsReport{}
+	return data.report
 }
 
 // getRobotsData fetches and caches robots.txt for a domain.

@@ -234,10 +234,13 @@ sequenceDiagram
 
 | Service | Purpose |
 |---|---|
-| **Redis** | Future distributed queue, caching layer, pub/sub for worker coordination |
-| **Postgres** | Structured storage for crawl results, job metadata, URL history |
+| **api** | The REST/WebSocket API server (`scrapegoat serve`) |
+| **prometheus** | Scrapes the metrics endpoint |
 
-> These services are optional — ScrapeGoat works standalone with file-based storage. Docker Compose is provided for users who want persistent, queryable storage.
+> Both are optional — ScrapeGoat runs standalone with file-based storage and needs no
+> services at all. The compose file previously declared Redis and Postgres for a
+> distributed queue and a structured store; neither was ever read by any code, so they
+> are gone along with the master/worker commands that motivated them.
 
 ---
 

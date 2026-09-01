@@ -2,9 +2,13 @@ package types
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 // Priority levels for request scheduling.
@@ -65,6 +69,12 @@ type Request struct {
 
 	// ID is a unique identifier for this request.
 	ID string
+
+	// registrableDomain caches the result of RegistrableDomain. It is computed at
+	// construction rather than lazily because the value is read from the frontier's
+	// probe loop, which runs under a lock and across every queued entry — a lazy
+	// write there would be both a hot-path allocation and a data race.
+	registrableDomain string
 }
 
 // NewRequest creates a new Request with sensible defaults.
@@ -75,15 +85,16 @@ func NewRequest(rawURL string) (*Request, error) {
 	}
 
 	return &Request{
-		URL:         u,
-		Method:      http.MethodGet,
-		Headers:     make(http.Header),
-		Priority:    PriorityNormal,
-		MaxRetries:  3,
-		FetcherType: "http",
-		Meta:        make(map[string]any),
-		CreatedAt:   time.Now(),
-		ID:          fmt.Sprintf("%s-%d", u.String(), time.Now().UnixNano()),
+		URL:               u,
+		registrableDomain: registrableDomain(u),
+		Method:            http.MethodGet,
+		Headers:           make(http.Header),
+		Priority:          PriorityNormal,
+		MaxRetries:        3,
+		FetcherType:       "http",
+		Meta:              make(map[string]any),
+		CreatedAt:         time.Now(),
+		ID:                fmt.Sprintf("%s-%d", u.String(), time.Now().UnixNano()),
 	}, nil
 }
 
@@ -95,12 +106,56 @@ func (r *Request) URLString() string {
 	return r.URL.String()
 }
 
-// Domain returns the hostname of the request URL.
+// Domain returns the hostname of the request URL. It is for display, logging and
+// metrics. Do not use it as a politeness key — see RegistrableDomain.
 func (r *Request) Domain() string {
 	if r.URL == nil {
 		return ""
 	}
 	return r.URL.Hostname()
+}
+
+// RegistrableDomain returns the domain one label below the public suffix —
+// "example.co.uk" for "a.b.example.co.uk" — which is the unit a site operator
+// actually controls, and therefore the unit politeness has to be measured in.
+//
+// Keying the throttler and the circuit breaker on the hostname instead meant
+// a.example.com and b.example.com held independent budgets, so a site with fifty
+// subdomains received fifty times the configured rate from one crawl. Nothing
+// reported this: every individual limiter was obeying its delay, and the operator's
+// only signal was the site's.
+//
+// It falls back to the hostname when the host is an IP literal, has no public
+// suffix, or is a public suffix in its own right. In each of those cases there is no
+// registrable domain to speak of and the hostname is the most conservative key
+// available.
+func (r *Request) RegistrableDomain() string {
+	if r.registrableDomain != "" {
+		return r.registrableDomain
+	}
+	// A Request built as a struct literal rather than through NewRequest has no
+	// cached value. Compute it rather than returning the wrong key; the write is
+	// skipped because the caller may not own this Request exclusively.
+	return registrableDomain(r.URL)
+}
+
+// registrableDomain resolves the public-suffix-aware key for u.
+func registrableDomain(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
+	if host == "" || net.ParseIP(host) != nil {
+		return host
+	}
+	etld1, err := publicsuffix.EffectiveTLDPlusOne(host)
+	if err != nil {
+		// Happens for a bare public suffix ("com") or a name under no known
+		// suffix ("localhost", "internal"). The host is already the narrowest
+		// honest key.
+		return host
+	}
+	return etld1
 }
 
 // Clone creates a deep copy of the request.

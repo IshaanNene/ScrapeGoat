@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/clock"
@@ -32,6 +33,13 @@ type Frontier struct {
 	// closedCh is closed exactly once by Close, which broadcasts to every waiter
 	// at once — a buffered channel could only wake them one at a time.
 	closedCh chan struct{}
+
+	// inFlight counts requests that have left the queue but whose processing has
+	// not finished. Every increment happens under mu at the instant of removal, so
+	// there is no moment in which a request is neither queued nor counted in
+	// flight — which is what makes Outstanding a fact about the crawl rather than
+	// an inference from how idle the workers look.
+	inFlight atomic.Int64
 }
 
 // NewFrontier creates a new Frontier. A nil clock means the system clock.
@@ -76,6 +84,7 @@ func (f *Frontier) Pop(ctx context.Context) *types.Request {
 		f.mu.Lock()
 		if f.pq.Len() > 0 {
 			item := popPQ(&f.pq)
+			f.inFlight.Add(1)
 			remaining := f.pq.Len()
 			f.mu.Unlock()
 
@@ -145,7 +154,7 @@ func (f *Frontier) PopReady(ctx context.Context, gate DomainGate) *types.Request
 		haveSoonest := false
 
 		for i, item := range f.pq {
-			domain := item.request.Domain()
+			domain := item.request.RegistrableDomain()
 			if gate.Ready(domain) {
 				if best == -1 || f.pq[i].priority < f.pq[best].priority {
 					best = i
@@ -159,12 +168,19 @@ func (f *Frontier) PopReady(ctx context.Context, gate DomainGate) *types.Request
 
 		if best != -1 {
 			item := removePQ(&f.pq, best)
+			f.inFlight.Add(1)
 			remaining := f.pq.Len()
 			f.mu.Unlock()
 
 			// Claim can still fail if another worker took the same domain's
 			// token between the scan and here; put the request back and retry.
-			if !gate.Claim(item.request.Domain()) {
+			if !gate.Claim(item.request.RegistrableDomain()) {
+				// Decrement before pushing, never after: between the Push and a
+				// later decrement the request would be counted twice, which is
+				// harmless, but the reverse order would leave a window in which it
+				// is counted neither way and the crawl could be declared complete
+				// with work still queued.
+				f.inFlight.Add(-1)
 				f.Push(item.request)
 				continue
 			}
@@ -229,14 +245,36 @@ func (f *Frontier) TryPop() *types.Request {
 	}
 
 	item := popPQ(&f.pq)
+	f.inFlight.Add(1)
 	return item.request
 }
 
-// Len returns the number of requests in the frontier.
+// Len returns the number of requests queued in the frontier. It does not count
+// requests already handed to a worker — use Outstanding for that.
 func (f *Frontier) Len() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.pq.Len()
+}
+
+// Done reports that a request taken from the frontier has finished processing.
+//
+// Must be called after every successful Pop, PopReady or TryPop, and after any work
+// that request generates has been enqueued — a link discovered on the page has to be
+// on the frontier before its parent stops counting, or the crawl can be observed
+// empty in between.
+func (f *Frontier) Done() { f.inFlight.Add(-1) }
+
+// Outstanding returns the number of requests either queued or in flight.
+//
+// Both halves are read under one lock acquisition because removal increments
+// inFlight under that same lock: reading them separately allows the intermediate
+// state where a request has left the queue and not yet been counted, which is
+// exactly the false "crawl complete" this exists to prevent.
+func (f *Frontier) Outstanding() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.pq.Len() + int(f.inFlight.Load())
 }
 
 // IsEmpty returns true if the frontier is empty.

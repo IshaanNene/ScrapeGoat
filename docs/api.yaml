@@ -79,10 +79,6 @@ components:
             title: string
             price: number
             in_stock: boolean
-        model:
-          type: string
-          description: LLM model override
-          example: gpt-4o
 
     Job:
       type: object
@@ -226,7 +222,7 @@ paths:
 
   /api/v1/extract:
     post:
-      summary: Extract structured data using LLM
+      summary: Extract structured data from a page
       operationId: extract
       requestBody:
         required: true

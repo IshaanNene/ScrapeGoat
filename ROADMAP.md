@@ -1,37 +1,40 @@
 # ScrapeGoat Roadmap
 
-This file tracks work that is **designed but not yet integrated**, and work that is planned but not
-yet written. The rule for the README is simple: if a capability is listed in the feature table, it
-runs in the crawl path. If it is on this page, it does not — however complete the code behind it may
-look.
+This file tracks work that is planned but not yet written. The rule for the README is simple: if a
+capability is listed in the feature table, it runs in the crawl path. If it is on this page, it does
+not exist yet.
 
----
+There used to be a section above this one called "Designed, not yet integrated", listing subsystems
+that compiled and had unit tests and were reachable from nothing. It is gone, and so are they.
+Code that looks finished and does nothing is worse than absent code: it survives review because it
+passes its tests, it appears in the dependency graph, and every reader has to work out for
+themselves that it is inert.
 
-## Designed, not yet integrated
+What was deleted, and what replacing it would take:
 
-These subsystems exist in the tree, compile, and have unit tests. None of them is reachable from a
-running crawl. They are listed here so that reading `internal/engine/` does not mislead you about
-what the product actually does.
-
-### Autoscaled worker pool — `internal/engine/autoscale.go`
-
-`AutoscaledPool.Evaluate()` returns a `ScaleDecision` based on queue depth and system load, modelled
-on Crawlee's autoscaled pool. Nothing consumes the decision. `Scheduler.Start()` launches exactly
-`config.Engine.Concurrency` goroutines and that number never changes for the life of the crawl.
-
-**To integrate:** have the scheduler own a resizable worker set — spawn on scale-up, and signal
-individual workers to exit via a per-worker quit channel on scale-down — then drive it from
-`Evaluate()` on a ticker. This must land *after* the frontier is event-driven, because a poll-loop
-worker cannot be cheaply parked.
-
-### Distributed tracing — `internal/observability/tracing.go`
-
-A hand-rolled `Tracer`/`Span`/`SpanExporter`. `go.mod` contains no OpenTelemetry dependency, so this
-cannot export OTLP and cannot reach Jaeger, Tempo, or Honeycomb. It also does not propagate W3C
-`traceparent`, including across the master/worker HTTP boundary where a trace would be most useful.
-
-**To integrate:** replace with `go.opentelemetry.io/otel` + OTLP exporter, and inject/extract
-`traceparent` on the distributed HTTP hop.
+- **Autoscaled worker pool** (`internal/engine/autoscale.go`). `Evaluate()` returned a decision
+  nothing consumed; `Scheduler.Start()` launched exactly `Engine.Concurrency` goroutines and never
+  changed the number. Doing this properly needs a scheduler that owns a resizable worker set —
+  spawn on scale-up, per-worker quit channel on scale-down — and it must land after the frontier
+  work below, because the same frontier restructuring decides how cheaply a worker can be parked.
+- **Distributed tracing** (`internal/observability/tracing.go`). A hand-rolled `Tracer`/`Span`/
+  `SpanExporter` with no OpenTelemetry dependency, so it could not export OTLP or reach Jaeger,
+  Tempo or Honeycomb, and did not propagate W3C `traceparent`. Replace with `go.opentelemetry.io/otel`
+  and an OTLP exporter rather than reviving it.
+- **Distributed master/worker** (`internal/distributed/`). A Redis-backed queue with at-least-once
+  delivery, recovery of tasks abandoned by dead workers, and no crawl: the worker's crawl function
+  logged its task and returned `nil`, and the package imported `internal/engine` zero times. Workers
+  shared no frontier, no dedup set and no politeness state, so two of them pointed at one site would
+  each enforce the delay against their own half of the traffic. Coordination has to be over crawl
+  *state*, not URL batches — an event ledger workers append to and read membership from, which is
+  the same substrate resume needs. Not before a real user hits a real single-node ceiling.
+- **CAPTCHA solving** (`internal/fetcher/captcha.go`). Not planned at all, at any point. An evasion
+  arms race against funded adversaries is not a position a single maintainer can hold, and it
+  contradicts being a crawler that is legible about who it is. CAPTCHA *detection* stays in
+  `internal/middleware` — knowing you have been blocked is not the same as pretending you have not.
+- **LLM extraction** (`internal/llmextract/`) and the `ai`/`llm` config sections. Deleted; see the
+  note on derivation in the corpus section below. AI belongs as a derivation tier that carries its
+  own evidence, never as a pipeline stage.
 
 ---
 
@@ -39,27 +42,40 @@ cannot export OTLP and cannot reach Jaeger, Tempo, or Honeycomb. It also does no
 
 ### Near term
 
-- **Per-domain rate-limiter slots.** Politeness delay is currently enforced with `time.Sleep` while
-  holding the per-domain mutex, *after* a worker has already dequeued. One slow domain parks the
-  whole pool and starves every other domain. Replace with `golang.org/x/time/rate` limiters per
-  domain and a frontier partitioned so workers only dequeue from domains that have a token.
-- **Exponential backoff with jitter, and a circuit breaker** on the retry path.
-- **`AllowedDomains` suffix matching.** Today the check is exact-match, so `example.com` rejects
-  `www.example.com`. Needs public-suffix awareness.
-- **HTTP/2.** The custom `TLSClientConfig`/`DialContext` silently disables it. Re-enabling costs
-  nothing and removes an obvious bot fingerprint.
-- **`testdata/` corpus and golden files** for the parser, captured from real pages.
+- **`PopReady` is O(n) per dequeue.** The scan over `f.pq` has no `break`, so it walks every queued
+  entry on every dequeue while holding `f.mu` — and the readiness probe calls through to
+  `limiterFor`, which takes the throttler's lock and moves the domain to the front of the LRU. A
+  supposedly non-consuming probe therefore mutates eviction order, and on a wide crawl can evict the
+  slots it is only inspecting. Replace with domain-bucketed ready-sets and a heap of domains keyed
+  by earliest-ready time, plus a read-only `Ready` path that does not touch the LRU.
+- **Deterministic retry jitter.** `backoffFor` draws from the engine's shared random source under a
+  lock, so delays are handed out in worker-arrival order. A replay with the same seed reproduces the
+  same multiset of delays but not the same assignment of delays to requests. Derive each delay from
+  the request's own identity instead, and the lock becomes unnecessary too.
 
 ### Medium term
 
-- **Deterministic termination.** The idle monitor is a 600 ms heuristic; replace with an in-flight
-  counter incremented before dequeue.
-- **HTTP caching** — ETag / If-Modified-Since / Cache-Control.
-- **Real anti-bot fingerprinting** — uTLS-driven JA3/JA4 matching the advertised User-Agent, and
-  browser-accurate HTTP/2 SETTINGS and header ordering. This is what would make the anti-bot claim
-  in the README true rather than aspirational.
-- **Plugin system** via WASM or real Go plugins, replacing the current stubs.
-- **`goleak` in `TestMain`** across packages.
+- **HTTP caching** — ETag / If-Modified-Since / Cache-Control. Cloudflare reports that over half of
+  AI-crawler traffic re-fetches unchanged pages, which makes this the highest value-to-effort item
+  on this page. Store the validators on the record, send `If-None-Match` / `If-Modified-Since` on
+  recrawl, and treat a 304 as a free freshness confirmation that updates the timestamp without
+  re-deriving anything. Then publish the number no competitor publishes: the cost, in requests, of
+  keeping a 100,000-page corpus fresh for thirty days.
+- **Browser-accurate HTTP/2 SETTINGS and header ordering.** uTLS-driven JA3/JA4 matching the
+  advertised User-Agent has shipped, and the README is honest that it closes one signal and nothing
+  more. These are the next two tells. Note the explicit decision not to pursue this past the point
+  of diminishing returns — an evasion arms race against funded adversaries is not a position this
+  project can hold.
+- **OpenTelemetry**, replacing the deleted hand-rolled tracer, with `traceparent` propagation.
+- **Merge comparably-scoring sibling blocks in `internal/extract`.** An article interrupted by an
+  inline ad or a pull-quote becomes several containers, and taking only the single best one
+  truncates it at the interruption. Code to do this existed and never ran: the lookup was
+  `scores[sib]` against a map keyed by `*goquery.Selection`, and `Siblings()` allocates fresh
+  Selections, so a sibling could not match its own entry even when it had one. It has been removed
+  rather than repaired, because repairing it changes what the extractor returns and the F1 numbers
+  in [docs/EXTRACTION.md](docs/EXTRACTION.md) are measured against what it returns today. Doing it
+  properly means keying candidates by `*html.Node`, re-running the extraction benchmark, updating
+  the published numbers, and regenerating `tests/golden`. `Result.Blocks` is always 1 until then.
 
 ### Longer term
 
@@ -91,19 +107,16 @@ something people reach for rather than something that competes with Colly.
 
 ### 1. Content extraction that survives the real web
 
-The single largest gap. `AutoExtractor.extractArticles` matches CSS selectors —
-`article`, `.post`, `.entry-content` — which works on well-marked-up sites and
-fails on most of the web, returning navigation, cookie banners, and footers as
-article text.
+**Largely shipped.** `internal/extract` replaced the CSS-selector list with text-density
+and link-density scoring per DOM node, so extraction no longer depends on what anyone
+named a class. It runs in the crawl path.
 
-What is needed is algorithmic main-content detection: text-density and link-density
-scoring per DOM node, boilerplate removal, and a confidence signal so downstream
-consumers can filter. Python has trafilatura and resiliparse; Go has nothing
-comparable, which makes this both the highest-leverage internal fix and a
-genuinely reusable package in its own right.
-
-Everything downstream depends on this. Deduplication, quality filtering, and
-embedding are all garbage-in-garbage-out on bad extraction.
+What remains is the evaluation. `docs/EXTRACTION.md` still lists a real-page comparison
+against trafilatura and resiliparse as outstanding, and an extractor's quality claim is
+only as good as its evaluation — publish the results including the cases where this
+loses. Extracting the package as a standalone Go module is the natural occasion: Go has
+no trafilatura-equivalent, it is independently useful and citable, and it is the best
+available funnel into the rest of the project.
 
 ### 2. Near-duplicate detection
 

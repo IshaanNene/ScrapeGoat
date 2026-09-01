@@ -65,8 +65,10 @@ go run ./spiders/
 | `scrapegoat extract <url>` | Auto-extract structured data |
 | `scrapegoat new spider <name>` | Scaffold a new spider |
 | `scrapegoat new project <name>` | Scaffold project with config |
-| `scrapegoat master` | Start distributed coordinator |
-| `scrapegoat worker` | Start distributed worker |
+| `scrapegoat serve` | Start the REST/WebSocket API server |
+| `scrapegoat mcp` | Start the MCP server |
+| `scrapegoat replay <dir>` | Re-run a recorded crawl from its fetch log |
+| `scrapegoat verify <dir>` | Check a fetch log's integrity |
 
 ## Using as a Library
 

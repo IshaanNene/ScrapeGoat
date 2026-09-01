@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"log/slog"
@@ -31,14 +30,13 @@ type Scheduler struct {
 	pauseMu  sync.RWMutex
 	resumeCh chan struct{}
 
-	throttler   *Throttler
-	breaker     *CircuitBreaker
-	idleWorkers atomic.Int32
+	throttler *Throttler
+	breaker   *CircuitBreaker
 
 	// pendingRetries counts requests waiting out a backoff off-queue. They are
-	// invisible to both the frontier length and the idle-worker count, so
-	// without this the idle monitor would declare the crawl finished and close
-	// the frontier while retries were still due — silently dropping them.
+	// neither queued nor in flight, so without this the idle monitor would declare
+	// the crawl finished and close the frontier while retries were still due —
+	// silently dropping them.
 	pendingRetries atomic.Int32
 	done           chan struct{}
 }
@@ -120,9 +118,24 @@ func (s *Scheduler) resumeGate() <-chan struct{} {
 	return s.resumeCh
 }
 
-// idleMonitor checks if all workers are idle and frontier is empty.
-// When this condition holds for a sustained period, it closes the frontier.
-func (s *Scheduler) idleMonitor(ctx context.Context, concurrency int) {
+// idleMonitor closes the frontier once there is provably no work left.
+//
+// It used to infer that from how many workers looked idle: idleWorkers was
+// incremented before PopReady and decremented after, so a worker holding a
+// just-dequeued request was briefly counted as idle. With an empty queue at that
+// instant, the monitor could see every worker idle and nothing queued while a fetch
+// was about to begin, and end the crawl underneath it. Rare, timing-dependent, and
+// indistinguishable from a crawl that had genuinely finished.
+//
+// Frontier.Outstanding counts queued and in-flight requests together under the
+// frontier's own lock, and the in-flight increment happens at the moment of removal,
+// so there is no window in which a request is invisible. That makes the completion
+// test a fact rather than an inference.
+//
+// The confirmation streak survives, with a narrower job. It no longer papers over
+// the dequeue window; it only covers work that arrives after the crawl looks empty —
+// principally a caller that adds seeds after Start rather than before.
+func (s *Scheduler) idleMonitor(ctx context.Context, _ int) {
 	ticker := s.engine.clock.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 	idleStreak := 0
@@ -135,16 +148,13 @@ func (s *Scheduler) idleMonitor(ctx context.Context, concurrency int) {
 		case <-s.done:
 			return
 		case <-ticker.C:
-			idle := int(s.idleWorkers.Load())
-			queueLen := s.engine.frontier.Len()
-
+			outstanding := s.engine.frontier.Outstanding()
 			pending := int(s.pendingRetries.Load())
 
-			if idle >= concurrency && queueLen == 0 && pending == 0 {
+			if outstanding == 0 && pending == 0 {
 				idleStreak++
-				// Require 3 consecutive idle checks (~600ms) to confirm completion
 				if idleStreak >= 3 {
-					s.logger.Info("all workers idle, frontier empty — crawl complete")
+					s.logger.Info("no queued or in-flight requests — crawl complete")
 					s.engine.frontier.Close()
 					return
 				}
@@ -173,14 +183,12 @@ func (s *Scheduler) worker(ctx context.Context, id int) {
 			}
 		}
 
-		// Mark as idle while parked on the frontier. PopReady blocks until a
-		// request whose domain is off cooldown is available, the frontier closes,
-		// or ctx is cancelled — no polling, and no waiting out one domain's
-		// politeness delay while other domains have work ready.
-		s.idleWorkers.Add(1)
+		// PopReady blocks until a request whose domain is off cooldown is
+		// available, the frontier closes, or ctx is cancelled — no polling, and no
+		// waiting out one domain's politeness delay while other domains have work
+		// ready. A returned request is already counted in flight by the frontier,
+		// so it is never invisible to the completion check.
 		req := s.engine.frontier.PopReady(ctx, s.throttler)
-		s.idleWorkers.Add(-1)
-
 		if req == nil {
 			// Frontier closed or context cancelled: no more work is coming.
 			return
@@ -191,8 +199,12 @@ func (s *Scheduler) worker(ctx context.Context, id int) {
 		s.engine.metrics.SetActiveWorkers(int(active))
 		s.engine.metrics.SetFrontierDepth(s.engine.frontier.Len())
 
-		// Process the request
+		// Process the request, then release it. Done comes after processRequest
+		// returns because links discovered on the page are pushed during it: a
+		// parent that stopped counting before its children were queued would leave
+		// the frontier momentarily empty and end the crawl one level in.
 		s.processRequest(ctx, logger, req)
+		s.engine.frontier.Done()
 
 		active = s.engine.stats.ActiveWorkers.Add(-1)
 		s.engine.metrics.SetActiveWorkers(int(active))
@@ -235,7 +247,10 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 	fetchCtx, fetchCancel := context.WithTimeout(ctx, timeout)
 	defer fetchCancel()
 
-	domain := req.Domain()
+	// The registrable domain, not the hostname: a site that fails on one subdomain
+	// is a site that is failing, and fifty subdomains must not each get their own
+	// full failure budget before the breaker notices.
+	domain := req.RegistrableDomain()
 
 	// A domain that has failed consistently is skipped rather than retried into
 	// the ground. Without this, a site that goes down absorbs the entire request
@@ -307,37 +322,72 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 		}
 	}
 
-	// A provenance record per response, when a corpus was asked for. Written
-	// before parsing so that a parse failure still leaves the record: what the
-	// source said about reuse does not depend on whether extraction succeeded.
-	s.recordProvenance(ctx, resp)
-
-	// Always run the parser for link discovery and structured data
+	// One derivation per response, feeding all three outputs: the claims, the
+	// corpus record they attach to, and the item the pipeline sees.
+	//
+	// The record is still written even when derivation fails, which is why the
+	// error is logged here rather than returned. What the source said about reuse
+	// does not depend on whether extraction succeeded, and a page whose parse
+	// broke is a page a corpus especially wants to have recorded.
+	var (
+		items []*types.Item
+		links []string
+	)
 	if s.engine.parser != nil {
-		items, links, err := s.engine.parser.Parse(resp, s.engine.cfg.Parser.Rules)
+		var assertions []provenance.Assertion
+		assertions, links, items = s.derive(logger, resp)
+		s.recordProvenance(ctx, resp, assertions)
+	} else {
+		s.recordProvenance(ctx, resp, nil)
+	}
+
+	// Only emit parser items if no callbacks produced items (avoid duplicates)
+	if len(callbacksCopy) == 0 {
+		for _, item := range items {
+			item.Depth = req.Depth
+			stampFromResponse(item, resp)
+			if !s.emitItem(ctx, item) {
+				return
+			}
+		}
+	}
+	for _, link := range links {
+		newReq, err := types.NewRequest(link)
+		if err != nil {
+			continue
+		}
+		newReq.Depth = req.Depth + 1
+		newReq.ParentURL = req.URLString()
+		_ = s.engine.AddRequest(newReq)
+	}
+}
+
+// derive runs the parser once and returns both shapes of what it found.
+//
+// A parser that implements Deriver is asked for assertions and the item is
+// projected from them, so the two cannot disagree. One that does not is asked for
+// items as before and contributes no assertions — a caller with its own Parser
+// keeps working, it simply gets no corpus claims.
+func (s *Scheduler) derive(logger *slog.Logger, resp *types.Response) ([]provenance.Assertion, []string, []*types.Item) {
+	rules := s.engine.cfg.Parser.Rules
+
+	if d, ok := s.engine.parser.(Deriver); ok {
+		assertions, links, err := d.Derive(resp, rules)
 		if err != nil {
 			logger.Warn("parse error", "error", err)
 		}
-		// Only emit parser items if no callbacks produced items (avoid duplicates)
-		if len(callbacksCopy) == 0 {
-			for _, item := range items {
-				item.Depth = req.Depth
-				stampFromResponse(item, resp)
-				if !s.emitItem(ctx, item) {
-					return
-				}
-			}
+		var items []*types.Item
+		if item := d.ItemFrom(resp.Request.URLString(), assertions); item != nil {
+			items = append(items, item)
 		}
-		for _, link := range links {
-			newReq, err := types.NewRequest(link)
-			if err != nil {
-				continue
-			}
-			newReq.Depth = req.Depth + 1
-			newReq.ParentURL = req.URLString()
-			_ = s.engine.AddRequest(newReq)
-		}
+		return assertions, links, items
 	}
+
+	items, links, err := s.engine.parser.Parse(resp, rules)
+	if err != nil {
+		logger.Warn("parse error", "error", err)
+	}
+	return nil, links, items
 }
 
 // recordProvenance writes one corpus record for a response.
@@ -346,31 +396,66 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 // and losing the crawl because a record could not be written would be the wrong
 // trade — but losing records silently would be worse, so it is logged loudly
 // enough to notice.
-func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response) {
+func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response, assertions []provenance.Assertion) {
 	s.engine.mu.RLock()
-	w, crawlID := s.engine.corpus, s.engine.crawlID
+	w, sink, crawlID := s.engine.corpus, s.engine.assertions, s.engine.crawlID
 	s.engine.mu.RUnlock()
 
-	if w == nil || resp == nil || resp.Request == nil {
+	if resp == nil || resp.Request == nil || (w == nil && sink == nil) {
 		return
 	}
 
 	var (
 		doc     *goquery.Document
 		content provenance.Content
+
+		// extracted holds the claims the main-content extractor makes, kept apart
+		// from the parser's until both are written.
+		extracted []provenance.Assertion
 	)
 
 	// Extraction only makes sense for HTML, and only the text needs it. A non-HTML
 	// response still gets a record — it has provenance, just no extracted text.
 	if isHTML(resp) {
-		if d, err := goquery.NewDocumentFromReader(bytes.NewReader(resp.Body)); err == nil {
+		// One DOM parse per response. Response.Document caches, so this is the
+		// same tree the parser goes on to use for link discovery and rules. This
+		// used to build a second document from the same bytes, so every page in
+		// every corpus crawl was tokenised and tree-built twice for two outputs
+		// that were never joined to each other.
+		if d, err := resp.Document(); err == nil {
 			doc = d
-			if r := extract.New().FromDocument(d); r != nil {
+
+			// The extractor gets a clone because it destroys what it is given:
+			// FromDocument strips script, style, nav, aside, footer and header
+			// from its input before scoring, since a <script> body is text as far
+			// as the DOM is concerned. Handing it the shared document would delete
+			// most of a site's navigation before the parser ran link discovery
+			// over it, and the crawl would quietly stop finding pages — no error,
+			// just fewer URLs than there should be.
+			//
+			// The clone is what that safety costs, and it is cheaper than the
+			// parse it replaces: ~10µs to clone a typical page against ~76µs to
+			// build it again from bytes. One parse plus one clone beats two
+			// parses.
+			//
+			// provenance.Build gets the pristine document, not the clone — it
+			// reads <meta> for AI directives, TDM reservations and licence, and
+			// those must be read from the page as served.
+			if r := extract.New().FromDocument(goquery.CloneDocument(d)); r != nil {
 				content = provenance.Content{
 					Text:       r.Text,
 					Title:      r.Title,
 					Confidence: r.Confidence,
 				}
+				// The main content is a derivation like any other and gets claims
+				// of its own, so the corpus can say which region of the page the
+				// text came from rather than only that some extractor produced it.
+				//
+				// These do not reach the item: the record has carried text and
+				// title in their own columns since before assertions existed, and
+				// adding them to the extracted fields would change every consumer's
+				// output to say something the record already said.
+				extracted = append(extracted, densityAssertions(r)...)
 			}
 		}
 	}
@@ -388,13 +473,96 @@ func (s *Scheduler) recordProvenance(ctx context.Context, resp *types.Response) 
 		// The decision this crawl actually operated under. The request reached a
 		// fetcher, which means the robots check upstream permitted it.
 		RobotsAllowed: true,
-		Robots:        s.engine.robots.Report(ctx, resp.Request.URLString()),
+		Robots:        s.engine.robots.Report(resp.Request.URLString()),
 	}, doc, content)
 
-	if err := w.Write(rec); err != nil {
-		s.engine.logger.Warn("could not record provenance",
-			"url", resp.Request.URLString(), "error", err)
+	if w != nil {
+		if err := w.Write(rec); err != nil {
+			s.engine.logger.Warn("could not record provenance",
+				"url", resp.Request.URLString(), "error", err)
+		}
 	}
+
+	if sink == nil || len(assertions) == 0 {
+		return
+	}
+
+	// Attach every claim to the bytes it was derived from, and to the range within
+	// them that supports it. The record's content hash is the join key, so this is
+	// the moment the two halves of the corpus become one thing: without it an
+	// assertion is a value with no stated source, which is what the old Item was
+	// and what this whole model exists to replace.
+	//
+	// Grounding happens here rather than in each parser for two reasons. The
+	// content hash is computed in provenance.Build, so this is the first point at
+	// which an assertion can name the observation it belongs to. And the index is
+	// built once for the page and reused across every claim on it, where a parser
+	// doing its own lookups would rebuild the normalised projection of the body per
+	// value.
+	index := provenance.NewEvidenceIndex(rec.ContentHash, resp.Body)
+
+	for _, a := range append(assertions, extracted...) {
+		a.SourceURL = rec.URL
+		groundAssertion(index, &a)
+		if err := sink.Write(a); err != nil {
+			s.engine.logger.Warn("could not record assertion",
+				"url", resp.Request.URLString(), "field", a.Field, "error", err)
+			break
+		}
+	}
+}
+
+// groundAssertion locates the claim's value in the observed bytes.
+//
+// Only string values are attempted. A structured value — a JSON-LD graph, an
+// OpenGraph set — is a parsed object with no single run of source text behind it,
+// and running it through a text search would mark every one of them unsupported.
+// That would be worse than leaving them alone: "unsupported" is a finding about a
+// derivation, and a signal that fires on a whole category of values for structural
+// reasons stops being a signal.
+//
+// So an unattempted assertion keeps Validated and Unsupported both false, which is
+// the honest third state: nobody claimed this was checked. Its confidence is left
+// as the derivation reported it, since nothing has been learned that would change
+// it either way.
+// densityAssertions turns the main-content extraction into claims.
+//
+// The extractor's own confidence is carried rather than replaced with certainty.
+// Unlike a selector, density scoring is a judgement about which block of a page is
+// the article, and it is routinely wrong on pages that have no article at all —
+// which is exactly why internal/extract reports a confidence in the first place.
+func densityAssertions(r *extract.Result) []provenance.Assertion {
+	var out []provenance.Assertion
+	add := func(field, method string, value string) {
+		if value == "" {
+			return
+		}
+		out = append(out, provenance.Assertion{
+			SchemaVersion: provenance.SchemaVersion,
+			Field:         field,
+			Value:         value,
+			Method:        method,
+			MethodVersion: densityVersion,
+			Confidence:    r.Confidence,
+		})
+	}
+	add("content_text", "density:main", r.Text)
+	add("content_title", "density:title", r.Title)
+	return out
+}
+
+// densityVersion is the version of the main-content extraction. Bump it when the
+// scoring would select a different block or return different text for the same
+// page, so a corpus spanning the change can tell its rows apart.
+const densityVersion = "1"
+
+func groundAssertion(index *provenance.EvidenceIndex, a *provenance.Assertion) {
+	text, ok := a.Value.(string)
+	if !ok {
+		a.Evidence.ObservationHash = index.Hash()
+		return
+	}
+	index.Ground(a, text)
 }
 
 // isHTML reports whether a response is worth running an HTML extractor over.
@@ -469,7 +637,10 @@ func (s *Scheduler) handleFetchError(logger *slog.Logger, req *types.Request, er
 			)
 		}
 
-		s.engine.metrics.RecordRequest(req.Domain(), "retry")
+		// Same key as the other RecordRequest calls, so retries line up with the
+		// successes and failures for the domain rather than landing on a separate
+		// per-subdomain series.
+		s.engine.metrics.RecordRequest(req.RegistrableDomain(), "retry")
 
 		// Re-queued on a timer rather than by sleeping here: sleeping inside the
 		// worker is what the politeness throttle used to do, and it holds a

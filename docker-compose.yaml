@@ -1,48 +1,23 @@
-version: "3.8"
+# Runs the API server and Prometheus.
+#
+# This file used to describe a master, three worker replicas, a dashboard and
+# Redis. None of it worked: the workers' crawl function logged its task and
+# returned nil, and `dashboard` was never a subcommand of this binary — contrib
+# tools are built separately. It described an architecture, not a deployment.
 
 services:
-  master:
+  api:
     build: .
-    container_name: scrapegoat-master
-    command: ["master", "--addr", ":8081"]
-    ports:
-      - "8081:8081"
+    container_name: scrapegoat-api
+    # The server refuses to start without an API key. Set SCRAPEGOAT_API_KEY in a
+    # .env file beside this one rather than putting a key in version control.
+    command: ["serve", "--port", "8080"]
     environment:
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - redis
-    networks:
-      - scrapegoat
-
-  worker:
-    build: .
-    command: ["worker", "--master", "http://master:8081", "--capacity", "10"]
-    deploy:
-      replicas: 3
-    depends_on:
-      - master
-      - redis
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-    networks:
-      - scrapegoat
-
-  dashboard:
-    build: .
-    container_name: scrapegoat-dashboard
-    command: ["dashboard", "--addr", ":8080"]
+      - SCRAPEGOAT_API_KEY=${SCRAPEGOAT_API_KEY:?set SCRAPEGOAT_API_KEY, e.g. in a .env file}
     ports:
       - "8080:8080"
-    networks:
-      - scrapegoat
-
-  redis:
-    image: redis:7-alpine
-    container_name: scrapegoat-redis
-    ports:
-      - "6379:6379"
     volumes:
-      - redis_data:/data
+      - crawl_data:/data
     networks:
       - scrapegoat
 
@@ -61,4 +36,4 @@ networks:
     driver: bridge
 
 volumes:
-  redis_data:
+  crawl_data:

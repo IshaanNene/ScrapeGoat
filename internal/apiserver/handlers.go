@@ -41,10 +41,6 @@ type ExtractRequest struct {
 			Description string `json:"description"`
 		} `json:"fields"`
 	} `json:"schema"`
-	LLM *struct {
-		Provider string `json:"provider"` // openai, anthropic, ollama
-		Model    string `json:"model"`
-	} `json:"llm,omitempty"`
 }
 
 // BatchRequest is the payload for POST /v1/batch.
@@ -395,11 +391,19 @@ func (s *Server) handleScreenshot(w http.ResponseWriter, r *http.Request) {
 		s.jsonError(w, http.StatusBadRequest, "url is required")
 		return
 	}
+	// This endpoint takes a URL from an API client and renders it in a browser, so
+	// it is an SSRF primitive unless the target is checked. The scheme/shape check
+	// happens here; the address checks happen on the dial, inside the guarded
+	// egress proxy the browser fetcher runs.
+	if err := s.guard.ValidateURL(req.URL); err != nil {
+		s.jsonError(w, http.StatusBadRequest, fmt.Sprintf("url rejected: %v", err))
+		return
+	}
 
 	cfg := s.requestConfig()
 	cfg.Browser.Headless = true
 
-	browserFetcher, err := fetcher.NewBrowserFetcher(cfg, s.logger)
+	browserFetcher, err := fetcher.NewBrowserFetcher(cfg, s.guard, s.logger)
 	if err != nil {
 		s.jsonError(w, http.StatusServiceUnavailable, "browser not available")
 		return

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
+	"github.com/IshaanNene/ScrapeGoat/internal/provenance"
 	"github.com/IshaanNene/ScrapeGoat/pkg/scrapegoat/types"
 )
 
@@ -24,10 +25,22 @@ func NewRegexParser(logger *slog.Logger) *RegexParser {
 	}
 }
 
-// Parse implements Parser for regex rules.
+// Parse implements Parser for regex rules, as a view over Derive.
 func (p *RegexParser) Parse(resp *types.Response, rules []config.ParseRule) ([]*types.Item, []string, error) {
+	assertions, _, err := p.Derive(resp, rules)
+	var items []*types.Item
+	if item := ItemFromAssertions(resp.Request.URLString(), assertions); item != nil {
+		items = append(items, item)
+	}
+	// A bad pattern is reported but does not discard what the good ones matched,
+	// which is what this returned before and what a partial rule set deserves.
+	return items, nil, err
+}
+
+// Derive returns one assertion per regex match.
+func (p *RegexParser) Derive(resp *types.Response, rules []config.ParseRule) ([]provenance.Assertion, []string, error) {
 	body := string(resp.Body)
-	item := types.NewItem(resp.Request.URLString())
+	var assertions []provenance.Assertion
 	var errs []string
 
 	for _, rule := range rules {
@@ -41,17 +54,8 @@ func (p *RegexParser) Parse(resp *types.Response, rules []config.ParseRule) ([]*
 			continue
 		}
 
-		values := p.extractRegex(re, body)
-		if len(values) == 1 {
-			item.Set(rule.Name, values[0])
-		} else if len(values) > 1 {
-			item.Set(rule.Name, values)
-		}
-	}
-
-	var items []*types.Item
-	if len(item.Fields) > 0 {
-		items = append(items, item)
+		assertions = append(assertions,
+			valueAssertions(rule.Name, "regex:"+rule.Pattern, regexVersion, p.extractRegex(re, body))...)
 	}
 
 	var retErr error
@@ -62,7 +66,7 @@ func (p *RegexParser) Parse(resp *types.Response, rules []config.ParseRule) ([]*
 		}
 	}
 
-	return items, nil, retErr
+	return assertions, nil, retErr
 }
 
 // extractRegex applies a compiled regex to the body and returns matches.

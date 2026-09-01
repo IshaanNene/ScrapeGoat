@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -21,7 +20,6 @@ import (
 
 	"github.com/IshaanNene/ScrapeGoat/internal/apiserver"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
-	"github.com/IshaanNene/ScrapeGoat/internal/distributed"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetchlog"
@@ -66,8 +64,8 @@ Crawl a site, extract structured data, or expose either to an AI agent over MCP.
   • Checkpoint pause/resume (--resume)
   • MCP server, REST API, Prometheus metrics
 
-Tools outside the core — SEO audit, change detection, crawl graph, dashboard,
-REPL, benchmark harness — live in contrib/ and are built separately.`,
+Tools outside the core — SEO audit, change detection, crawl graph, benchmark
+harness — live in contrib/ and are built separately.`,
 	}
 
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file path")
@@ -77,10 +75,7 @@ REPL, benchmark harness — live in contrib/ and are built separately.`,
 	rootCmd.AddCommand(newCmd())
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(configCmd())
-	rootCmd.AddCommand(masterCmd())
-	rootCmd.AddCommand(workerCmd())
 	rootCmd.AddCommand(extractCmd())
-	rootCmd.AddCommand(scaleCmd())
 	rootCmd.AddCommand(mcpCmd())
 	rootCmd.AddCommand(serveCmd())
 	rootCmd.AddCommand(replayCmd())
@@ -314,11 +309,60 @@ func openCorpus(eng *engine.Engine, logDir string) (provenance.RecordWriter, err
 	eng.SetCorpusWriter(w, crawlID)
 
 	fmt.Fprintf(os.Stderr, "  writing provenance records to %s\n", corpusPath)
+
+	// The claims go alongside the records, under a derived name rather than a flag
+	// of their own. They are one artifact in two tables joined on the content hash,
+	// and an operator holding one without the other has half a corpus — which is
+	// not a state a forgotten flag should be able to produce.
+	assertionsPath := provenance.AssertionPathFor(corpusPath)
+	aw, err := provenance.NewAssertionWriter(assertionsPath)
+	if err != nil {
+		w.Close()
+		return nil, err
+	}
+	eng.SetAssertionWriter(aw)
+	assertionWriter = aw
+
+	fmt.Fprintf(os.Stderr, "  writing derived claims to %s\n", assertionsPath)
 	return w, nil
+}
+
+// assertionWriter is closed and reported alongside the corpus. Package-level for
+// the same reason the corpus flags are: this file threads run state through
+// globals, and inventing a second convention here would be worse than following
+// the one that exists.
+var assertionWriter *provenance.AssertionWriter
+
+// reportAssertions closes the claim file and says what it holds.
+func reportAssertions() {
+	if assertionWriter == nil {
+		return
+	}
+	w := assertionWriter
+	assertionWriter = nil
+
+	if err := w.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "  claims did not close cleanly: %v\n", err)
+		return
+	}
+
+	written, skipped := w.Stats()
+	fmt.Printf("  Claims:    %d -> %s\n", written, w.Path())
+	if skipped > 0 {
+		// Reported rather than hidden: a claim with no observation to attach to is
+		// a derivation bug, and a silent drop is how it would stay one.
+		fmt.Printf("             %d dropped for naming no observation\n", skipped)
+	}
 }
 
 // reportCorpus prints what the corpus ended up holding.
 func reportCorpus(w provenance.RecordWriter) {
+	// Deferred as well as called inline below. The inline call puts the claim
+	// count next to the record count where a reader expects it; this makes sure
+	// the file is still closed when one of the early returns below is taken.
+	// reportAssertions clears its writer, so the second call is a no-op.
+	defer reportAssertions()
+
 	if w == nil {
 		return
 	}
@@ -332,6 +376,7 @@ func reportCorpus(w provenance.RecordWriter) {
 	if skipped > 0 {
 		fmt.Printf("             %d skipped for incomplete provenance\n", skipped)
 	}
+	reportAssertions()
 
 	records, err := provenance.ReadAnyCorpus(w.Path())
 	if err != nil {
@@ -697,105 +742,6 @@ func main() {
 	return nil
 }
 
-// masterCmd creates the "master" subcommand for starting the distributed coordinator.
-func masterCmd() *cobra.Command {
-	var (
-		addr string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "master",
-		Short: "Start the distributed crawl coordinator",
-		Long:  "Start the master node that coordinates distributed workers, assigns tasks, and monitors cluster health.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := setupLogger()
-
-			master := distributed.NewMaster(logger)
-			api := distributed.NewMasterAPI(master, logger)
-
-			if err := api.Start(addr); err != nil {
-				return fmt.Errorf("start master API: %w", err)
-			}
-
-			fmt.Printf("🐐 ScrapeGoat Master running at %s\n", addr)
-			fmt.Printf("\nEndpoints:\n")
-			fmt.Printf("  POST   %s/api/register    — Register worker\n", addr)
-			fmt.Printf("  POST   %s/api/submit      — Submit crawl task\n", addr)
-			fmt.Printf("  GET    %s/api/status       — Cluster status\n", addr)
-			fmt.Printf("  GET    %s/api/tasks/:id    — Get tasks for worker\n", addr)
-			fmt.Printf("\nPress Ctrl+C to stop.\n")
-
-			// Wait for shutdown signal
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-			<-sigCh
-
-			fmt.Println("\nMaster shutting down...")
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&addr, "addr", ":8081", "master API listen address")
-	return cmd
-}
-
-// workerCmd creates the "worker" subcommand for starting a distributed worker.
-func workerCmd() *cobra.Command {
-	var (
-		masterAddr string
-		capacity   int
-		workerID   string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "worker",
-		Short: "Start a distributed crawl worker",
-		Long:  "Start a worker node that connects to a master, pulls crawl tasks, and executes them.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			logger := setupLogger()
-
-			wcfg := &distributed.WorkerConfig{
-				ID:         workerID,
-				MasterAddr: masterAddr,
-				Capacity:   capacity,
-			}
-
-			worker := distributed.NewWorker(wcfg, logger)
-			worker.SetCrawlFunc(func(task *distributed.Task) error {
-				logger.Info("executing crawl task",
-					"task_id", task.ID,
-					"urls", len(task.URLs),
-				)
-				return nil
-			})
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			if err := worker.Start(ctx); err != nil {
-				return fmt.Errorf("start worker: %w", err)
-			}
-
-			fmt.Printf("🐐 ScrapeGoat Worker %s connected to %s\n", workerID, masterAddr)
-			fmt.Printf("   Capacity: %d concurrent tasks\n", capacity)
-			fmt.Printf("\nPress Ctrl+C to stop.\n")
-
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-			<-sigCh
-
-			worker.Stop()
-			fmt.Println("\nWorker stopped.")
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&masterAddr, "master", "http://localhost:8081", "master node address")
-	cmd.Flags().IntVar(&capacity, "capacity", 10, "max concurrent tasks")
-	cmd.Flags().StringVar(&workerID, "id", fmt.Sprintf("worker-%d", time.Now().UnixMilli()), "worker ID")
-	return cmd
-}
-
 // extractCmd creates the "extract" subcommand for auto-extracting data.
 func extractCmd() *cobra.Command {
 	var (
@@ -874,38 +820,6 @@ Examples:
 	return cmd
 }
 
-// scaleCmd creates the "scale" subcommand.
-func scaleCmd() *cobra.Command {
-	var masterAddr string
-
-	cmd := &cobra.Command{
-		Use:   "scale [workers]",
-		Short: "Scale worker count up or down",
-		Long:  "Adjust the number of distributed crawl workers in the cluster.",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("📊 Requesting scale to %s workers at %s...\n", args[0], masterAddr)
-
-			resp, err := http.Get(masterAddr + "/api/scale")
-			if err != nil {
-				return fmt.Errorf("contact master: %w", err)
-			}
-			defer resp.Body.Close()
-
-			var status map[string]any
-			if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-				return fmt.Errorf("decode scale response: %w", err)
-			}
-
-			fmt.Printf("✅ Scale request sent. Current workers: %v\n", status["current_workers"])
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&masterAddr, "master", "http://localhost:8081", "master node address")
-	return cmd
-}
-
 // generateProject creates a new project directory with config and spider scaffold.
 func generateProject(name string) error {
 	dir := name
@@ -965,11 +879,6 @@ storage:
   type: json
   output_path: ./output/%s
   batch_size: 100
-
-distributed:
-  enabled: false
-  master_addr: ":8081"
-  redis_addr: "localhost:6379"
 
 metrics:
   enabled: true

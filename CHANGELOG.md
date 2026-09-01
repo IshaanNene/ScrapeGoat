@@ -13,6 +13,149 @@ wired into the running system, and several security properties a crawler needs w
 absent. Both are addressed, and the README now describes only what actually runs —
 everything else moved to [ROADMAP.md](ROADMAP.md).
 
+### Added (corpus model)
+
+- **Dual-write.** A crawl with `--corpus` now emits both shapes from one derivation:
+  the records file as before, plus a sibling `.assertions.jsonl` of derived claims,
+  joined to it by content hash. Two flat tables rather than one nested one — a page
+  yields zero to hundreds of claims, and the Parquet projection is deliberately flat.
+  The name is derived from the corpus path rather than taken from a second flag,
+  because holding one file without the other is half a corpus.
+
+- **`--corpus` claims now carry evidence.** Each row in the assertions file names the
+  observation it came from and the byte range within it, so a value can be re-checked
+  years later against the fetch log alone.
+
+- **`Item` is now a view over `Assertion`**, not a second thing produced beside it.
+  All four parsers derive assertions and implement `Parse` in terms of `Derive`, so
+  it cannot drift back into a parallel path. Each claim carries the method that
+  produced it and that method's version.
+
+- **`Observation`, `Assertion`, `EvidenceSpan` and `PolicyState`** in
+  `internal/provenance`. An observation is content-addressed bytes plus how they were
+  obtained; an assertion is one derived claim about an observation carrying the bytes
+  it came from, the method and version that produced it, and whether the evidence
+  checks out. Nothing is wired to them yet — they are the target shape for merging
+  `types.Item` and `provenance.Record`, which are today two parallel models that never
+  meet.
+
+- **Evidence spans on every derivation.** CSS, XPath, regex, structured data and
+  main-content extraction all produce claims carrying the byte range of the source that
+  supports them, the method and version that produced them, and a confidence. Across
+  the golden corpus every claim grounds, and `TestEvidenceSpansReVerifyOffline` reads
+  each stored body back by hash and checks that the span renders to the value — 698 of
+  them, verified without the extractor, the network, or anything but the bytes.
+
+  `Assertion.Validate` records one of three outcomes: grounded; attempted and not
+  found, in which case the claim is kept, flagged unsupported and its confidence
+  zeroed; or not attempted, for values like a JSON-LD graph that are parsed objects
+  rather than a run of source text. That third state matters — marking a whole category
+  unsupported for structural reasons would stop the flag meaning anything.
+
+  Matching goes through a rendering of the page that collapses whitespace per Unicode
+  rune, decodes character references, and optionally drops markup and the contents of
+  non-text elements, while remembering the source range behind every rendered byte.
+  Each of those was a page that would not ground without it. Fuzzed at 13.7M
+  executions and in CI's fuzz list: an off-by-one here does not crash, it writes a
+  citation pointing at the wrong bytes.
+
+- **A golden corpus** at `tests/golden`, frozen from a 17-fetch recording of
+  books.toscrape.com. It pins the items, the records, and the claims, and asserts that
+  items are exactly the assertion projection across every page. Replay is offline and
+  deterministic.
+
+### Fixed (corpus model)
+
+- **Extraction was not reproducible.** `internal/extract` held scored candidates in a
+  map. The winner was chosen with a strict `>`, so two containers tying on score handed
+  the article to whichever the runtime visited first — different text on different runs
+  of the same bytes. The confidence denominator was summed by iterating the same map,
+  and floating point addition is not associative, so the value moved in its last bits.
+  Replaying one fetch log twice produced two different corpora, which is a direct
+  failure of the property the project is built around.
+
+- **A dead sibling-merge in the extractor**, which looked up `scores[sib]` in a map
+  keyed by `*goquery.Selection` while `Siblings()` allocates fresh ones. Unreachable for
+  as long as it existed. Removed rather than repaired — repairing it changes extraction
+  output and owes a benchmark re-run; see ROADMAP.md. `Result.Blocks` is always 1.
+
+- **Each response's DOM is parsed once.** The corpus writer built its own document and
+  the parser then built another from the same bytes. The extractor gets a clone, because
+  it strips `nav`, `aside`, `footer` and `header` from its input — sharing the parsed
+  tree directly would have deleted most of a site's navigation before link discovery
+  ran, and the crawl would quietly have stopped finding pages.
+
+- **`RobotsManager.Report` no longer fetches.** Its doc comment promised it read the
+  cache and cost no extra request; it called through to a path that fetches on a miss.
+  With `respect_robots_txt: false` the cache is never populated, so every domain in a
+  corpus crawl took a robots.txt request nothing asked for and no counter recorded.
+
+### Security (remediation pass)
+
+- **The headless browser is no longer an unguarded SSRF path.** Chromium does its own
+  DNS and opens its own sockets, so `ValidateURL` — which deliberately checks only the
+  scheme and shape, leaving addresses to `DialContext` — was the only thing between an
+  attacker-supplied URL and the connection. No Go code was in the path to enforce
+  anything.
+
+  Reachable from the agent surface: an MCP client whose model had just read a page
+  saying "screenshot `http://169.254.169.254/latest/meta-data/`" passed the scheme
+  check, Chromium fetched cloud metadata, and the credentials came back to the model
+  as page content. The REST screenshot endpoint validated nothing at all.
+
+  Browser egress now goes through a loopback proxy backed by `URLGuard.DialContext`,
+  with `--proxy-bypass-list=<-loopback>` so that Chromium's implicit exemptions for
+  localhost *and link-local* — the destinations that matter most here — do not apply.
+  `NewBrowserFetcher` takes a `*safety.URLGuard` as a required argument, so an
+  unguarded browser is a compile error.
+
+- **Chromium's security boundaries are back on.** `--no-sandbox`,
+  `--disable-setuid-sandbox`, `--disable-web-security` and site isolation were all
+  disabled in a process whose job is rendering pages chosen by someone else.
+  `--no-sandbox` existed to run as root in a container; the Dockerfile has run as an
+  unprivileged user since. A test fails if any of them return, including rod's own
+  default of `--disable-features=site-per-process`.
+
+### Fixed (remediation pass)
+
+- **Politeness was keyed on the hostname, not the registrable domain**, despite the
+  throttler's own documentation. `a.example.com` and `b.example.com` held independent
+  rate limiters and circuit-breaker budgets, so a crawl touching fifty subdomains sent
+  a site fifty times the configured rate. Nothing surfaced it: every limiter was
+  correctly obeying its delay.
+
+- **A data race on the engine's random source.** `backoffFor` drew from a single
+  `*rand.Rand` from every worker goroutine, and `math/rand/v2`'s `*Rand` is not safe
+  for concurrent use. Serialised. Note this does not restore reproducibility of retry
+  delays under concurrency — see ROADMAP.md.
+
+- **Completion is decided from an in-flight counter rather than idle workers.** A
+  worker holding a just-dequeued request was briefly counted as idle, so with an empty
+  queue at that instant the crawl could be declared finished and the frontier closed
+  underneath a fetch about to start.
+
+- **The benchmark CI job ran nothing.** Its path did not exist and the pipe to `tee`
+  swallowed the non-zero status, so it reported success for its entire life.
+
+- **Goroutine leaks fail the build.** `goleak.VerifyTestMain` across the core
+  packages, which immediately found one.
+
+### Removed (remediation pass)
+
+Every subsystem that compiled, passed tests, and was reachable from nothing:
+`internal/distributed` and the master/worker/scale commands, `internal/llmextract`,
+`internal/media`, `internal/api`, `internal/engine/autoscale.go`,
+`internal/observability/tracing.go`, `internal/fetcher/captcha.go`, and
+`contrib/{plugin,dashboard,repl,antibot,automation}`. The `distributed`, `ai` and
+`llm` config sections went with them — they were read by nothing, so an operator
+setting `llm.enabled` with an API key got silence.
+
+The README feature table lost its Distributed and LLM extraction rows. `scrapegoat
+scale N` returns an error instead of printing a success message for the `GET
+/api/scale` it issued without ever sending `N`.
+
+CAPTCHA *detection* stays in `internal/middleware`; only solving was removed.
+
 ### Added (Phase 3 — provenance)
 
 - **`--compliance-report out.json`** writes a machine-readable account of what the

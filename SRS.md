@@ -2,6 +2,13 @@
 
 ## ScrapeGoat — Next-Generation Web Scraping & Crawling Toolkit
 
+> **Historical document.** This records the requirements the project was designed
+> against, not what it ships today. Several requirements here were implemented and
+> later removed — the AI-processing features in F4 in particular: `internal/ai/` now
+> lives in `examples/aicrawl/`, and `internal/llmextract/` has been deleted. AI is a
+> derivation tier, not a pipeline stage. For what actually runs, read the feature
+> table in [README.md](README.md); for what is planned, [ROADMAP.md](ROADMAP.md).
+
 | Field          | Value                                              |
 |----------------|-----------------------------------------------------|
 | **Version**    | 1.0                                                 |

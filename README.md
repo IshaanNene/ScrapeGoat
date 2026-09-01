@@ -314,26 +314,25 @@ SETTINGS, header order, TCP characteristics, and behaviour are all still tells.
 | **Output** | JSON, JSONL, CSV |
 | **Interfaces** | CLI, Go library, MCP server, REST + WebSocket API, Python and TypeScript SDKs |
 | **Dedup** | Exact set, or Bloom at 1.2 bytes/URL when a crawl outgrows memory |
-| **Distributed** | Master/worker with a Redis queue — at-least-once delivery, recovery of tasks abandoned by dead workers |
 | **Browser** | Headless Chromium via go-rod for JS-rendered pages |
 | **Observability** | Prometheus metrics with labels and histograms |
-| **LLM extraction** | OpenAI, Anthropic, Ollama; schema-based, SQLite-cached |
 
-Deliberately **not** here: SEO auditing, change detection, crawl-graph export, a
-web dashboard, a REPL, and a benchmark harness. They work, and they live in
-[contrib/](contrib/) — out of the binary and out of this list. The reasoning is in
+Deliberately **not** here: SEO auditing, change detection, crawl-graph export, and a
+benchmark harness. They work, and they live in [contrib/](contrib/) — out of the
+binary and out of this list. The reasoning is in
 [contrib/README.md](contrib/README.md); the short version is that every subsystem
 in core is one the crawl's determinism invariant has to hold across.
 
-The autoscaled pool and in-process tracing are implemented but not wired into the
-crawl path; they are in [ROADMAP.md](ROADMAP.md). If it is in the table above, it
-runs.
+Nothing in this repository is implemented-but-unwired any more. The autoscaled pool,
+the hand-rolled tracer, the distributed master/worker, and LLM extraction have all
+been deleted rather than left in the tree looking finished; what would replace them
+is in [ROADMAP.md](ROADMAP.md). If it is in the table above, it runs.
 
 ## Docs
 
 **Start here:** [Quick Start](docs/quickstart.md) · [Examples](docs/examples.md) · [MCP setup](docs/mcp.md)
 
-**Going deeper:** [Architecture](docs/architecture.md) · [Record & replay](docs/REPLAY.md) · [Provenance](docs/PROVENANCE.md) · [Middleware](docs/middleware.md) · [Distributed](docs/distributed.md) · [API spec](docs/api.yaml)
+**Going deeper:** [Architecture](docs/architecture.md) · [Record & replay](docs/REPLAY.md) · [Provenance](docs/PROVENANCE.md) · [Middleware](docs/middleware.md) · [API spec](docs/api.yaml)
 
 **Design:** [Design docs](docs/design/) — accepted proposals, with the alternatives that were rejected
 

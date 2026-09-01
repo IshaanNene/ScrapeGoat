@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/IshaanNene/ScrapeGoat/internal/ai"
 	"github.com/IshaanNene/ScrapeGoat/internal/config"
 	"github.com/IshaanNene/ScrapeGoat/internal/engine"
 	"github.com/IshaanNene/ScrapeGoat/internal/fetcher"
@@ -49,12 +48,12 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	// ── LLM Configuration ──────────────────────────────────────────
-	provider := ai.ProviderOllama
+	provider := ProviderOllama
 	model := "llama3.2"
 	endpoint := "http://localhost:11434"
 
 	if p := os.Getenv("SCRAPEGOAT_LLM_PROVIDER"); p != "" {
-		provider = ai.LLMProvider(p)
+		provider = LLMProvider(p)
 	}
 	if m := os.Getenv("SCRAPEGOAT_LLM_MODEL"); m != "" {
 		model = m
@@ -62,11 +61,11 @@ func main() {
 	if e := os.Getenv("SCRAPEGOAT_LLM_ENDPOINT"); e != "" {
 		endpoint = e
 	}
-	if provider == ai.ProviderOpenAI && endpoint == "http://localhost:11434" {
+	if provider == ProviderOpenAI && endpoint == "http://localhost:11434" {
 		endpoint = "https://api.openai.com"
 	}
 
-	llmClient := ai.NewLLMClient(ai.LLMConfig{
+	llmClient := NewLLMClient(LLMConfig{
 		Provider:    provider,
 		Endpoint:    endpoint,
 		Model:       model,
@@ -117,13 +116,13 @@ func main() {
 
 	if llmClient != nil {
 		// AI Summarizer: summarizes body_text field
-		pipe.Use(ai.NewSummarizer(llmClient, []string{"body_text"}, 200, logger))
+		pipe.Use(NewSummarizer(llmClient, []string{"body_text"}, 200, logger))
 
 		// Named Entity Recognition: extracts entities from body_text
-		pipe.Use(ai.NewNERExtractor(llmClient, []string{"body_text"}, logger))
+		pipe.Use(NewNERExtractor(llmClient, []string{"body_text"}, logger))
 
 		// Sentiment Analysis: evaluates sentiment of body_text
-		pipe.Use(ai.NewSentimentAnalyzer(llmClient, []string{"body_text"}, logger))
+		pipe.Use(NewSentimentAnalyzer(llmClient, []string{"body_text"}, logger))
 	}
 
 	eng.SetPipeline(pipe)

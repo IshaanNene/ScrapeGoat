@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math/rand/v2"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -105,6 +104,19 @@ type Parser interface {
 	Parse(resp *types.Response, rules []config.ParseRule) ([]*types.Item, []string, error)
 }
 
+// Deriver is a Parser that reports its derivations as assertions rather than only
+// as items.
+//
+// Optional, and checked for at run time: a caller with its own Parser keeps
+// working, it just produces no assertions. When a parser implements this, the
+// scheduler asks for assertions once and projects the item from them, so there is
+// still exactly one extraction pass per response.
+type Deriver interface {
+	Parser
+	Derive(resp *types.Response, rules []config.ParseRule) ([]provenance.Assertion, []string, error)
+	ItemFrom(sourceURL string, assertions []provenance.Assertion) *types.Item
+}
+
 // Pipeline is the interface for the item processing pipeline.
 type Pipeline interface {
 	Process(item *types.Item) (*types.Item, error)
@@ -150,12 +162,17 @@ type Engine struct {
 	// from the standard library, so that a crawl can be replayed. See
 	// docs/design/0001-deterministic-crawl.md.
 	clock clock.Clock
-	rand  *rand.Rand
+	rand  randSource
 
 	// corpus, when set, receives a provenance record for every response. Nil by
 	// default: most crawls do not want one, and building records costs an
 	// extraction pass over each body.
 	corpus provenance.RecordWriter
+
+	// assertions, when set, receives the derived claims for every response,
+	// joined to the record above by content hash. Set together with corpus in
+	// practice: half a corpus is not useful.
+	assertions provenance.AssertionSink
 
 	// crawlID identifies this run in the records it emits, so a corpus assembled
 	// from several crawls can still be traced back per record.
@@ -186,7 +203,7 @@ func New(cfg *config.Config, logger *slog.Logger, opts ...Option) *Engine {
 
 	e := &Engine{
 		clock:    o.clock,
-		rand:     o.rand,
+		rand:     newLockedRand(o.rand),
 		cfg:      cfg,
 		logger:   logger,
 		frontier: NewFrontier(o.clock),
@@ -236,6 +253,14 @@ func (e *Engine) SetCorpusWriter(w provenance.RecordWriter, crawlID string) {
 	defer e.mu.Unlock()
 	e.corpus = w
 	e.crawlID = crawlID
+}
+
+// SetAssertionWriter attaches the sink for derived claims. Like the corpus writer,
+// the engine does not close it.
+func (e *Engine) SetAssertionWriter(w provenance.AssertionSink) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.assertions = w
 }
 
 // SetParser sets the parser implementation.
@@ -395,7 +420,13 @@ func (e *Engine) Wait() {
 	<-e.shutdownDone
 }
 
-// Stop gracefully stops the engine.
+// Stop gracefully stops the engine. It signals; it does not join.
+//
+// Callers must still call Wait. The item and result processors range over channels
+// that only Wait closes, and it closes them there rather than here for a reason:
+// itemChan can only be closed once every worker has returned from scheduler.Wait(),
+// or a worker still mid-send panics on a closed channel. Stopping without waiting
+// leaves those two goroutines parked for the life of the process.
 func (e *Engine) Stop() {
 	if !e.state.CompareAndSwap(int32(StateRunning), int32(StateStopping)) {
 		return

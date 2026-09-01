@@ -24,9 +24,15 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      # The path used to be ./internal/benchmark/..., which does not exist — the
+      # benchmarks are in contrib/benchmark/. `go test` reported "matched no
+      # packages" and the pipe to tee swallowed the non-zero status, so this job
+      # went green for its whole life while running nothing. `set -o pipefail`
+      # is here so the next path mistake fails instead of passing quietly.
       - name: Run benchmarks
         run: |
-          go test ./internal/benchmark/... -bench=. -benchmem -count=3 -timeout=10m | tee benchmark.txt
+          set -o pipefail
+          go test ./contrib/benchmark/... -bench=. -benchmem -count=3 -timeout=10m | tee benchmark.txt
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
