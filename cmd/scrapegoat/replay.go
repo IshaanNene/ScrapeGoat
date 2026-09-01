@@ -18,6 +18,8 @@ var (
 	replayOutput string
 	replayFormat string
 	replayConfig string
+	replayCorpus string
+	replayItems  bool
 	verifyJSON   bool
 )
 
@@ -43,6 +45,8 @@ fixed, so any difference in the output is attributable to the policy change.`,
 	cmd.Flags().StringVarP(&replayOutput, "output", "o", "./replay-output", "output directory or file path")
 	cmd.Flags().StringVarP(&replayFormat, "format", "f", "json", "output format: json, jsonl, csv")
 	cmd.Flags().StringVar(&replayConfig, "config-override", "", "replay under a different config file instead of the recorded one")
+	cmd.Flags().StringVar(&replayCorpus, "corpus", "", "corpus path (.parquet or .jsonl, by extension); defaults to <output>/corpus.jsonl")
+	cmd.Flags().BoolVar(&replayItems, "legacy-items", false, "also write the flat item file (deprecated; removed in "+legacyItemsRemovedIn+")")
 
 	return cmd
 }
@@ -63,6 +67,16 @@ func runReplay(_ *cobra.Command, args []string) error {
 	// Whatever the recording said about output, this run writes where it was told.
 	cfg.Storage.Type = replayFormat
 	cfg.Storage.OutputPath = replayOutput
+
+	// Politeness is a policy about not overloading a server, and a replay contacts
+	// none: every response comes from the log. Honouring the recorded delay made a
+	// replay take as long as the crawl it replays — seventeen cached fetches at one
+	// second each — which is the opposite of what this command is for, and made
+	// regenerating a corpus from a log cost the same as re-crawling the sites.
+	//
+	// Nothing about the output depends on it. The delay changes the order pages are
+	// dequeued in, not what is derived from any of them.
+	cfg.Engine.PolitenessDelay = 0
 
 	// A replay exists to reproduce a run, so a scheduling-dependent record order
 	// would defeat it: the records would be right and the file would still differ.
@@ -87,9 +101,23 @@ func runReplay(_ *cobra.Command, args []string) error {
 
 	eng := engine.New(cfg, logger)
 	eng.SetFetcher("http", player)
-	if err := wireCrawlPipeline(eng, cfg, logger); err != nil {
+	if err := wireCrawlPipeline(eng, cfg, logger, replayItems); err != nil {
 		return err
 	}
+
+	// A replay derives a corpus from the log without going back to the network,
+	// which is the operation wanted after any change to how values are derived —
+	// including regenerating the golden corpus in tests/. Before this, the only
+	// way to rebuild a corpus was to crawl the sites again.
+	corpus, err := openCorpus(eng, dir, resolveCorpusPath(replayCorpus, cfg.Storage.OutputPath))
+	if err != nil {
+		return err
+	}
+	if corpus != nil {
+		defer corpus.Close()
+	}
+
+	announceOutputs(legacyItems || replayItems)
 
 	for _, seed := range manifest.Seeds {
 		if err := eng.AddSeed(seed); err != nil {
@@ -103,12 +131,16 @@ func runReplay(_ *cobra.Command, args []string) error {
 	}
 	eng.Wait()
 
+	reportCorpus(corpus)
+
 	stats := eng.StatsSnapshot()
 	fmt.Printf("\n  Replay complete in %s\n", time.Since(start).Round(time.Millisecond))
 	fmt.Printf("   Recorded:  %d fetches in the log\n", player.Len())
 	fmt.Printf("   Served:    %v requests, %v failed\n", stats["requests_sent"], stats["requests_failed"])
 	fmt.Printf("   Items:     %v scraped\n", stats["items_scraped"])
-	fmt.Printf("   Output:    %s\n", cfg.Storage.OutputPath)
+	if replayItems {
+		fmt.Printf("   Written:   %s\n", cfg.Storage.OutputPath)
+	}
 
 	if replayConfig != "" {
 		fmt.Printf("\n   Ran under %s, not the recorded config. Differences from the original\n", replayConfig)

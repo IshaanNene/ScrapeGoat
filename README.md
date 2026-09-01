@@ -80,9 +80,22 @@ scrapegoat crawl https://books.toscrape.com \
   --depth 2 \
   --concurrency 10 \
   --allowed-domains books.toscrape.com \
-  --output ./out \
-  --format jsonl
+  --output ./out
 ```
+
+That writes a **corpus**: two files in `./out`, joined on the content hash.
+
+```
+out/corpus.jsonl              one row per page — the bytes' hash, the fetch, what
+                              the source said about reuse, the main text
+out/corpus.assertions.jsonl   one row per derived value — what it is, which method
+                              produced it at what version, and the byte range of
+                              the source that supports it
+```
+
+The point of the second file is that a value can be checked. A row does not say
+"the price is £51.25", it says that *and* which bytes of which document say so, so
+anyone holding the page can confirm it without the crawler, the network, or trust.
 
 Interrupt it with `Ctrl-C` and pick up where it stopped:
 
@@ -90,8 +103,13 @@ Interrupt it with `Ctrl-C` and pick up where it stopped:
 scrapegoat crawl https://books.toscrape.com --resume
 ```
 
-Useful flags: `--delay` (politeness, default `1s`), `--max-requests`, `--format`
-(`json`, `jsonl`, `csv`). Full list with `scrapegoat crawl --help`.
+Useful flags: `--delay` (politeness, default `1s`), `--max-requests`, `--corpus`
+(path and format — `.jsonl` or `.parquet`, by extension). Full list with
+`scrapegoat crawl --help`.
+
+**Coming from an earlier version?** A crawl used to leave a flat `results.json`
+behind. It is behind `--legacy-items` now and goes away in v0.3.0; the corpus
+carries the same values plus where each one came from.
 
 ---
 
@@ -311,7 +329,8 @@ SETTINGS, header order, TCP characteristics, and behaviour are all still tells.
 |---|---|
 | **Crawling** | Priority frontier, per-domain rate limiting, circuit breaker, jittered backoff, `robots.txt`, sitemap discovery, checkpoint resume |
 | **Parsing** | CSS, XPath, regex, JSON-LD, OpenGraph, tables, structural listing detection, density-based main-content extraction |
-| **Output** | JSON, JSONL, CSV |
+| **Output** | A corpus: observations and derived claims, JSONL or Parquet, joined on content hash. Flat items behind `--legacy-items` until v0.3.0 |
+| **Provenance** | Every value carries the method that produced it, its version, and the byte range of the source supporting it |
 | **Interfaces** | CLI, Go library, MCP server, REST + WebSocket API, Python and TypeScript SDKs |
 | **Dedup** | Exact set, or Bloom at 1.2 bytes/URL when a crawl outgrows memory |
 | **Browser** | Headless Chromium via go-rod for JS-rendered pages |

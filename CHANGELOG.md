@@ -8,6 +8,49 @@ the major version is 0, the minor version is bumped for breaking changes.
 
 ## [Unreleased]
 
+### Changed — BREAKING
+
+- **A crawl writes a corpus by default.** `--output` now receives `corpus.jsonl` and
+  `corpus.assertions.jsonl` — one row per page and one per derived value, joined on
+  content hash — instead of a flat `results.json`.
+
+  This is the change the rest of the work was for. The flat file could say "the price
+  is £51.25" and nothing else; the corpus says that, which method produced it at what
+  version, and the byte range of the document that supports it, so a value can be
+  re-checked by anyone holding the page.
+
+  **To keep the old file:** pass `--legacy-items`. It writes alongside the corpus and
+  is **removed in v0.3.0**. Every run says which of the two it is doing, because the
+  failure mode of a silent default change is a pipeline reading an empty directory and
+  reporting no error.
+
+  `--corpus` still chooses the path and, by extension, the format.
+
+- **`--compliance-report` no longer requires `--corpus`.** It was derived from the
+  corpus and the corpus was opt-in; there is nothing left to require.
+
+### Added
+
+- **`scrapegoat replay --corpus`.** A corpus can now be re-derived from a fetch log
+  without going back to the network — the operation wanted after any change to how
+  values are derived, including regenerating `tests/golden`. Previously the only way
+  to rebuild a corpus was to crawl the sites again.
+
+### Fixed
+
+- **Replay no longer waits out politeness delays.** It honoured the recorded delay
+  while contacting nothing, so replaying seventeen cached fetches took fifteen
+  seconds — as long as the crawl it replays, and the opposite of what the command's
+  own help promises. Now 30ms. Politeness is a policy about not overloading a server,
+  and a replay opens no sockets.
+
+- **The empty-crawl hint named two commands that do not exist** (`scrapegoat search`,
+  `scrapegoat ai-crawl`). Advice that fails is worse than none, and it failed at the
+  moment someone was already stuck.
+
+- **`openCorpus` no longer writes its resolved path back to the flag variable**, which
+  made a second crawl in the same process inherit the first one's corpus location.
+
 This release is a correctness and honesty pass. Several documented features were not
 wired into the running system, and several security properties a crawler needs were
 absent. Both are addressed, and the README now describes only what actually runs —
