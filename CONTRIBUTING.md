@@ -6,9 +6,31 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ### Prerequisites
 
-- **Go 1.21+** — [Install Go](https://go.dev/dl/)
-- **golangci-lint** — `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
-- **Docker & Docker Compose** (optional, for Redis/Postgres)
+- **Go 1.25+** — [Install Go](https://go.dev/dl/). `go.mod` targets 1.25.0.
+- **golangci-lint v2.12.2**, matching the version CI pins:
+
+  ```bash
+  go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+  ```
+
+  Both halves of that line matter.
+
+  The `/v2/` is not optional. The v1 module path still resolves, and `@latest`
+  against it installs v1.64.8 — the last v1, built with Go 1.24, which refuses to
+  start against a module targeting Go 1.25. It exits in under a second with a
+  config error, which is easy to read as "nothing to report". `.golangci.yml`
+  opens with the story of that happening in CI for a while.
+
+  The pinned version is not optional either. Linters disagree between releases:
+  an older one reports findings CI does not have, and a newer one can miss
+  findings CI does. Either way you are debugging the tool instead of the code.
+
+  `make lint` installs the right one for you if you have none. Three places carry
+  this version — here, `Makefile`, and `.github/workflows/ci.yml` — and they have
+  to move together.
+
+- **Docker & Docker Compose** (optional) — `docker-compose.yaml` runs the API
+  server and Prometheus.
 
 ### Getting Started
 
@@ -23,7 +45,9 @@ make test    # Run all tests
 ## Code Style
 
 - **Format**: All Go code must be formatted with `gofmt`
-- **Lint**: Code must pass `golangci-lint run ./...`
+- **Lint**: Code must pass `golangci-lint run ./...`. `go vet` is not a
+  substitute — it does not run `errcheck`, `staticcheck`, or `gosec`, all of which
+  gate CI.
 - **Naming**: Follow [Go naming conventions](https://go.dev/doc/effective_go#names)
 - **Comments**: All exported types and functions must have doc comments
 - **Errors**: Use `fmt.Errorf` with `%w` for error wrapping
