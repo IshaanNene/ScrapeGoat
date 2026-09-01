@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # No branches filter: a PR targeting a branch other than main used to run no
+    # CI while still reporting as mergeable. See .github/workflows/ci.yml.
   schedule:
     # Run weekly on Monday at 06:00 UTC to catch new CVEs
     - cron: "0 6 * * 1"

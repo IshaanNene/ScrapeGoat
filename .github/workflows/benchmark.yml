@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # No branches filter: a PR targeting a branch other than main used to run no
+    # CI while still reporting as mergeable. See .github/workflows/ci.yml.
 
 permissions:
   contents: read
