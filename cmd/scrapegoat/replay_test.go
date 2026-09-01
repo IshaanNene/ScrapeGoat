@@ -11,7 +11,11 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"reflect"
+	"sort"
+
 	"github.com/IshaanNene/ScrapeGoat/internal/fetchlog"
+	"github.com/IshaanNene/ScrapeGoat/internal/provenance"
 )
 
 // site serves a small linked set of pages and counts what it was asked for.
@@ -95,12 +99,14 @@ func resetGlobals(t *testing.T) {
 		cfgFile, outputPath, outputType, recordDir string
 		replayOutput, replayFormat, replayConfig   string
 		verbose, resumeCrawl, verifyJSON           bool
+		legacyItems, replayItems                   bool
 		depth, concurrent, maxRequests, maxRetries int
 		delay, userAgent, allowedDomains           string
 	}{
 		cfgFile, outputPath, outputType, recordDir,
 		replayOutput, replayFormat, replayConfig,
 		verbose, resumeCrawl, verifyJSON,
+		legacyItems, replayItems,
 		depth, concurrent, maxRequests, maxRetries,
 		delay, userAgent, allowedDomains,
 	}
@@ -109,6 +115,7 @@ func resetGlobals(t *testing.T) {
 		cfgFile, outputPath, outputType, recordDir = prev.cfgFile, prev.outputPath, prev.outputType, prev.recordDir
 		replayOutput, replayFormat, replayConfig = prev.replayOutput, prev.replayFormat, prev.replayConfig
 		verbose, resumeCrawl, verifyJSON = prev.verbose, prev.resumeCrawl, prev.verifyJSON
+		legacyItems, replayItems = prev.legacyItems, prev.replayItems
 		depth, concurrent, maxRequests, maxRetries = prev.depth, prev.concurrent, prev.maxRequests, prev.maxRetries
 		delay, userAgent, allowedDomains = prev.delay, prev.userAgent, prev.allowedDomains
 	})
@@ -144,6 +151,9 @@ func TestCrawlRecordThenReplayProducesIdenticalOutput(t *testing.T) {
 	cfgFile = loopbackConfigFile(t, liveOut)
 	recordDir = logDir
 	outputPath, outputType = "", ""
+	// Both artifacts, so this covers the corpus that is now the output and the item
+	// file that is on its way out.
+	legacyItems = true
 
 	if err := runCrawl(nil, []string{srv.URL + "/"}); err != nil {
 		t.Fatalf("recorded crawl: %v", err)
@@ -178,6 +188,8 @@ func TestCrawlRecordThenReplayProducesIdenticalOutput(t *testing.T) {
 	// --- replay ---
 	recordDir = ""
 	replayOutput, replayFormat = replayOut, "jsonl"
+	replayItems = true
+	replayCorpus = ""
 
 	if err := runReplay(nil, []string{logDir}); err != nil {
 		t.Fatalf("replay: %v", err)
@@ -197,6 +209,17 @@ func TestCrawlRecordThenReplayProducesIdenticalOutput(t *testing.T) {
 			live[:12], liveBody, replayed[:12], replayBody)
 	}
 
+	// The corpus is the output now, so equivalence has to hold for it too — and it
+	// carries strictly more than the item file: the content hash of every body, the
+	// policy each page stated, and the evidence behind every derived value.
+	//
+	// Compared as sets rather than byte for byte. Corpus rows are written as pages
+	// complete, and a live crawl and a replay do not schedule identically, so an
+	// ordering difference would fail a test about content.
+	assertSameCorpus(t,
+		filepath.Join(liveOut, "corpus.jsonl"),
+		filepath.Join(replayOut, "corpus.jsonl"))
+
 	// --- and replaying twice must agree with itself ---
 	second := filepath.Join(work, "replay2")
 	replayOutput = second
@@ -205,6 +228,39 @@ func TestCrawlRecordThenReplayProducesIdenticalOutput(t *testing.T) {
 	}
 	if sha256File(t, filepath.Join(second, "results.jsonl")) != replayed {
 		t.Error("two replays of the same log produced different output")
+	}
+	assertSameCorpus(t,
+		filepath.Join(replayOut, "corpus.jsonl"),
+		filepath.Join(second, "corpus.jsonl"))
+}
+
+// assertSameCorpus compares two corpora by content, ignoring row order.
+func assertSameCorpus(t *testing.T, wantPath, gotPath string) {
+	t.Helper()
+
+	want, err := provenance.ReadCorpus(wantPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", wantPath, err)
+	}
+	got, err := provenance.ReadCorpus(gotPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", gotPath, err)
+	}
+	if len(want) == 0 {
+		t.Fatalf("%s holds no records; the comparison would pass vacuously", wantPath)
+	}
+	if len(want) != len(got) {
+		t.Fatalf("record counts differ: %s has %d, %s has %d", wantPath, len(want), gotPath, len(got))
+	}
+
+	key := func(r provenance.Record) string { return r.URL + "\x00" + r.ContentHash }
+	sort.Slice(want, func(i, j int) bool { return key(want[i]) < key(want[j]) })
+	sort.Slice(got, func(i, j int) bool { return key(got[i]) < key(got[j]) })
+
+	for i := range want {
+		if !reflect.DeepEqual(want[i], got[i]) {
+			t.Errorf("record %d differs\n want: %+v\n got:  %+v", i, want[i], got[i])
+		}
 	}
 }
 

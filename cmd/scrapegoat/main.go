@@ -47,6 +47,7 @@ var (
 	resumeCrawl    bool
 	recordDir      string
 	corpusPath     string
+	legacyItems    bool
 	compliancePath string
 )
 
@@ -107,8 +108,9 @@ func crawlCmd() *cobra.Command {
 	cmd.Flags().StringVar(&allowedDomains, "allowed-domains", "", "comma-separated domains to stay within (e.g. en.wikipedia.org)")
 	cmd.Flags().BoolVar(&resumeCrawl, "resume", false, "resume from the last checkpoint instead of starting fresh")
 	cmd.Flags().StringVar(&recordDir, "record", "", "record every fetch to this directory so the crawl can be replayed")
-	cmd.Flags().StringVar(&corpusPath, "corpus", "", "write a provenance record per page here (.parquet or .jsonl, by extension)")
-	cmd.Flags().StringVar(&compliancePath, "compliance-report", "", "write a machine-readable compliance report here (JSON; requires --corpus)")
+	cmd.Flags().StringVar(&corpusPath, "corpus", "", "corpus path (.parquet or .jsonl, by extension); defaults to <output>/corpus.jsonl")
+	cmd.Flags().BoolVar(&legacyItems, "legacy-items", false, "also write the flat item file (deprecated; removed in v0.3.0)")
+	cmd.Flags().StringVar(&compliancePath, "compliance-report", "", "write a machine-readable compliance report here (JSON)")
 
 	return cmd
 }
@@ -175,22 +177,26 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 		eng.SetFetcher("http", httpFetcher)
 	}
 
-	if err := wireCrawlPipeline(eng, cfg, logger); err != nil {
+	if err := wireCrawlPipeline(eng, cfg, logger, legacyItems); err != nil {
 		return err
 	}
 
-	if compliancePath != "" && corpusPath == "" {
-		return fmt.Errorf("--compliance-report needs --corpus: the report is derived from the corpus, " +
-			"so that the two cannot disagree about the crawl they describe")
-	}
-
-	corpus, err := openCorpus(eng, recordDir)
+	// The corpus is the output now, so it needs no flag to switch it on. --corpus
+	// remains, and still chooses the path and the format.
+	//
+	// Resolved into a local rather than back into the flag variable: writing the
+	// derived path to the global made a second crawl in the same process inherit
+	// the first one's corpus location, which is wrong for anything embedding this
+	// and is why the record-then-replay test passed alone and failed in a suite.
+	corpus, err := openCorpus(eng, recordDir, resolveCorpusPath(corpusPath, cfg.Storage.OutputPath))
 	if err != nil {
 		return err
 	}
 	if corpus != nil {
 		defer corpus.Close()
 	}
+
+	announceOutputs(legacyItems)
 
 	// Setup metrics (if enabled). The recorder must be handed to the engine, not
 	// merely served: without SetMetrics the endpoint comes up and reports zeroes
@@ -270,34 +276,41 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   Requests:  %v sent, %v failed\n", stats["requests_sent"], stats["requests_failed"])
 	fmt.Printf("   Items:     %v scraped, %v dropped\n", stats["items_scraped"], stats["items_dropped"])
 	fmt.Printf("   Data:      %v bytes downloaded\n", stats["bytes_downloaded"])
-	fmt.Printf("   Output:    %s\n", cfg.Storage.OutputPath)
+	if legacyItems {
+		fmt.Printf("   Written:   %s\n", cfg.Storage.OutputPath)
+	}
 
 	reportCorpus(corpus)
 
 	if stats["items_scraped"] == int64(0) {
-		fmt.Println("\n  No items were scraped. The crawl command discovers and follows links by default.")
-		fmt.Println("   For automatic content extraction, try:")
-		fmt.Println("     scrapegoat search <url>      — extract title, headings, body text, meta")
-		fmt.Println("     scrapegoat ai-crawl <url>    — AI-powered summarize, NER, sentiment")
-		fmt.Println("     scrapegoat crawl <url> -c config.yaml  — use custom parse rules")
+		// Named commands only, and only ones this binary has. The previous version
+		// of this hint pointed at `scrapegoat search` and `scrapegoat ai-crawl`,
+		// neither of which exists — advice that fails is worse than none, and it
+		// fails at the moment someone is already stuck.
+		fmt.Println("\n  No values were extracted. The crawl command follows links by default and")
+		fmt.Println("  extracts only what parse rules ask for.")
+		fmt.Println("   To get content out of the pages it fetched:")
+		fmt.Println("     scrapegoat extract <url>               — one page, structure detected automatically")
+		fmt.Println("     scrapegoat crawl <url> -c config.yaml  — a crawl with parse rules")
+		fmt.Println("   The corpus still holds each page's main text and where it came from.")
 	}
 
 	return nil
 }
 
-// openCorpus attaches a provenance corpus writer when --corpus was given.
+// openCorpus attaches the corpus writer.
 //
 // The crawl ID is the fetch log's directory when there is one, so a corpus record
 // points at the log that can prove it. Without a log the records still stand on
 // their own; they just cannot be re-derived.
-func openCorpus(eng *engine.Engine, logDir string) (provenance.RecordWriter, error) {
-	if corpusPath == "" {
+func openCorpus(eng *engine.Engine, logDir, path string) (provenance.RecordWriter, error) {
+	if path == "" {
 		return nil, nil
 	}
 
 	// Format follows the extension. A .parquet full of JSON would be worse than
 	// either, and the extension is what a reader looks at to decide how to open it.
-	w, err := provenance.OpenCorpus(corpusPath)
+	w, err := provenance.OpenCorpus(path)
 	if err != nil {
 		return nil, err
 	}
@@ -308,13 +321,13 @@ func openCorpus(eng *engine.Engine, logDir string) (provenance.RecordWriter, err
 	}
 	eng.SetCorpusWriter(w, crawlID)
 
-	fmt.Fprintf(os.Stderr, "  writing provenance records to %s\n", corpusPath)
+	fmt.Fprintf(os.Stderr, "  writing provenance records to %s\n", path)
 
 	// The claims go alongside the records, under a derived name rather than a flag
 	// of their own. They are one artifact in two tables joined on the content hash,
 	// and an operator holding one without the other has half a corpus — which is
 	// not a state a forgotten flag should be able to produce.
-	assertionsPath := provenance.AssertionPathFor(corpusPath)
+	assertionsPath := provenance.AssertionPathFor(path)
 	aw, err := provenance.NewAssertionWriter(assertionsPath)
 	if err != nil {
 		w.Close()
@@ -435,12 +448,19 @@ func writeComplianceReport(records []provenance.Record, corpus string) {
 // would be reproducing the fetches but not the processing, and the first time the
 // two drifted the replay would produce different output from the same responses —
 // which is precisely the failure the fetch log exists to rule out.
-func wireCrawlPipeline(eng *engine.Engine, cfg *config.Config, logger *slog.Logger) error {
+func wireCrawlPipeline(eng *engine.Engine, cfg *config.Config, logger *slog.Logger, writeItems bool) error {
 	eng.SetParser(parser.NewCompositeParser(logger))
 
 	pipe := pipeline.New(logger)
 	pipe.Use(&pipeline.TrimMiddleware{})
 	eng.SetPipeline(pipe)
+
+	// No storage means no item file. The engine treats that as a crawl nobody asked
+	// for items from, which is now the default: the corpus is the output, and the
+	// flat file is a compatibility shim on its way out.
+	if !writeItems {
+		return nil
+	}
 
 	store, err := storage.NewFileStorageOrdered(
 		cfg.Storage.Type, cfg.Storage.OutputPath, logger, cfg.Storage.DeterministicOrder)
@@ -450,6 +470,51 @@ func wireCrawlPipeline(eng *engine.Engine, cfg *config.Config, logger *slog.Logg
 	eng.SetStorage(store)
 
 	return nil
+}
+
+// announceOutputs says, once per run, what this crawl will write and what it will
+// not.
+//
+// The default output changed: a crawl used to leave results.json behind and now
+// leaves a corpus. That is a breaking change, and the failure mode of a silent one
+// is somebody's pipeline reading an empty directory and reporting no error. So it
+// is stated at the point of use, with the flag that restores the old behaviour,
+// rather than left to the changelog.
+func announceOutputs(writingItems bool) {
+	if writingItems {
+		fmt.Fprintf(os.Stderr,
+			"  --legacy-items is deprecated and will be removed in %s. The corpus carries the\n"+
+				"  same values, plus the bytes each one came from; see docs/PROVENANCE.md.\n",
+			legacyItemsRemovedIn)
+		return
+	}
+	fmt.Fprintf(os.Stderr,
+		"  the flat item file is no longer written by default — pass --legacy-items for it\n")
+}
+
+// legacyItemsRemovedIn names the release that deletes the flat item file. Stated
+// in the deprecation warning rather than left as "a future version", because a
+// deprecation without a date is a warning people learn to scroll past.
+const legacyItemsRemovedIn = "v0.3.0"
+
+// resolveCorpusPath decides where the corpus goes when --corpus was not given.
+//
+// Beside the item file rather than in place of it, so that --output keeps meaning
+// what it meant: the directory a crawl's results land in. A caller who pointed
+// --output at a file gets the corpus next to that file, since the alternative is
+// writing a corpus inside a path that is not a directory.
+func resolveCorpusPath(explicit, outputPath string) string {
+	if explicit != "" {
+		return explicit
+	}
+	dir := outputPath
+	if ext := filepath.Ext(outputPath); ext != "" {
+		dir = filepath.Dir(outputPath)
+	}
+	if dir == "" {
+		dir = "."
+	}
+	return filepath.Join(dir, "corpus.jsonl")
 }
 
 // writeRecordManifest stamps the log with what produced it.

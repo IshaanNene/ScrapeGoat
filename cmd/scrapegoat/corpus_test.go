@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -183,8 +182,13 @@ func TestConfigFileOutputSurvivesFlagDefaults(t *testing.T) {
 		t.Fatalf("crawl: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(configured, "results.jsonl")); err != nil {
-		t.Errorf("config output_path was ignored: %v", err)
+	// The corpus is the default output and follows the configured path.
+	if _, err := os.Stat(filepath.Join(configured, "corpus.jsonl")); err != nil {
+		t.Errorf("config output_path was ignored for the corpus: %v", err)
+	}
+	// The item file only exists when asked for, and then in the same place.
+	if _, err := os.Stat(filepath.Join(configured, "results.jsonl")); err == nil {
+		t.Error("the item file was written without --legacy-items")
 	}
 	if _, err := os.Stat("./output"); err == nil {
 		os.RemoveAll("./output")
@@ -339,20 +343,29 @@ func TestCrawlWritesComplianceReport(t *testing.T) {
 
 // The report is derived from the corpus, so asking for one without the other is a
 // mistake worth naming rather than silently producing nothing.
-func TestComplianceReportRequiresCorpus(t *testing.T) {
+func TestComplianceReportNeedsNoCorpusFlag(t *testing.T) {
 	resetGlobals(t)
 
+	var hits int32
+	srv := corpusSite(t, &hits)
+	defer srv.Close()
+
 	work := t.TempDir()
-	cfgFile = loopbackConfigFile(t, filepath.Join(work, "out"))
+	out := filepath.Join(work, "out")
+	cfgFile = loopbackConfigFile(t, out)
 	corpusPath = ""
 	compliancePath = filepath.Join(work, "compliance.json")
 	t.Cleanup(func() { compliancePath = "" })
 
-	err := runCrawl(nil, []string{"http://127.0.0.1:1/"})
-	if err == nil {
-		t.Fatal("--compliance-report without --corpus was accepted")
+	if err := runCrawl(nil, []string{srv.URL + "/"}); err != nil {
+		t.Fatalf("crawl: %v", err)
 	}
-	if !strings.Contains(err.Error(), "--corpus") {
-		t.Errorf("error does not explain the requirement: %v", err)
+
+	// This used to be an error: the report is derived from the corpus, and the
+	// corpus was opt-in, so asking for one without the other was a request that
+	// could not be satisfied. The corpus is the default output now, so there is
+	// nothing left to require.
+	if _, err := os.Stat(compliancePath); err != nil {
+		t.Errorf("--compliance-report produced nothing without --corpus: %v", err)
 	}
 }
