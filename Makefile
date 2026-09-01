@@ -3,7 +3,17 @@
 BINARY_NAME=scrapegoat
 BUILD_DIR=./bin
 MAIN_PATH=./cmd/scrapegoat
-GOLANGCI_LINT_VERSION ?= v1.64.8
+# Keep in step with the version pinned in .github/workflows/ci.yml. Linters
+# disagree between releases: an older one reports findings CI does not have, a
+# newer one can miss findings CI does, and either way the time goes on the tool
+# instead of the code.
+#
+# This was v1.64.8 on the v1 module path, which cannot lint this repository at
+# all — .golangci.yml is a v2 config, and v1 exits immediately with "you are
+# using a configuration file for golangci-lint v2 with golangci-lint v1". So
+# `make lint` was broken for anyone who did not already have a linter installed.
+GOLANGCI_LINT_VERSION ?= v2.12.2
+GOLANGCI_LINT_MODULE ?= github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 GOLANGCI_LINT_BIN ?= $(shell go env GOPATH)/bin/golangci-lint
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -29,7 +39,7 @@ test-short: ## Run tests (short mode)
 lint: ## Run linters
 	@if ! command -v golangci-lint > /dev/null 2>&1 && [ ! -x "$(GOLANGCI_LINT_BIN)" ]; then \
 		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
-		go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION); \
+		go install $(GOLANGCI_LINT_MODULE)@$(GOLANGCI_LINT_VERSION); \
 	fi
 	@if command -v golangci-lint > /dev/null 2>&1; then \
 		golangci-lint run ./...; \
