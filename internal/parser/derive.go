@@ -117,20 +117,24 @@ func ItemFromAssertions(sourceURL string, assertions []provenance.Assertion) *ty
 		// answer wearing the same name.
 		sort.SliceStable(group, func(i, j int) bool { return group[i].Index < group[j].Index })
 
+		// Collected in the same pass that checks the type, rather than testing
+		// every value and then asserting each one again. The second assertion was
+		// unchecked, which errcheck is right to object to: it is safe only because
+		// of a loop several lines above it, and that is exactly the kind of
+		// reasoning that stops being true after an edit.
+		strs := make([]string, 0, len(group))
 		allStrings := true
 		for _, a := range group {
-			if _, ok := a.Value.(string); !ok {
+			v, ok := a.Value.(string)
+			if !ok {
 				allStrings = false
 				break
 			}
+			strs = append(strs, v)
 		}
 
 		if allStrings {
-			vals := make([]string, 0, len(group))
-			for _, a := range group {
-				vals = append(vals, a.Value.(string))
-			}
-			item.Set(field, vals)
+			item.Set(field, strs)
 			continue
 		}
 
