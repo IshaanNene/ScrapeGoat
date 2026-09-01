@@ -3,6 +3,7 @@ package engine
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"net"
 	"net/url"
 	"sort"
 	"strings"
@@ -117,11 +118,27 @@ func CanonicalizeURL(rawURL string) string {
 	// Remove fragment
 	u.Fragment = ""
 
-	// Remove default ports
+	// Remove default ports.
+	//
+	// The host is rebuilt rather than assigned from Hostname() directly, because
+	// Hostname() answers a different question than the one being asked here. It
+	// strips the brackets from an IPv6 literal and URL.String() does not put them
+	// back, so http://[::1]:80/ canonicalised to http://::1/ — not a URL, and not
+	// one that parses back to the host it came from. Every IPv6 address on a
+	// default port was quietly corrupted.
+	//
+	// It also splits on the *last* colon, so a malformed authority like
+	// "0000:80:80" yields the hostname "0000:80". Assigning that leaves a host
+	// that still looks like host:port, and canonicalising the result strips a
+	// second time — http://0000:80:80 became http://0000:80/ and then
+	// http://0000/. A canonicaliser that is not idempotent hands the same URL two
+	// different dedup keys, which is the one thing it exists to prevent.
 	host := u.Hostname()
 	port := u.Port()
 	if (u.Scheme == "http" && port == "80") || (u.Scheme == "https" && port == "443") {
-		u.Host = host
+		if h, ok := hostWithoutPort(host); ok {
+			u.Host = h
+		}
 	}
 
 	// Sort query parameters
@@ -155,6 +172,28 @@ func CanonicalizeURL(rawURL string) string {
 	}
 
 	return u.String()
+}
+
+// hostWithoutPort renders a hostname as an authority with no port, reporting
+// whether it can be rendered at all.
+//
+// Three cases, and only the first is the ordinary one:
+//
+//   - An ordinary name or IPv4 address passes through.
+//   - An IPv6 literal gets its brackets back. url.URL.Hostname() removes them and
+//     URL.String() does not restore them.
+//   - Anything else containing a colon did not come from a well-formed authority.
+//     Rather than guess, the caller is told to leave the host alone: an unstripped
+//     default port is a cosmetic flaw, while a rewritten malformed host is a
+//     canonical form that changes every time it is applied.
+func hostWithoutPort(host string) (string, bool) {
+	if !strings.Contains(host, ":") {
+		return host, true
+	}
+	if net.ParseIP(host) != nil {
+		return "[" + host + "]", true
+	}
+	return "", false
 }
 
 // hashURL creates a compact hash of a URL string.
