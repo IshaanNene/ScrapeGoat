@@ -4,7 +4,20 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # No branches filter, deliberately.
+    #
+    # This was `branches: [main]`, which meant a pull request targeting anything
+    # else ran no CI at all — and GitHub still reported it mergeable, because the
+    # checks that would have gated it never existed to be required. A stacked PR
+    # therefore looked exactly like a passing one, with only the secret scan
+    # behind it.
+    #
+    # Retargeting does not rescue it either: changing a PR's base fires
+    # `pull_request: edited`, which is not one of the default event types, so the
+    # workflow stays unrun until the branch is pushed to or the PR is reopened.
+    #
+    # Stacking a PR on another is a normal way to split a large change into
+    # reviewable pieces. It should not silently cost the tests.
 
 permissions:
   contents: read
