@@ -58,13 +58,34 @@ func (cm *CheckpointManager) Save(frontier *Frontier, dedup Deduper, stats *Stat
 		return fmt.Errorf("create checkpoint dir: %w", err)
 	}
 
-	// Snapshot frontier (non-destructive — items stay in queue)
+	// Snapshot frontier (non-destructive — items stay in queue). Includes work a
+	// worker is currently holding, which has not been done and must survive.
 	requests := frontier.Snapshot()
+
+	seen := dedup.Export()
+
+	// A deduplicator that has claimed URLs and can export none cannot be
+	// checkpointed. BloomDeduplicator is the case: a Bloom filter cannot enumerate
+	// its members, so Export returns nil by design.
+	//
+	// Writing the checkpoint anyway produced a file claiming an empty seen set,
+	// and resuming from it re-crawled every URL the previous run had already
+	// covered — the exact thing --resume exists to avoid, failing silently and
+	// looking like a slow crawl rather than a broken one. Refusing is louder and
+	// leaves the operator a choice: exact dedup, or no resume.
+	//
+	// The two stop being exclusive once membership is a query against the event
+	// ledger rather than a serialised set; see ROADMAP.md.
+	if len(seen) == 0 && dedup.Count() > 0 {
+		return fmt.Errorf("checkpoint: this deduplicator holds %d URLs but cannot export them, "+
+			"so a resume would re-crawl everything it has already covered — "+
+			"use the default dedup strategy for a resumable crawl", dedup.Count())
+	}
 
 	data := checkpointData{
 		Timestamp:    cm.clock.Now(),
 		FrontierURLs: make([]checkpointReq, len(requests)),
-		SeenHashes:   dedup.Export(),
+		SeenHashes:   seen,
 		Stats: checkpointStats{
 			RequestsSent:    stats.RequestsSent.Load(),
 			RequestsFailed:  stats.RequestsFailed.Load(),

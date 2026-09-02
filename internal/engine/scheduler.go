@@ -204,7 +204,7 @@ func (s *Scheduler) worker(ctx context.Context, id int) {
 		// parent that stopped counting before its children were queued would leave
 		// the frontier momentarily empty and end the crawl one level in.
 		s.processRequest(ctx, logger, req)
-		s.engine.frontier.Done()
+		s.engine.frontier.Done(req)
 
 		active = s.engine.stats.ActiveWorkers.Add(-1)
 		s.engine.metrics.SetActiveWorkers(int(active))

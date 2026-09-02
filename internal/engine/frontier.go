@@ -3,9 +3,9 @@ package engine
 import (
 	"container/heap"
 	"context"
+	"sort"
 
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/IshaanNene/ScrapeGoat/internal/clock"
@@ -34,12 +34,18 @@ type Frontier struct {
 	// at once — a buffered channel could only wake them one at a time.
 	closedCh chan struct{}
 
-	// inFlight counts requests that have left the queue but whose processing has
-	// not finished. Every increment happens under mu at the instant of removal, so
-	// there is no moment in which a request is neither queued nor counted in
-	// flight — which is what makes Outstanding a fact about the crawl rather than
-	// an inference from how idle the workers look.
-	inFlight atomic.Int64
+	// inFlight holds requests that have left the queue but whose processing has
+	// not finished. Every entry is added under mu at the instant of removal, so
+	// there is no moment in which a request is neither queued nor in flight —
+	// which is what makes Outstanding a fact about the crawl rather than an
+	// inference from how idle the workers look.
+	//
+	// The requests themselves are kept, not merely counted, because a checkpoint
+	// has to be able to write them down. Snapshot used to return the queue alone,
+	// so a request a worker was holding at checkpoint time appeared in neither the
+	// saved frontier nor anywhere else — while the dedup set had already claimed
+	// it, so a resume would not accept it back.
+	inFlight map[*types.Request]struct{}
 }
 
 // NewFrontier creates a new Frontier. A nil clock means the system clock.
@@ -47,6 +53,7 @@ func NewFrontier(clk clock.Clock) *Frontier {
 	f := &Frontier{
 		clock:    clock.OrSystem(clk),
 		pq:       make(priorityQueue, 0, 1024),
+		inFlight: make(map[*types.Request]struct{}),
 		notify:   make(chan struct{}, 1),
 		closedCh: make(chan struct{}),
 	}
@@ -84,7 +91,7 @@ func (f *Frontier) Pop(ctx context.Context) *types.Request {
 		f.mu.Lock()
 		if f.pq.Len() > 0 {
 			item := popPQ(&f.pq)
-			f.inFlight.Add(1)
+			f.inFlight[item.request] = struct{}{}
 			remaining := f.pq.Len()
 			f.mu.Unlock()
 
@@ -168,7 +175,7 @@ func (f *Frontier) PopReady(ctx context.Context, gate DomainGate) *types.Request
 
 		if best != -1 {
 			item := removePQ(&f.pq, best)
-			f.inFlight.Add(1)
+			f.inFlight[item.request] = struct{}{}
 			remaining := f.pq.Len()
 			f.mu.Unlock()
 
@@ -178,9 +185,9 @@ func (f *Frontier) PopReady(ctx context.Context, gate DomainGate) *types.Request
 				// Decrement before pushing, never after: between the Push and a
 				// later decrement the request would be counted twice, which is
 				// harmless, but the reverse order would leave a window in which it
-				// is counted neither way and the crawl could be declared complete
+				// is tracked neither way and the crawl could be declared complete
 				// with work still queued.
-				f.inFlight.Add(-1)
+				f.Done(item.request)
 				f.Push(item.request)
 				continue
 			}
@@ -245,7 +252,7 @@ func (f *Frontier) TryPop() *types.Request {
 	}
 
 	item := popPQ(&f.pq)
-	f.inFlight.Add(1)
+	f.inFlight[item.request] = struct{}{}
 	return item.request
 }
 
@@ -263,7 +270,18 @@ func (f *Frontier) Len() int {
 // that request generates has been enqueued — a link discovered on the page has to be
 // on the frontier before its parent stops counting, or the crawl can be observed
 // empty in between.
-func (f *Frontier) Done() { f.inFlight.Add(-1) }
+//
+// Takes the request rather than decrementing a counter so that a checkpoint can
+// name what is still outstanding. Releasing one costs the frontier's lock, which
+// is one acquisition per completed page against a dequeue that already takes it.
+func (f *Frontier) Done(req *types.Request) {
+	if req == nil {
+		return
+	}
+	f.mu.Lock()
+	delete(f.inFlight, req)
+	f.mu.Unlock()
+}
 
 // Outstanding returns the number of requests either queued or in flight.
 //
@@ -274,7 +292,7 @@ func (f *Frontier) Done() { f.inFlight.Add(-1) }
 func (f *Frontier) Outstanding() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.pq.Len() + int(f.inFlight.Load())
+	return f.pq.Len() + len(f.inFlight)
 }
 
 // IsEmpty returns true if the frontier is empty.
@@ -304,15 +322,36 @@ func (f *Frontier) IsClosed() bool {
 
 // Snapshot returns a copy of all queued requests without removing them.
 // Safe for use during checkpointing while the crawl is running.
+// Snapshot returns everything the crawl still owes work on: what is queued and
+// what a worker is currently holding. Non-destructive — nothing leaves the queue.
+//
+// In-flight requests are included because this is what a checkpoint writes down,
+// and a request being processed when the process dies has not been done. It used
+// to return the queue alone, so up to one request per worker vanished on every
+// resume: absent from the restored frontier, and present in the restored dedup
+// set, which then refused to accept it again. No error, no counter, and the crawl
+// reported success.
+//
+// Order is queued first, then in-flight, and the in-flight part is sorted by URL
+// so that two checkpoints of the same state produce the same file. Go randomises
+// map iteration, and a checkpoint that reorders itself between saves is one nobody
+// can diff.
 func (f *Frontier) Snapshot() []*types.Request {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	requests := make([]*types.Request, f.pq.Len())
-	for i, item := range f.pq {
-		requests[i] = item.request
+	requests := make([]*types.Request, 0, f.pq.Len()+len(f.inFlight))
+	for _, item := range f.pq {
+		requests = append(requests, item.request)
 	}
-	return requests
+
+	held := make([]*types.Request, 0, len(f.inFlight))
+	for req := range f.inFlight {
+		held = append(held, req)
+	}
+	sort.Slice(held, func(i, j int) bool { return held[i].URLString() < held[j].URLString() })
+
+	return append(requests, held...)
 }
 
 // Drain returns all remaining requests, removing them from the queue.
