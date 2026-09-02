@@ -95,6 +95,8 @@ type goldenRecord struct {
 	StatusCode           int      `json:"status_code"`
 	MIMEType             string   `json:"mime_type,omitempty"`
 	FinalURL             string   `json:"final_url,omitempty"`
+	ETag                 string   `json:"etag,omitempty"`
+	LastModified         string   `json:"last_modified,omitempty"`
 	Title                string   `json:"title,omitempty"`
 	TextLen              int      `json:"text_len"`
 	TextHead             string   `json:"text_head,omitempty"`
@@ -155,6 +157,8 @@ func TestGoldenRecords(t *testing.T) {
 			StatusCode:           r.StatusCode,
 			MIMEType:             r.MIMEType,
 			FinalURL:             r.FinalURL,
+			ETag:                 r.ETag,
+			LastModified:         r.LastModified,
 			Title:                r.Title,
 			TextLen:              len(r.Text),
 			TextHead:             head(r.Text, 60),

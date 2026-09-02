@@ -39,6 +39,13 @@ type parquetRecord struct {
 	// rows, so the dictionary is tiny and the column nearly free.
 	CrawlerIdentity string `parquet:"crawler_identity,optional,dict,zstd"`
 
+	// Cache validators, verbatim. Not dict-encoded: an ETag is close to unique per
+	// page, so a dictionary would hold one entry per row and cost more than it
+	// saves. Last-Modified repeats across a statically generated site, but not
+	// reliably enough to be worth a different encoding from its neighbour.
+	ETag         string `parquet:"etag,optional,zstd"`
+	LastModified string `parquet:"last_modified,optional,zstd"`
+
 	Text     string `parquet:"text,optional,zstd"`
 	Title    string `parquet:"title,optional,zstd"`
 	Language string `parquet:"language,optional,dict,zstd"`
@@ -95,6 +102,8 @@ func toParquet(r Record) parquetRecord {
 		MIMEType:             r.MIMEType,
 		FinalURL:             r.FinalURL,
 		CrawlerIdentity:      r.CrawlerIdentity,
+		ETag:                 r.ETag,
+		LastModified:         r.LastModified,
 		Text:                 r.Text,
 		Title:                r.Title,
 		Language:             r.Language,
@@ -138,6 +147,8 @@ func fromParquet(p parquetRecord) Record {
 		MIMEType:             p.MIMEType,
 		FinalURL:             p.FinalURL,
 		CrawlerIdentity:      p.CrawlerIdentity,
+		ETag:                 p.ETag,
+		LastModified:         p.LastModified,
 		Text:                 p.Text,
 		Title:                p.Title,
 		Language:             p.Language,

@@ -52,6 +52,11 @@ type Observation struct {
 	// only meaningful alongside the identity that obtained it.
 	CrawlerIdentity string `json:"crawler_identity,omitempty"`
 
+	// ETag and LastModified are the cache validators the server supplied, stored
+	// verbatim so they can be echoed back exactly as received.
+	ETag         string `json:"etag,omitempty"`
+	LastModified string `json:"last_modified,omitempty"`
+
 	// Policy is what the source asked for at the moment of the fetch, not what it
 	// asks for now. Recorded rather than recomputed: robots.txt changes, and a
 	// corpus re-checked next year answers a different question from the one that
@@ -676,6 +681,8 @@ func (r Record) Observation() Observation {
 		StatusCode:      r.StatusCode,
 		MIMEType:        r.MIMEType,
 		CrawlerIdentity: r.CrawlerIdentity,
+		ETag:            r.ETag,
+		LastModified:    r.LastModified,
 		CrawlID:         r.CrawlID,
 		Policy: PolicyState{
 			RobotsAllowed: r.RobotsAllowed,
