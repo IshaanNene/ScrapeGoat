@@ -56,10 +56,16 @@ type Stats struct {
 	URLsEnqueued    atomic.Int64
 	URLsFiltered    atomic.Int64
 	BytesDownloaded atomic.Int64
-	ActiveWorkers   atomic.Int32
-	StartTime       time.Time
-	mu              sync.RWMutex
-	domainStats     map[string]*DomainStats
+
+	// PagesUnchanged counts 304 responses: pages a conditional request confirmed
+	// were still current, at the cost of a header exchange rather than a download.
+	// Reported so a refresh can say what it saved instead of only what it did.
+	PagesUnchanged atomic.Int64
+
+	ActiveWorkers atomic.Int32
+	StartTime     time.Time
+	mu            sync.RWMutex
+	domainStats   map[string]*DomainStats
 }
 
 // DomainStats tracks per-domain statistics.
@@ -89,6 +95,7 @@ func (s *Stats) Snapshot() map[string]any {
 		"urls_enqueued":    s.URLsEnqueued.Load(),
 		"urls_filtered":    s.URLsFiltered.Load(),
 		"bytes_downloaded": s.BytesDownloaded.Load(),
+		"pages_unchanged":  s.PagesUnchanged.Load(),
 		"active_workers":   s.ActiveWorkers.Load(),
 	}
 }
@@ -173,6 +180,11 @@ type Engine struct {
 	// joined to the record above by content hash. Set together with corpus in
 	// practice: half a corpus is not useful.
 	assertions provenance.AssertionSink
+
+	// prior, when set, is what an earlier crawl recorded. It supplies the cache
+	// validators that let this crawl ask "is it still what I have?" instead of
+	// downloading the page again.
+	prior *provenance.PriorCorpus
 
 	// crawlID identifies this run in the records it emits, so a corpus assembled
 	// from several crawls can still be traced back per record.
@@ -261,6 +273,14 @@ func (e *Engine) SetAssertionWriter(w provenance.AssertionSink) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.assertions = w
+}
+
+// SetPriorCorpus attaches an earlier crawl's records, turning recrawls of the
+// pages it covers into conditional requests.
+func (e *Engine) SetPriorCorpus(p *provenance.PriorCorpus) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.prior = p
 }
 
 // SetParser sets the parser implementation.
