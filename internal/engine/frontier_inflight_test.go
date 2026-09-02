@@ -36,7 +36,7 @@ func TestOutstandingCountsDequeuedRequests(t *testing.T) {
 		t.Fatalf("Outstanding() = %d while a request is in flight, want 1", o)
 	}
 
-	f.Done()
+	f.Done(got)
 	if o := f.Outstanding(); o != 0 {
 		t.Fatalf("Outstanding() = %d after Done, want 0", o)
 	}
@@ -70,7 +70,7 @@ func TestOutstandingCountsEveryHeldRequest(t *testing.T) {
 			}
 			holding <- struct{}{}
 			<-release
-			f.Done()
+			f.Done(req)
 		}()
 	}
 
@@ -117,7 +117,7 @@ func TestOutstandingRestoredWhenClaimFails(t *testing.T) {
 	if o := f.Outstanding(); o != 1 {
 		t.Fatalf("Outstanding() = %d after a put-back and re-take, want 1", o)
 	}
-	f.Done()
+	f.Done(got)
 	if o := f.Outstanding(); o != 0 {
 		t.Fatalf("Outstanding() = %d after Done, want 0", o)
 	}

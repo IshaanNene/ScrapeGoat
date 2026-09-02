@@ -92,11 +92,18 @@ func TestResumeSuppressesAlreadyCrawledSeeds(t *testing.T) {
 	if err := first.AddSeed("https://example.com/seed"); err != nil {
 		t.Fatalf("add seed: %v", err)
 	}
-	// Simulate the seed having been crawled: drain it from the frontier, leaving
-	// it in the dedup set.
-	if req := first.frontier.TryPop(); req == nil {
+	// Simulate the seed having been crawled: take it from the frontier and finish
+	// it, leaving it in the dedup set.
+	//
+	// Done is the load-bearing half. Dequeuing alone used to be indistinguishable
+	// from completing, because a request in a worker's hands was tracked nowhere —
+	// which is exactly the bug that lost in-flight work on every resume. Now that
+	// the two states differ, a test about work that finished has to say so.
+	req := first.frontier.TryPop()
+	if req == nil {
 		t.Fatal("seed was not queued")
 	}
+	first.frontier.Done(req)
 	if err := first.checkpoint.Save(first.frontier, first.dedup, first.stats); err != nil {
 		t.Fatalf("save: %v", err)
 	}
