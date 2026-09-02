@@ -55,6 +55,21 @@ What was deleted, and what replacing it would take:
 
 ### Medium term
 
+- **An append-only event ledger for resume.** Two of the ways a checkpoint lost state
+  are fixed — in-flight requests are now snapshotted, and a checkpoint that cannot
+  serialise its seen set is refused rather than written — but the shape is still
+  wrong. Every checkpoint serialises the entire seen set as a JSON array of hex
+  strings; at 10M URLs that is roughly 330 MB written synchronously on an interval.
+  And Bloom dedup and resume remain mutually exclusive, because membership is a
+  serialised set rather than a query.
+
+  An `acquisition_started` entry with no matching `acquisition_completed` is
+  in-flight work by definition, so resume re-enqueues it without a special case,
+  and membership becomes a ledger query with an in-memory index — which makes Bloom
+  an index-acceleration choice instead of a mode that forecloses resuming.
+  `internal/fetchlog` is already the right substrate; extend it rather than starting
+  over.
+
 - **HTTP caching** — ETag / If-Modified-Since / Cache-Control. Cloudflare reports that over half of
   AI-crawler traffic re-fetches unchanged pages, which makes this the highest value-to-effort item
   on this page. Store the validators on the record, send `If-None-Match` / `If-Modified-Since` on
