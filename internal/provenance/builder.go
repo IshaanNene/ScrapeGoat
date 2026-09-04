@@ -79,6 +79,9 @@ func Build(src Source, doc *goquery.Document, content Content) Record {
 		FinalURL:        src.FinalURL,
 		CrawlerIdentity: src.CrawlerIdentity,
 
+		ETag:         strings.TrimSpace(src.Headers.Get("ETag")),
+		LastModified: strings.TrimSpace(src.Headers.Get("Last-Modified")),
+
 		Text:                 content.Text,
 		Title:                content.Title,
 		Language:             language(src.Headers, doc, content.Language),

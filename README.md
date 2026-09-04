@@ -97,6 +97,32 @@ The point of the second file is that a value can be checked. A row does not say
 "the price is £51.25", it says that *and* which bytes of which document say so, so
 anyone holding the page can confirm it without the crawler, the network, or trust.
 
+### Refreshing a corpus
+
+```bash
+scrapegoat crawl https://books.toscrape.com --output ./out --since ./out/corpus.jsonl
+```
+
+Pages the previous corpus covered are checked with `If-None-Match` /
+`If-Modified-Since`. A page the server says is unchanged costs a header exchange
+instead of a download, and its corpus record is carried forward with a new
+timestamp rather than re-derived.
+
+```
+  comparing against ./out/corpus.jsonl: 3 pages, 3 with a validator to check against
+   Requests:  3 sent, 0 failed
+   Data:      0 bytes downloaded
+   Unchanged: 3 confirmed by the server without re-downloading
+```
+
+`--since` also queues every URL the prior corpus holds. Without that a refresh
+stops one page in: an unchanged page returns no body, so there are no links to
+discover from it — the URLs come from the corpus, which is where they were written
+down last time.
+
+The ceiling on what this saves is printed up front. A page the server issued no
+validator for is fetched in full however often you ask.
+
 Interrupt it with `Ctrl-C` and pick up where it stopped:
 
 ```bash
@@ -331,6 +357,7 @@ SETTINGS, header order, TCP characteristics, and behaviour are all still tells.
 | **Parsing** | CSS, XPath, regex, JSON-LD, OpenGraph, tables, structural listing detection, density-based main-content extraction |
 | **Output** | A corpus: observations and derived claims, JSONL or Parquet, joined on content hash. Flat items behind `--legacy-items` until v0.3.0 |
 | **Provenance** | Every value carries the method that produced it, its version, and the byte range of the source supporting it |
+| **Refresh** | `--since` re-checks a corpus with conditional requests; unchanged pages cost a header exchange, not a download |
 | **Interfaces** | CLI, Go library, MCP server, REST + WebSocket API, Python and TypeScript SDKs |
 | **Dedup** | Exact set, or Bloom at 1.2 bytes/URL when a crawl outgrows memory |
 | **Browser** | Headless Chromium via go-rod for JS-rendered pages |

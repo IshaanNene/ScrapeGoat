@@ -70,12 +70,18 @@ What was deleted, and what replacing it would take:
   `internal/fetchlog` is already the right substrate; extend it rather than starting
   over.
 
-- **HTTP caching** — ETag / If-Modified-Since / Cache-Control. Cloudflare reports that over half of
-  AI-crawler traffic re-fetches unchanged pages, which makes this the highest value-to-effort item
-  on this page. Store the validators on the record, send `If-None-Match` / `If-Modified-Since` on
-  recrawl, and treat a 304 as a free freshness confirmation that updates the timestamp without
-  re-deriving anything. Then publish the number no competitor publishes: the cost, in requests, of
-  keeping a 100,000-page corpus fresh for thirty days.
+- **Publish the refresh number.** Conditional requests have shipped: `--since` sends
+  `If-None-Match` / `If-Modified-Since`, a 304 renews the record without re-deriving,
+  and a refresh reports what it confirmed rather than downloaded. What is still owed
+  is the measurement the feature was argued for — the cost, in requests and bytes, of
+  keeping a 100,000-page corpus fresh for thirty days. No competitor publishes that
+  number, and it is now measurable rather than estimated.
+
+  Also outstanding: `Cache-Control` is recorded nowhere, so a refresh re-asks about
+  pages whose `max-age` has not elapsed. Reading it would turn some conditional
+  requests into no request at all.
+
+
 - **Browser-accurate HTTP/2 SETTINGS and header ordering.** uTLS-driven JA3/JA4 matching the
   advertised User-Agent has shipped, and the README is honest that it closes one signal and nothing
   more. These are the next two tells. Note the explicit decision not to pursue this past the point

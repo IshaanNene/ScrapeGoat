@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -262,6 +263,18 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 		return
 	}
 
+	// Ask the server to confirm rather than resend, when an earlier crawl left us
+	// something to ask with.
+	s.engine.mu.RLock()
+	prior := s.engine.prior
+	s.engine.mu.RUnlock()
+	if prior != nil {
+		if req.Headers == nil {
+			req.Headers = make(http.Header)
+		}
+		prior.ConditionalHeaders(req.URLString(), req.Headers)
+	}
+
 	s.engine.stats.RequestsSent.Add(1)
 
 	resp, err := fetcher.Fetch(fetchCtx, req)
@@ -281,6 +294,22 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 	s.engine.metrics.RecordResponse(domain, fetcherType, resp.StatusCode,
 		resp.FetchDuration, resp.ContentLength)
 	logger.Debug("fetched", "status", resp.StatusCode, "size", resp.ContentLength, "duration", resp.FetchDuration)
+
+	// 304 Not Modified: the server confirmed what we already hold, and sent no
+	// body to go with it.
+	//
+	// This has to return before anything downstream. A 304 body is empty, so
+	// hashing it would produce the digest of nothing and write that over the
+	// record for a page whose content is unchanged — destroying the corpus entry
+	// the request was meant to renew. Parsing it would find no links and no
+	// values, and emit an item saying the page had become blank.
+	//
+	// What actually happened is that a fact got a later timestamp, so that is all
+	// that is recorded.
+	if resp.StatusCode == http.StatusNotModified {
+		s.recordUnchanged(logger, resp)
+		return
+	}
 
 	// Invoke ALL registered callbacks on every response
 	s.engine.mu.RLock()
@@ -388,6 +417,41 @@ func (s *Scheduler) derive(logger *slog.Logger, resp *types.Response) ([]provena
 		logger.Warn("parse error", "error", err)
 	}
 	return nil, links, items
+}
+
+// recordUnchanged carries a prior record forward after a 304.
+//
+// The whole saving lives here: the page was not transferred, nothing was
+// re-derived, and the corpus still gains a row saying the content was current at
+// this moment. A refresh of a corpus whose pages all carry validators costs one
+// small response each instead of one page each.
+//
+// A 304 for a URL the prior corpus does not know is a server answering a question
+// nobody asked — this crawl sent no validator for it. There is nothing to carry
+// forward, so it is counted and logged rather than invented.
+func (s *Scheduler) recordUnchanged(logger *slog.Logger, resp *types.Response) {
+	s.engine.stats.PagesUnchanged.Add(1)
+	s.engine.metrics.RecordRequest(resp.Request.RegistrableDomain(), "not_modified")
+
+	s.engine.mu.RLock()
+	w, prior, crawlID := s.engine.corpus, s.engine.prior, s.engine.crawlID
+	s.engine.mu.RUnlock()
+
+	if w == nil {
+		return
+	}
+
+	rec, ok := prior.Lookup(resp.Request.URLString())
+	if !ok {
+		logger.Warn("304 for a page no prior corpus covers; nothing to renew",
+			"url", resp.Request.URLString())
+		return
+	}
+
+	if err := w.Write(provenance.Refreshed(rec, resp.FetchedAt, crawlID)); err != nil {
+		logger.Warn("could not renew provenance record",
+			"url", resp.Request.URLString(), "error", err)
+	}
 }
 
 // recordProvenance writes one corpus record for a response.

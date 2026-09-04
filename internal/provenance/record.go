@@ -50,6 +50,22 @@ type Record struct {
 	// alongside the identity that obtained it.
 	CrawlerIdentity string `json:"crawler_identity,omitempty"`
 
+	// ETag and LastModified are the cache validators the server supplied, stored
+	// verbatim.
+	//
+	// Verbatim because they are echoed back, not interpreted: If-None-Match sends
+	// the ETag exactly as received, weak-comparison marker and all, and
+	// If-Modified-Since sends the Last-Modified string the server itself chose to
+	// format. Parsing and re-rendering an HTTP-date is a way to send a server a
+	// date it did not say.
+	//
+	// Recorded whether or not this crawl uses them. A corpus that knows which of
+	// its pages carry validators can say what a refresh would cost before anyone
+	// runs one, and pages that carry none are the ones that will always cost a
+	// full fetch.
+	ETag         string `json:"etag,omitempty"`
+	LastModified string `json:"last_modified,omitempty"`
+
 	// --- content ---
 
 	Text     string `json:"text,omitempty"`

@@ -48,6 +48,7 @@ var (
 	recordDir      string
 	corpusPath     string
 	legacyItems    bool
+	sincePath      string
 	compliancePath string
 )
 
@@ -110,6 +111,7 @@ func crawlCmd() *cobra.Command {
 	cmd.Flags().StringVar(&recordDir, "record", "", "record every fetch to this directory so the crawl can be replayed")
 	cmd.Flags().StringVar(&corpusPath, "corpus", "", "corpus path (.parquet or .jsonl, by extension); defaults to <output>/corpus.jsonl")
 	cmd.Flags().BoolVar(&legacyItems, "legacy-items", false, "also write the flat item file (deprecated; removed in v0.3.0)")
+	cmd.Flags().StringVar(&sincePath, "since", "", "a previous corpus; pages it covers are re-fetched only if the server says they changed")
 	cmd.Flags().StringVar(&compliancePath, "compliance-report", "", "write a machine-readable compliance report here (JSON)")
 
 	return cmd
@@ -198,6 +200,10 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 
 	announceOutputs(legacyItems)
 
+	if err := attachPriorCorpus(eng); err != nil {
+		return err
+	}
+
 	// Setup metrics (if enabled). The recorder must be handed to the engine, not
 	// merely served: without SetMetrics the endpoint comes up and reports zeroes
 	// forever, which is worse than having no endpoint at all.
@@ -226,6 +232,19 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 			seedsAdded++
 		}
 	}
+	// Every page the prior corpus covers is queued too.
+	//
+	// Without this --since barely does anything on a real refresh: the seed comes
+	// back 304 with no body, so no links are discovered from it, and the crawl
+	// stops one page in. A page that has not changed has not changed its links
+	// either — but the crawler cannot read them out of a response that carries no
+	// body, so the URLs come from the corpus instead, which is where they were
+	// written down last time.
+	//
+	// Ones already queued as command-line seeds are refused by the dedup set,
+	// which is the correct outcome and why the count below is of the rest.
+	seedsAdded += seedFromPriorCorpus(eng, logger)
+
 	if seedsAdded == 0 && eng.Stats() != nil {
 		// A resumed crawl legitimately adds no new seeds: the outstanding work is
 		// already in the restored frontier, and the seeds are duplicates by design.
@@ -276,6 +295,9 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   Requests:  %v sent, %v failed\n", stats["requests_sent"], stats["requests_failed"])
 	fmt.Printf("   Items:     %v scraped, %v dropped\n", stats["items_scraped"], stats["items_dropped"])
 	fmt.Printf("   Data:      %v bytes downloaded\n", stats["bytes_downloaded"])
+	if n, _ := stats["pages_unchanged"].(int64); n > 0 {
+		fmt.Printf("   Unchanged: %v confirmed by the server without re-downloading\n", n)
+	}
 	if legacyItems {
 		fmt.Printf("   Written:   %s\n", cfg.Storage.OutputPath)
 	}
@@ -470,6 +492,62 @@ func wireCrawlPipeline(eng *engine.Engine, cfg *config.Config, logger *slog.Logg
 	eng.SetStorage(store)
 
 	return nil
+}
+
+// attachPriorCorpus wires --since, so pages an earlier crawl already covered are
+// confirmed rather than downloaded.
+//
+// The count of pages carrying a validator is printed up front because it is the
+// ceiling on what this can save: a page the server issued no ETag or
+// Last-Modified for will be fetched in full no matter what, and knowing that
+// before a run beats inferring it from the traffic afterwards.
+func attachPriorCorpus(eng *engine.Engine) error {
+	if sincePath == "" {
+		return nil
+	}
+
+	prior, err := provenance.LoadPriorCorpus(sincePath)
+	if err != nil {
+		return err
+	}
+	eng.SetPriorCorpus(prior)
+
+	fmt.Fprintf(os.Stderr,
+		"  comparing against %s: %d pages, %d with a validator to check against\n",
+		sincePath, prior.Len(), prior.Validated())
+
+	if prior.Validated() == 0 && prior.Len() > 0 {
+		fmt.Fprintf(os.Stderr,
+			"  none of them carry an ETag or Last-Modified, so every page will be fetched in full\n")
+	}
+	return nil
+}
+
+// seedFromPriorCorpus queues every URL an earlier crawl recorded, returning how
+// many were accepted.
+func seedFromPriorCorpus(eng *engine.Engine, logger *slog.Logger) int {
+	if sincePath == "" {
+		return 0
+	}
+
+	prior, err := provenance.LoadPriorCorpus(sincePath)
+	if err != nil {
+		// Already reported by attachPriorCorpus, which runs first and fails the
+		// command; reaching here at all would mean the file changed underneath us.
+		logger.Warn("could not re-read the prior corpus for seeding", "error", err)
+		return 0
+	}
+
+	var added int
+	for _, u := range prior.URLs() {
+		if err := eng.AddSeed(u); err == nil {
+			added++
+		}
+	}
+	if added > 0 {
+		fmt.Fprintf(os.Stderr, "  queued %d pages from the prior corpus to check\n", added)
+	}
+	return added
 }
 
 // announceOutputs says, once per run, what this crawl will write and what it will

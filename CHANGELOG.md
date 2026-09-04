@@ -8,6 +8,30 @@ the major version is 0, the minor version is bumped for breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- **Conditional requests — `--since <corpus>`.** Pages a previous corpus covered are
+  re-checked with `If-None-Match` / `If-Modified-Since`. A 304 renews the record with
+  a new timestamp instead of re-deriving it, so an unchanged page costs a header
+  exchange rather than a download. Over half of AI-crawler traffic is reported to be
+  re-fetching pages that have not changed.
+
+  Refreshing a 3-page corpus of books.toscrape.com: 3 requests, **0 bytes
+  downloaded**, 3 confirmed unchanged.
+
+  `--since` also queues every URL the prior corpus holds. Without that a refresh
+  stops one page in — an unchanged page returns no body, so nothing can be
+  discovered from it, and the URLs have to come from where they were written down.
+
+  The number of pages carrying a validator is printed before the crawl starts,
+  because it is the ceiling on what this can save.
+
+- **`ETag` and `Last-Modified` on every record**, stored verbatim and carried through
+  the Observation view and the Parquet projection. Verbatim because they are echoed
+  back rather than interpreted: re-rendering an HTTP-date sends a server a date it
+  never said.
+
+
 ### Changed — BREAKING
 
 - **A crawl writes a corpus by default.** `--output` now receives `corpus.jsonl` and
