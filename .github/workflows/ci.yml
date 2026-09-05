@@ -101,6 +101,10 @@ jobs:
   fuzz:
     name: Fuzz
     runs-on: ubuntu-latest
+    # Twenty targets at 60s each, plus a build apiece and room for one retry. The
+    # cap exists so a wedged run is killed in half an hour rather than holding a
+    # runner for the six-hour default.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -117,10 +121,42 @@ jobs:
       - name: Fuzz parsers and decoders
         run: |
           set -euo pipefail
+
+          # A fuzz run fails for two very different reasons, and they need
+          # different answers.
+          #
+          # It found an input, which is the point of running it. Go writes that
+          # input under the package's testdata/fuzz/<Target>/, where it is
+          # untracked — committed seeds are in git. That must never be retried
+          # away: a second random run might not rediscover the input, and the job
+          # would go green over a real finding.
+          #
+          # Or the run died for a reason that was not an input. This job runs
+          # twenty targets back to back for twenty-odd minutes on a shared runner,
+          # and a starved worker missing its deadline surfaces as "context
+          # deadline exceeded" with nothing written. That is infrastructure, and
+          # it turned a docs-only pull request red once already. It gets one
+          # retry, and a second failure is taken at face value.
           run_fuzz() {
-            echo "::group::$2 ($1)"
-            go test -run=XXX -fuzz="^$2\$" -fuzztime=60s "$1"
+            local pkg="$1" target="$2" rc=0
+            local found="${pkg#./}/testdata/fuzz/$target"
+
+            echo "::group::$target ($pkg)"
+            if go test -run=XXX -fuzz="^$target\$" -fuzztime=60s "$pkg"; then
+              echo "::endgroup::"
+              return 0
+            fi
+
+            if [ -n "$(git status --porcelain -- "$found" 2>/dev/null)" ]; then
+              echo "::error::$target found a failing input, saved under $found"
+              echo "::endgroup::"
+              return 1
+            fi
+
+            echo "::warning::$target failed without producing a failing input; retrying once"
+            go test -run=XXX -fuzz="^$target\$" -fuzztime=60s "$pkg" || rc=$?
             echo "::endgroup::"
+            return $rc
           }
           run_fuzz ./internal/parser  FuzzCompositeParse
           run_fuzz ./internal/parser  FuzzCSSParseWithRules
