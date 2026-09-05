@@ -123,6 +123,12 @@ down last time.
 The ceiling on what this saves is printed up front. A page the server issued no
 validator for is fetched in full however often you ask.
 
+Measured on a 50-page corpus: a full refresh moves 1,188,673 bytes, a conditional
+one moves 9,350 — **127× fewer**, or 0.56 GB against 71.88 GB to keep 100,000
+pages fresh for thirty days. The request count is unchanged; what falls is bytes
+and downstream work. Method, caveats and the change-rate table are in
+[docs/REFRESH.md](docs/REFRESH.md).
+
 Interrupt it with `Ctrl-C` and pick up where it stopped:
 
 ```bash
@@ -382,7 +388,7 @@ is in [ROADMAP.md](ROADMAP.md). If it is in the table above, it runs.
 
 **Design:** [Design docs](docs/design/) — accepted proposals, with the alternatives that were rejected
 
-**About the project:** [Security](SECURITY.md) · [Performance](docs/PERFORMANCE.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
+**About the project:** [Security](SECURITY.md) · [Performance](docs/PERFORMANCE.md) · [Refresh cost](docs/REFRESH.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 ---
 

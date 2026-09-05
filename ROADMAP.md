@@ -70,16 +70,12 @@ What was deleted, and what replacing it would take:
   `internal/fetchlog` is already the right substrate; extend it rather than starting
   over.
 
-- **Publish the refresh number.** Conditional requests have shipped: `--since` sends
-  `If-None-Match` / `If-Modified-Since`, a 304 renews the record without re-deriving,
-  and a refresh reports what it confirmed rather than downloaded. What is still owed
-  is the measurement the feature was argued for — the cost, in requests and bytes, of
-  keeping a 100,000-page corpus fresh for thirty days. No competitor publishes that
-  number, and it is now measurable rather than estimated.
-
-  Also outstanding: `Cache-Control` is recorded nowhere, so a refresh re-asks about
-  pages whose `max-age` has not elapsed. Reading it would turn some conditional
-  requests into no request at all.
+- **Read `Cache-Control` on refresh.** It is recorded nowhere, so a refresh re-asks
+  about pages whose `max-age` has not elapsed. Reading it would turn some conditional
+  requests into no request at all — which is the only thing that reduces the *request*
+  count, since conditional requests demonstrably do not: see
+  [docs/REFRESH.md](docs/REFRESH.md), where three million page-checks cost three
+  million requests either way and only the bytes fall.
 
 
 - **Browser-accurate HTTP/2 SETTINGS and header ordering.** uTLS-driven JA3/JA4 matching the

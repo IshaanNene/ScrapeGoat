@@ -10,6 +10,16 @@ the major version is 0, the minor version is bumped for breaking changes.
 
 ### Added
 
+- **[docs/REFRESH.md](docs/REFRESH.md)** — the measurement conditional requests were
+  argued for. A 50-page corpus refreshes in 9,350 bytes against 1,188,673 for a full
+  crawl: 127× fewer, 99.21%. Extrapolated to 100,000 pages over thirty days, 0.56 GB
+  against 71.88 GB when nothing changes, with a table for change rates up to 100%.
+
+  It also states what the feature does not do. The request count is unchanged — three
+  million checks are three million requests either way — and wall clock was unchanged
+  too, both crawls being governed by the politeness delay rather than by transfer
+  time.
+
 - **Conditional requests — `--since <corpus>`.** Pages a previous corpus covered are
   re-checked with `If-None-Match` / `If-Modified-Since`. A 304 renews the record with
   a new timestamp instead of re-deriving it, so an unchanged page costs a header
