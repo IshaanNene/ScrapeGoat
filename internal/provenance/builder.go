@@ -81,6 +81,8 @@ func Build(src Source, doc *goquery.Document, content Content) Record {
 
 		ETag:         strings.TrimSpace(src.Headers.Get("ETag")),
 		LastModified: strings.TrimSpace(src.Headers.Get("Last-Modified")),
+		CacheControl: strings.TrimSpace(src.Headers.Get("Cache-Control")),
+		Age:          strings.TrimSpace(src.Headers.Get("Age")),
 
 		Text:                 content.Text,
 		Title:                content.Title,

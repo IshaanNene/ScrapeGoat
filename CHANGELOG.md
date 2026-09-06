@@ -10,6 +10,24 @@ the major version is 0, the minor version is bumped for breaking changes.
 
 ### Added
 
+- **`Cache-Control` is read on refresh.** A page whose `max-age` has not elapsed is
+  not requested at all — the server already said how long its answer was good for.
+  This is the only part of the refresh path that reduces the *request* count;
+  conditional requests reduce bytes, as [docs/REFRESH.md](docs/REFRESH.md) measures.
+
+  `Cache-Control` and `Age` are recorded verbatim on every record. `Age` matters
+  because a response relayed by a cache arrived already partly used up.
+
+  `no-store` and `no-cache` defeat it, as they must: `no-cache` does not mean "do not
+  store", it means "do not reuse without revalidating", which is exactly the decision
+  being made. `Expires` is deliberately not read — honouring an absolute date means
+  trusting two clocks, and being wrong there skips a page that changed.
+
+  Filtered before the frontier, not before the fetch. A request skipped in the
+  scheduler still occupies a worker and spends the domain's politeness token, so a
+  refresh of 100,000 fresh pages would make no requests and still take 100,000
+  seconds.
+
 - **[docs/REFRESH.md](docs/REFRESH.md)** — the measurement conditional requests were
   argued for. A 50-page corpus refreshes in 9,350 bytes against 1,188,673 for a full
   crawl: 127× fewer, 99.21%. Extrapolated to 100,000 pages over thirty days, 0.56 GB

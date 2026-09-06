@@ -8,11 +8,17 @@ import (
 
 // Sentinel errors for common failure modes.
 var (
-	ErrTimeout        = errors.New("request timed out")
-	ErrMaxRetries     = errors.New("max retries exceeded")
-	ErrBlocked        = errors.New("blocked by robots.txt")
-	ErrMaxDepth       = errors.New("max depth exceeded")
-	ErrDuplicate      = errors.New("duplicate URL")
+	ErrTimeout    = errors.New("request timed out")
+	ErrMaxRetries = errors.New("max retries exceeded")
+	ErrBlocked    = errors.New("blocked by robots.txt")
+	ErrMaxDepth   = errors.New("max depth exceeded")
+	ErrDuplicate  = errors.New("duplicate URL")
+
+	// ErrStillFresh means a URL was not enqueued because a previous crawl's copy
+	// is still covered by the server's own Cache-Control. It is a successful
+	// outcome, not a failure: the page is accounted for and its record carried
+	// forward, it simply cost no request.
+	ErrStillFresh     = errors.New("still fresh per Cache-Control")
 	ErrEmptyResponse  = errors.New("empty response body")
 	ErrInvalidURL     = errors.New("invalid URL")
 	ErrCrawlStopped   = errors.New("crawl has been stopped")

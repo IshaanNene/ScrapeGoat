@@ -66,6 +66,17 @@ type Record struct {
 	ETag         string `json:"etag,omitempty"`
 	LastModified string `json:"last_modified,omitempty"`
 
+	// CacheControl and Age are the freshness directives the server supplied, again
+	// verbatim.
+	//
+	// A validator answers "has this changed?" and still costs a request to ask.
+	// These answer "is it even worth asking yet?", which costs nothing — a page
+	// the server said is good for an hour does not need to be revalidated twice in
+	// that hour. Age matters because a response relayed by an upstream cache
+	// arrived already partly used up.
+	CacheControl string `json:"cache_control,omitempty"`
+	Age          string `json:"age,omitempty"`
+
 	// --- content ---
 
 	Text     string `json:"text,omitempty"`
