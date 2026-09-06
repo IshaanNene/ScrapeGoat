@@ -62,6 +62,12 @@ type Stats struct {
 	// Reported so a refresh can say what it saved instead of only what it did.
 	PagesUnchanged atomic.Int64
 
+	// PagesStillFresh counts pages not requested at all, because the server's own
+	// Cache-Control said the copy already held was still valid. Unlike
+	// PagesUnchanged these cost no request, which is the only way the refresh path
+	// reduces request count rather than bytes.
+	PagesStillFresh atomic.Int64
+
 	ActiveWorkers atomic.Int32
 	StartTime     time.Time
 	mu            sync.RWMutex
@@ -96,6 +102,7 @@ func (s *Stats) Snapshot() map[string]any {
 		"urls_filtered":    s.URLsFiltered.Load(),
 		"bytes_downloaded": s.BytesDownloaded.Load(),
 		"pages_unchanged":  s.PagesUnchanged.Load(),
+		"pages_fresh":      s.PagesStillFresh.Load(),
 		"active_workers":   s.ActiveWorkers.Load(),
 	}
 }
@@ -275,6 +282,45 @@ func (e *Engine) SetAssertionWriter(w provenance.AssertionSink) {
 	e.assertions = w
 }
 
+// freshPrior reports the prior record for a URL when the server's own
+// Cache-Control still covers it.
+func (e *Engine) freshPrior(rawURL string) (provenance.Record, bool) {
+	e.mu.RLock()
+	prior := e.prior
+	e.mu.RUnlock()
+
+	if prior == nil {
+		return provenance.Record{}, false
+	}
+	rec, ok := prior.Lookup(rawURL)
+	if !ok || !rec.IsFresh(e.clock.Now()) {
+		return provenance.Record{}, false
+	}
+	return rec, true
+}
+
+// carryForward writes a prior record into this run's corpus unchanged.
+//
+// FetchedAt is deliberately not moved, which is where this differs from a 304. A
+// 304 is the server saying "still current" at that moment, so the moment is a new
+// fact and the timestamp earns its update. Here nothing was asked and nothing
+// answered; the only thing known is what was known before, and stamping it with
+// now would claim a confirmation that never happened.
+func (e *Engine) carryForward(rec provenance.Record) {
+	e.stats.PagesStillFresh.Add(1)
+
+	e.mu.RLock()
+	w := e.corpus
+	e.mu.RUnlock()
+
+	if w == nil {
+		return
+	}
+	if err := w.Write(rec); err != nil {
+		e.logger.Warn("could not carry forward a still-fresh record", "url", rec.URL, "error", err)
+	}
+}
+
 // SetPriorCorpus attaches an earlier crawl's records, turning recrawls of the
 // pages it covers into conditional requests.
 func (e *Engine) SetPriorCorpus(p *provenance.PriorCorpus) {
@@ -362,6 +408,21 @@ func (e *Engine) AddRequest(req *types.Request) error {
 	if !e.dedup.MarkIfUnseen(urlStr) {
 		e.stats.URLsFiltered.Add(1)
 		return types.ErrDuplicate
+	}
+
+	// A page the server said is still fresh never reaches the frontier.
+	//
+	// Filtering here rather than before the fetch is the difference between the
+	// saving being real and being notional. A request skipped in the scheduler has
+	// still occupied a worker and spent the domain's politeness token, so a
+	// refresh of 100,000 fresh pages would make no requests and still take
+	// 100,000 seconds. Refusing to enqueue costs neither.
+	//
+	// After MarkIfUnseen deliberately: the URL has been accounted for, and a later
+	// discovery of the same link should not queue it either.
+	if rec, ok := e.freshPrior(urlStr); ok {
+		e.carryForward(rec)
+		return types.ErrStillFresh
 	}
 
 	e.frontier.Push(req)

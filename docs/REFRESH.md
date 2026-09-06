@@ -75,11 +75,16 @@ Unconditionally, the same thirty days cost **71.88 GB** regardless.
 
 ## What this does not say
 
-**The request count is unchanged.** Three million checks are three million
-requests either way. Conditional requests reduce bytes and downstream work, not
-traffic. If the binding constraint is a rate limit, a politeness delay, or a
-server's opinion about how often it wants to hear from you, this feature does not
-help at all.
+**The request count is unchanged by conditional requests.** Three million checks
+are three million requests either way. They reduce bytes and downstream work, not
+traffic.
+
+Reading `Cache-Control` is what reduces traffic, and it is a separate mechanism:
+a page whose `max-age` has not elapsed is not requested at all. `books.toscrape.com`
+sends no `Cache-Control`, so none of the figures above benefit from it — every one
+of those 50 pages had to be asked about. A site that does send it turns some
+fraction of the requests into none, and the summary reports those separately as
+`Fresh:` rather than folding them into the unchanged count.
 
 **Wall clock was unchanged**, for the same reason: 49.3 s against 49.8 s, both
 governed by the one-second politeness delay rather than by transfer time. The

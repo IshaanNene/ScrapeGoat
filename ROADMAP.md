@@ -70,13 +70,6 @@ What was deleted, and what replacing it would take:
   `internal/fetchlog` is already the right substrate; extend it rather than starting
   over.
 
-- **Read `Cache-Control` on refresh.** It is recorded nowhere, so a refresh re-asks
-  about pages whose `max-age` has not elapsed. Reading it would turn some conditional
-  requests into no request at all — which is the only thing that reduces the *request*
-  count, since conditional requests demonstrably do not: see
-  [docs/REFRESH.md](docs/REFRESH.md), where three million page-checks cost three
-  million requests either way and only the bytes fall.
-
 
 - **Browser-accurate HTTP/2 SETTINGS and header ordering.** uTLS-driven JA3/JA4 matching the
   advertised User-Agent has shipped, and the README is honest that it closes one signal and nothing

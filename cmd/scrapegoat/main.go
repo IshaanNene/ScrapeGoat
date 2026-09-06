@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -226,10 +227,17 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	// Add seed URLs — robots-block on a seed is a warning, not fatal
 	var seedsAdded int
 	for _, rawURL := range args {
-		if err := eng.AddSeed(rawURL); err != nil {
-			logger.Warn("seed skipped", "url", rawURL, "reason", err)
-		} else {
+		switch err := eng.AddSeed(rawURL); {
+		case err == nil:
 			seedsAdded++
+		case errors.Is(err, types.ErrStillFresh):
+			// Counted, not warned about. A seed the server said is still fresh is
+			// a page this run has accounted for at no cost; treating it as a
+			// filtered seed made a refresh of a single fresh page fail outright
+			// with "all seeds were filtered or blocked".
+			seedsAdded++
+		default:
+			logger.Warn("seed skipped", "url", rawURL, "reason", err)
 		}
 	}
 	// Every page the prior corpus covers is queued too.
@@ -297,6 +305,9 @@ func runCrawl(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   Data:      %v bytes downloaded\n", stats["bytes_downloaded"])
 	if n, _ := stats["pages_unchanged"].(int64); n > 0 {
 		fmt.Printf("   Unchanged: %v confirmed by the server without re-downloading\n", n)
+	}
+	if n, _ := stats["pages_fresh"].(int64); n > 0 {
+		fmt.Printf("   Fresh:     %v still within their Cache-Control, not requested at all\n", n)
 	}
 	if legacyItems {
 		fmt.Printf("   Written:   %s\n", cfg.Storage.OutputPath)
@@ -538,16 +549,27 @@ func seedFromPriorCorpus(eng *engine.Engine, logger *slog.Logger) int {
 		return 0
 	}
 
-	var added int
+	var added, fresh int
 	for _, u := range prior.URLs() {
-		if err := eng.AddSeed(u); err == nil {
+		switch err := eng.AddSeed(u); {
+		case err == nil:
 			added++
+		case errors.Is(err, types.ErrStillFresh):
+			// Not queued and not a failure: the server's own Cache-Control still
+			// covers the copy held, so the page is accounted for at no cost.
+			fresh++
 		}
 	}
 	if added > 0 {
 		fmt.Fprintf(os.Stderr, "  queued %d pages from the prior corpus to check\n", added)
 	}
-	return added
+	if fresh > 0 {
+		fmt.Fprintf(os.Stderr,
+			"  skipped %d still within the freshness the server gave them\n", fresh)
+	}
+	// Counted as seeded so that a refresh where everything is still fresh is a
+	// complete crawl rather than "all seeds were filtered or blocked".
+	return added + fresh
 }
 
 // announceOutputs says, once per run, what this crawl will write and what it will

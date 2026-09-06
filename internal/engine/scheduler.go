@@ -263,11 +263,12 @@ func (s *Scheduler) processRequest(ctx context.Context, logger *slog.Logger, req
 		return
 	}
 
-	// Ask the server to confirm rather than resend, when an earlier crawl left us
-	// something to ask with.
 	s.engine.mu.RLock()
 	prior := s.engine.prior
 	s.engine.mu.RUnlock()
+
+	// Ask the server to confirm rather than resend. Pages the server said are
+	// still fresh never got this far — AddRequest declines to enqueue them.
 	if prior != nil {
 		if req.Headers == nil {
 			req.Headers = make(http.Header)

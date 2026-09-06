@@ -120,6 +120,15 @@ stops one page in: an unchanged page returns no body, so there are no links to
 discover from it — the URLs come from the corpus, which is where they were written
 down last time.
 
+Pages whose `Cache-Control` still covers them are not requested at all — the
+server already said how long its answer was good for, so asking again inside that
+window is a request nobody needed. Those are reported separately:
+
+```
+   Requests:  0 sent, 0 failed
+   Fresh:     1 still within their Cache-Control, not requested at all
+```
+
 The ceiling on what this saves is printed up front. A page the server issued no
 validator for is fetched in full however often you ask.
 
