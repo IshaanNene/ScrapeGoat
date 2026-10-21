@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w -X github.com/IshaanNene/ScrapeGoat/internal/config.Version=${VERSION}" \
     -o /scrapegoat ./cmd/scrapegoat
 
-FROM alpine:3.22
+FROM alpine:3.24
 
 # hadolint ignore=DL3018
 RUN apk add --no-cache ca-certificates tzdata chromium
